@@ -149,10 +149,6 @@ The Dockerfile copies the Prisma CLI into the runner image (standalone tracing s
 
 Private — Phase 1 MVP.
 
-## Branching and pilot freeze
-
-During the pilot-ready substrate period, use feature branches and PR review — do not merge protocol, schema, route, or signing changes without approval. See [docs/branching.md](./docs/branching.md) for workflow, baseline tag `passport-pilot-ready-v1`, and GitHub branch protection steps.
-
 ## First External Agent Kit
 
 Documentation for enrolling any external agent with Passport (enrollment + signed evidence):
