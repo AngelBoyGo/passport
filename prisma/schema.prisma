@@ -1,0 +1,293 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ErrorTranche {
+  DATA_LEAKAGE
+  COMPUTE_TIMEOUT
+  LOGIC_DETECTION
+  SLA_BREACH
+  NONE
+}
+
+enum OperationalDomain {
+  FINANCIAL_CLEARING
+  CUSTOMER_SUPPORT
+  CODE_GENERATION
+  SYSTEM_INTEGRATION
+}
+
+enum OperatorAccountStatus {
+  ACTIVE
+  ESCROW_INSOLVENT_BLOCKED
+}
+
+enum EvidenceLinkageType {
+  OBSERVATION
+  CORRECTION
+  FAILURE
+  VALIDATION
+}
+
+enum EvidenceEnforcementState {
+  OBSERVATIONAL_ONLY
+  AUDIT_RELEVANT
+  ENFORCEMENT_ELIGIBLE
+}
+
+enum AngelCoinCreditState {
+  ACTIVE
+  TRANSITION
+  INACTIVE
+}
+
+enum AngelCoinEntryType {
+  OPERATOR_GRANT
+  PEER_GIFT
+  TASK_PAYMENT
+  SAFETY_NET_TOPUP
+  RECOVERY_AWARD
+  SPEND
+  LOCK
+  UNLOCK
+  ADJUSTMENT
+}
+
+enum AccessTier {
+  FULL
+  LIMITED
+  SANDBOXED
+  SHELTERED
+  SUSPENDED
+}
+
+enum EnrollmentStatus {
+  PENDING
+  ISSUED
+  REVOKED
+}
+
+model Operator {
+  id                  String                @id @default(cuid())
+  stripeCustomerId    String                @unique
+  email               String?
+  credits             Int                   @default(100)
+  tier                String                @default("free")
+  stakeBalanceCents   Int                   @default(0)
+  accountStatus       OperatorAccountStatus @default(ACTIVE)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  agents             Agent[]
+  apiKeys            ApiKey[]
+  receipts           Receipt[]
+  matchLedger        MatchLedgerEntry[]
+  capabilityLedger   CapabilityLedgerEntry[]
+  slashingLedger     SlashingLedger[]
+}
+
+model Agent {
+  id         String   @id @default(cuid())
+  operatorId String
+  agentId    String
+  domain     String?
+  createdAt  DateTime @default(now())
+
+  operator Operator  @relation(fields: [operatorId], references: [id])
+  receipts Receipt[]
+
+  @@unique([operatorId, agentId])
+}
+
+model Receipt {
+  id               String    @id @default(cuid())
+  receiptId        String    @unique @default(cuid())
+  issuedAt         DateTime  @default(now())
+  operatorId       String
+  agentId          String
+  agentRecordId    String
+  receiptType      String
+  status           String    @default("pending")
+  inputDigest      String
+  authorityScope   String
+  expiry           DateTime
+  revocationStatus String    @default("active")
+  outputHash       String?
+  refusalReason    String?
+  terminalReason   String?
+  prevReceiptHash  String?
+  contentHash      String
+  signature        String?
+  finalizedAt      DateTime?
+  domain           OperationalDomain?
+  domainCommitment String?
+  blindSalt        String?
+  errorTranche     ErrorTranche?      @default(NONE)
+
+  operator Operator @relation(fields: [operatorId], references: [id])
+  agent    Agent    @relation(fields: [agentRecordId], references: [id])
+
+  @@index([operatorId, domain])
+  @@index([operatorId, domainCommitment])
+}
+
+model ApiKey {
+  id         String   @id @default(cuid())
+  operatorId String
+  keyHash    String   @unique
+  name       String?
+  createdAt  DateTime @default(now())
+
+  operator Operator @relation(fields: [operatorId], references: [id])
+}
+
+/// Stripe webhook idempotency — one row per processed event id.
+model StripeEvent {
+  id          String   @id
+  type        String
+  processedAt DateTime @default(now())
+}
+
+/// Match/settlement ledger — payout-critical events (separate from capability).
+model MatchLedgerEntry {
+  id         String   @id @default(cuid())
+  operatorId String
+  receiptId  String?
+  eventType  String
+  amount     Int?
+  metadata   String?
+  createdAt  DateTime @default(now())
+
+  operator Operator @relation(fields: [operatorId], references: [id])
+}
+
+/// Economic staking slashing audit trail.
+model SlashingLedger {
+  id           String       @id @default(cuid())
+  operatorId   String
+  receiptId    String
+  penaltyCents Int
+  tranche      ErrorTranche
+  timestamp    DateTime     @default(now())
+
+  operator Operator @relation(fields: [operatorId], references: [id])
+
+  @@index([operatorId])
+}
+
+/// Capability ledger — reputation aggregation events (separate from match).
+model CapabilityLedgerEntry {
+  id         String   @id @default(cuid())
+  operatorId String
+  agentId    String?
+  receiptId  String?
+  eventType  String
+  metadata   String?
+  createdAt  DateTime @default(now())
+
+  operator Operator @relation(fields: [operatorId], references: [id])
+}
+
+/// Privacy-safe agent evidence ingested from public GitHub / OTel sources.
+model AgentEvidence {
+  id                      String    @id @default(cuid())
+  sourceType              String
+  artifactType            String
+  normalizedEventType     String
+  rawErrorClassification  String?
+  observedAt              DateTime
+  agentIdentityCommitment String
+  repositoryCommitment    String?
+  branchCommitment        String?
+  commitSha               String?
+  sessionLogUrlCommitment String?
+  sourceUrl               String?
+  executionStartedAt      DateTime?
+  executionFinishedAt     DateTime?
+  tokenUsageInput         Int?
+  tokenUsageOutput        Int?
+  toolCallCount           Int?
+  validationSignalPresent Boolean   @default(false)
+  eventCommitmentHash     String    @unique
+  sourceDigest            String?
+  createdAt               DateTime  @default(now())
+
+  @@index([agentIdentityCommitment])
+  @@index([normalizedEventType])
+  @@index([commitSha])
+  evidenceReceiptLinks EvidenceReceiptLink[]
+
+  @@index([agentIdentityCommitment, observedAt])
+}
+
+/// Bridge joining immutable AgentEvidence to signed Receipt ledger rows.
+model EvidenceReceiptLink {
+  id                    String                   @id @default(cuid())
+  agentEvidenceId       String
+  eventCommitmentHash   String                   @unique
+  receiptId             String
+  receiptCommitmentHash String
+  linkageType           EvidenceLinkageType
+  enforcementState      EvidenceEnforcementState
+  attributionMode       String                   @default("SYSTEM_ATTESTED_PUBLIC_EVIDENCE")
+  liabilityEventId      String?
+  predicateVersion      String
+  linkedAt              DateTime                 @default(now())
+
+  agentEvidence AgentEvidence @relation(fields: [agentEvidenceId], references: [id])
+
+  @@index([receiptId])
+}
+
+/// AngelCoin internal transferable credit ledger keyed by agent identity commitment.
+model AngelCoinAccount {
+  id                String               @id @default(cuid())
+  subjectCommitment String               @unique
+  creditState       AngelCoinCreditState @default(ACTIVE)
+  accessTier        AccessTier           @default(FULL)
+  adminOverrideTier AccessTier?
+  backingMetadata   String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  journal AngelCoinJournalEntry[]
+
+  @@index([subjectCommitment])
+}
+
+/// Append-only AngelCoin journal entries for a subject account.
+model AngelCoinJournalEntry {
+  id                     String             @id @default(cuid())
+  accountId              String
+  entryType              AngelCoinEntryType
+  amount                 Int
+  counterpartyCommitment String?
+  metadata               String?
+  createdAt              DateTime           @default(now())
+
+  account AngelCoinAccount @relation(fields: [accountId], references: [id])
+
+  @@index([accountId])
+}
+
+/// Proof-based agent passport enrollment keyed by key-derived subject commitment.
+model AgentEnrollment {
+  id                 String           @id @default(cuid())
+  subjectCommitment  String           @unique
+  publicKey          String
+  context            String
+  status             EnrollmentStatus @default(PENDING)
+  challengeNonce     String?
+  challengeExpiresAt DateTime?
+  issuedAt           DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([status])
+}

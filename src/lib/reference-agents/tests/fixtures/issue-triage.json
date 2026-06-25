@@ -1,0 +1,15 @@
+{
+  "agent_identity": "agent.issue-triage.v1",
+  "repository": "acme/agent-repo",
+  "issue": {
+    "id": "issue-42-acme",
+    "number": 42,
+    "url": "https://github.com/acme/agent-repo/issues/42",
+    "title": "Auth bug in login flow"
+  },
+  "labels": ["bug", "triage:needs-review"],
+  "action": "triage_output",
+  "summary": "Classified as authentication regression",
+  "transcript_url": "https://logs.example.com/triage-sess-42",
+  "observed_at": "2026-06-16T14:30:00Z"
+}

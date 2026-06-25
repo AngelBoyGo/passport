@@ -1,0 +1,17 @@
+{
+  "ref": "refs/heads/main",
+  "repository": {
+    "full_name": "acme/agent-repo",
+    "html_url": "https://github.com/acme/agent-repo"
+  },
+  "commits": [
+    {
+      "id": "abc111def222",
+      "sha": "abc111def222",
+      "message": "feat: steward patch\n\nAgent-Logs-Url: https://logs.example.com/steward-sess-1",
+      "url": "https://github.com/acme/agent-repo/commit/abc111def222",
+      "author": { "name": "agent.repo-steward.v1", "email": "steward@bots.local" },
+      "timestamp": "2026-06-15T12:00:00Z"
+    }
+  ]
+}

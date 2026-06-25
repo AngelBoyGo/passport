@@ -1,0 +1,12 @@
+{
+  "agent_identity": "agent.compliance-evidence.v1",
+  "control_domain": "SOC2-CC6.1",
+  "report": {
+    "id": "report-cc61-2026-06",
+    "url": "https://compliance.example.com/reports/cc61-2026-06",
+    "title": "Access control gap analysis Q2"
+  },
+  "action": "report_created",
+  "transcript_url": "https://logs.example.com/compliance-sess-9",
+  "observed_at": "2026-06-17T09:00:00Z"
+}
