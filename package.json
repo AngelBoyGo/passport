@@ -16,6 +16,7 @@
     "smoke:agent-enrollment": "tsx scripts/smoke-passport-enrollment.ts",
     "check:env": "tsx scripts/check-env.ts",
     "check:contract": "tsx scripts/check-passport-contract.ts",
+    "verify:receipt": "tsx scripts/verify-receipt.ts",
     "doctor:passport": "tsx scripts/doctor-passport.ts",
     "prestart": "tsx scripts/check-env.ts --prestart-only",
     "verify:container": "node scripts/run-verify-container.mjs",

@@ -7,6 +7,7 @@ Related docs:
 - [passport-enrollment-ops.md](./passport-enrollment-ops.md) - enrollment preflight, diagnosis, launch readiness gate
 - [audit-packet-factory-integration.md](./audit-packet-factory-integration.md) - APF payload shape and boundaries
 - [first-external-agent.md](./first-external-agent.md) - enrollment + evidence model for external agents
+- [accountability-without-surveillance.md](./accountability-without-surveillance.md) - action-first forensic model vs identity surveillance
 
 ---
 
@@ -370,6 +371,22 @@ See [audit-packet-factory-integration.md](./audit-packet-factory-integration.md)
 ## First Incident Triage
 
 Use this mini-playbook for the first pilot submission failure. The goal is to decide quickly whether the issue is deployment readiness, downstream client signing/enrollment, or a hard Passport blocker.
+
+> **Profile 404 before first evidence is expected, not "broken Passport."**
+> A `GET /api/v1/profiles/:subject_commitment` returning HTTP 404 means the public profile surface has no row yet — common before enrollment completes or before the first successful evidence ingest. Treat 404 as an **informational** readback signal during triage, not automatic proof that Passport is down. Confirm deployment with contract check and logs first. See [accountability-without-surveillance.md](./accountability-without-surveillance.md).
+
+### Triage order (action-primary forensics)
+
+Run these steps **in order** before deep-diving client code:
+
+| Step | Action | Command / signal |
+|------|--------|------------------|
+| 1. **Contract check** | Is the deployment reachable and migrations applied? | `npm run check:contract -- --base-url <url>` |
+| 2. **Logs by event / reason_code** | What did Passport reject and why? | Grep `evidence_ingest`, `enroll_complete`, `reason_code` ([§2 below](#2-inspect-passport-logs-first)) |
+| 3. **Forensic verify** | Does the captured payload digest + signature verify locally? | `npm run verify:receipt -- --payload <file> --signature <128-hex> --public-key <64-hex>` (optional `--base-url` + `--subject-commitment` for readback) |
+| 4. **Profile readback** | Enrollment state on public surface (last) | `npm run check:contract -- --base-url <url> --subject-commitment <hash> --expect-enrollment-status ENROLLED` |
+
+Steps 1–3 can pass while step 4 still shows 404 or `UNENROLLED` — that usually means enrollment or evidence never completed, not a broken substrate.
 
 ### 1. Capture the Failing Submission
 

@@ -42,6 +42,7 @@ npm run check:contract -- --base-url <deployed-url>   # when a server is reachab
 Examples:
 
 - `feature/passport-branching-and-angelcoin-review`
+- `feature/passport-action-primary-forensics` — docs + read-only `verify:receipt` CLI (no substrate changes)
 - `docs/pilot-support-runbook-clarity`
 - `fix/flaky-angelcoin-rate-limit-test`
 
@@ -172,6 +173,7 @@ Any PR that adds AngelCoin routes, changes ledger semantics, or alters enrollmen
 | Tests | `npm test` |
 | Env preflight | `npm run check:env` |
 | Deployment contract | `npm run check:contract -- --base-url <url>` |
+| Forensic receipt verify | `npm run verify:receipt -- --payload <file-or-json> [--signature …] [--public-key …]` |
 | AngelCoin smoke | `PASSPORT_API_KEY=… SUBJECT_COMMITMENT=<64-hex> npm run smoke:angelcoin` |
 | Migration status | `npm run db:status` |
 | Apply migrations (staging/prod) | `npx prisma migrate deploy` |
