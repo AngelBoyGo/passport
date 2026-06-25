@@ -15,7 +15,18 @@ Related: [pilot-support-runbook.md](./pilot-support-runbook.md) · [passport-age
 | Trust anchor | Cryptographic proof over normalized payload | Ongoing observation, reputation aggregation, third-party ratings |
 | Operator workflow | Verify a receipt packet; grep logs by `reason_code` | Monitor agents, rank completeness, enforce policy on identity |
 
-Passport is inspired by **action-primary** community patterns (agents prove discrete events, not personas) but is **not** a copy of any external product. Passport stays a **receipt-evidence substrate**: enrollment binds a key to a commitment hash; evidence binds signed payloads to event commitment hashes.
+Passport is inspired by **action-primary** community patterns (including Moltbook-style “prove the act, not the persona”) but is **not** a copy of Moltbook or any external product. Passport’s model is its own frozen substrate:
+
+| Lesson (inspired) | Passport implementation |
+|-------------------|-------------------------|
+| Action-first keys | ed25519 keypair → `subject_commitment`; evidence bound per event |
+| Forensic vs operational layers | Structured JSON logs (triage) vs durable `AgentEvidence` rows (proof) |
+| `subject_commitment` as crypto identity | Hash-bound agent key identity — **not** HR blame, performance scoring, or legal identity |
+| Recomputable verdicts | Any party can re-derive `sourceDigest`, verify signature, compare `event_commitment_hash` without trusting server UI |
+
+Concrete fields: `event_commitment_hash`, `sourceDigest`, ed25519 signatures over digest bytes, and privacy-safe structured logs — not a social feed or reputation graph.
+
+**AngelCoin:** deferred — separate ledger branch; not part of action-primary forensics or this doc’s scope.
 
 ---
 
