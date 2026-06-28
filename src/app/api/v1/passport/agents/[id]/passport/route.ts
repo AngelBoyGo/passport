@@ -49,5 +49,6 @@ export async function GET(
     issued_at: passport.issuedAt,
     public_key: passport.publicKey,
     context: passport.context,
+    presentation: passport.presentation ?? null,
   });
 }

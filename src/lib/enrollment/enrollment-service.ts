@@ -7,7 +7,9 @@ import {
   generateChallengeNonce,
   isValidPublicKeyHex,
 } from "@/lib/enrollment/identity";
+import { toAgentPresentation } from "@/lib/enrollment/presentation";
 import { verifyChallengeSignature } from "@/lib/enrollment/proof";
+import type { AgentPresentation } from "@/lib/enrollment/presentation";
 import {
   ChallengeExpiredError,
   ChallengeNotFoundError,
@@ -25,6 +27,7 @@ export type EnrollmentPassport = {
   publicKey: string;
   context: string;
   issuedAt: string | null;
+  presentation?: AgentPresentation | null;
   challengeNonce?: string;
   expiresAt?: string;
 };
@@ -52,13 +55,28 @@ function toPassport(row: {
   challengeNonce: string | null;
   challengeExpiresAt: Date | null;
   issuedAt: Date | null;
+  photoUrl?: string | null;
+  photoContentSha256?: string | null;
+  photoMimeType?: string | null;
+  photoUpdatedAt?: Date | null;
 }): EnrollmentPassport {
+  const presentation =
+    row.photoUrl !== undefined
+      ? toAgentPresentation({
+          photoUrl: row.photoUrl ?? null,
+          photoContentSha256: row.photoContentSha256 ?? null,
+          photoMimeType: row.photoMimeType ?? null,
+          photoUpdatedAt: row.photoUpdatedAt ?? null,
+        })
+      : undefined;
+
   return {
     subjectCommitment: row.subjectCommitment,
     status: row.status,
     publicKey: row.publicKey,
     context: row.context,
     issuedAt: row.issuedAt?.toISOString() ?? null,
+    presentation,
     challengeNonce: row.challengeNonce ?? undefined,
     expiresAt: row.challengeExpiresAt?.toISOString() ?? undefined,
   };

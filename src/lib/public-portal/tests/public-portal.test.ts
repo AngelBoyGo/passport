@@ -444,6 +444,31 @@ describe("getAgentProfile", () => {
     const profile = await getAgentProfile(AGENT_A);
     expect(profile).not.toBeNull();
     expect(profile!.enrollment_status).toBe("ENROLLED");
+    expect(profile!.presentation).toBeNull();
+  });
+
+  it("includes presentation when enrolled agent has signed photo", async () => {
+    findManyMock.mockResolvedValue([
+      evidenceRow({
+        normalizedEventType: "AGENT_ARTIFACT_CREATED",
+        observedAt: daysAgo(1),
+      }),
+    ]);
+    findEnrollmentMock.mockResolvedValue({
+      status: "ISSUED",
+      photoUrl: "https://cdn.example.com/agent.png",
+      photoContentSha256: "f".repeat(64),
+      photoMimeType: "image/png",
+      photoUpdatedAt: new Date("2026-06-28T12:00:00.000Z"),
+    });
+
+    const profile = await getAgentProfile(AGENT_A);
+    expect(profile!.presentation).toEqual({
+      url: "https://cdn.example.com/agent.png",
+      content_sha256: "f".repeat(64),
+      mime_type: "image/png",
+      updated_at: "2026-06-28T12:00:00.000Z",
+    });
   });
 
   it("preserves APF profile readback fields without APF-owned packet semantics", async () => {

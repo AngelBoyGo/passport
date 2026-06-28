@@ -286,6 +286,10 @@ model AgentEnrollment {
   challengeNonce     String?
   challengeExpiresAt DateTime?
   issuedAt           DateTime?
+  photoUrl           String?
+  photoContentSha256 String?
+  photoMimeType      String?
+  photoUpdatedAt     DateTime?
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
 

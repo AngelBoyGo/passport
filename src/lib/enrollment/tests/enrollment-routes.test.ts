@@ -214,6 +214,7 @@ describe("GET /api/v1/passport/agents/[id]/passport", () => {
       issuedAt: "2026-06-18T12:00:00.000Z",
       publicKey: VALID_PK,
       context: "passport-v1",
+      presentation: null,
     });
 
     const { GET } = await import(
@@ -230,6 +231,38 @@ describe("GET /api/v1/passport/agents/[id]/passport", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.status).toBe(EnrollmentStatus.ISSUED);
+    expect(body.presentation).toBeNull();
+  });
+
+  it("includes presentation when set", async () => {
+    getPassportMock.mockResolvedValue({
+      subjectCommitment: VALID_COMMITMENT,
+      status: EnrollmentStatus.ISSUED,
+      issuedAt: "2026-06-18T12:00:00.000Z",
+      publicKey: VALID_PK,
+      context: "passport-v1",
+      presentation: {
+        url: "https://cdn.example.com/agent.png",
+        content_sha256: "d".repeat(64),
+        mime_type: "image/png",
+        updated_at: "2026-06-28T12:00:00.000Z",
+      },
+    });
+
+    const { GET } = await import(
+      "@/app/api/v1/passport/agents/[id]/passport/route"
+    );
+    const { resetInMemoryRateLimits } = await import("@/lib/rateLimit");
+    resetInMemoryRateLimits();
+
+    const response = await GET(
+      new Request(`http://localhost/api/v1/passport/agents/${VALID_COMMITMENT}/passport`) as import("next/server").NextRequest,
+      { params: Promise.resolve({ id: VALID_COMMITMENT }) }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.presentation?.url).toBe("https://cdn.example.com/agent.png");
   });
 
   it("returns 404 when unknown", async () => {
