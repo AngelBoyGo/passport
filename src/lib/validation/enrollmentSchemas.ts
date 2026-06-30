@@ -43,7 +43,20 @@ export const ingestEvidenceBodySchema = z.object({
   signature: signatureSchema,
 });
 
+export const updatePresentationBodySchema = z.object({
+  photo_url: z.string(),
+  photo_content_sha256: z
+    .string()
+    .regex(
+      /^$|^[0-9a-f]{64}$/i,
+      "photo_content_sha256 must be empty or a 64-character hex string"
+    ),
+  photo_mime_type: z.string(),
+  signature: signatureSchema,
+});
+
 export type EnrollStartBody = z.infer<typeof enrollStartBodySchema>;
 export type EnrollCompleteBody = z.infer<typeof enrollCompleteBodySchema>;
+export type UpdatePresentationBody = z.infer<typeof updatePresentationBodySchema>;
 
 export { zodValidationErrorResponse } from "@/lib/validation/receiptSchemas";

@@ -1,13 +1,19 @@
 export type PassportLogOutcome = "issued" | "pending" | "rejected" | "error";
 
 export type PassportLogEvent = {
-  event: "enroll_start" | "enroll_complete" | "evidence_ingest";
+  event:
+    | "enroll_start"
+    | "enroll_complete"
+    | "evidence_ingest"
+    | "presentation_update";
   outcome: PassportLogOutcome;
   http_status: number;
   reason_code?: string;
   subject_commitment?: string;
   source_type?: string;
   event_commitment_hash?: string;
+  photo_content_sha256?: string;
+  cleared?: boolean;
   rate_limited?: boolean;
   latency_ms?: number;
 };
@@ -20,6 +26,8 @@ const ALLOWED_LOG_KEYS: (keyof PassportLogEvent)[] = [
   "subject_commitment",
   "source_type",
   "event_commitment_hash",
+  "photo_content_sha256",
+  "cleared",
   "rate_limited",
   "latency_ms",
 ];

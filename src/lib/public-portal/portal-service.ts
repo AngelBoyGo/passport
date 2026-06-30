@@ -6,6 +6,8 @@ import {
 import { verifyReceipt } from "@/lib/receipt/verify";
 import { operatorIdFromStripe } from "@/lib/operator";
 import { resolveEnrollmentStatus } from "@/lib/enrollment/evidence-binding";
+import { getPresentation } from "@/lib/enrollment/presentation-service";
+import type { AgentPresentation } from "@/lib/enrollment/presentation";
 
 /** Evidence row fields used for rate computation. */
 export type EvidenceRateInput = {
@@ -262,6 +264,7 @@ export async function getLeaderboard(opts: {
 export type AgentProfile = {
   agent_commitment_hash: string;
   enrollment_status: "ENROLLED" | "UNENROLLED";
+  presentation: AgentPresentation | null;
   first_observed_at: string;
   last_observed_at: string;
   totals: {
@@ -327,10 +330,12 @@ export async function getAgentProfile(
   );
 
   const enrollment_status = await resolveEnrollmentStatus(agentCommitmentHash);
+  const presentation = await getPresentation(agentCommitmentHash);
 
   return {
     agent_commitment_hash: agentCommitmentHash,
     enrollment_status,
+    presentation,
     first_observed_at: sortedAsc[0].observedAt.toISOString(),
     last_observed_at: sortedAsc[sortedAsc.length - 1].observedAt.toISOString(),
     totals: {

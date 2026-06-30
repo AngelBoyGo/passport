@@ -6,6 +6,24 @@ Related: [daily-maintenance-loop.md](./daily-maintenance-loop.md) · [pilot-supp
 
 ---
 
+## Pilot substrate branches
+
+| Branch | Role |
+|--------|------|
+| **`dev`** | Frozen pilot substrate baseline (enrollment, evidence, receipts, forensics docs). New capability work branches from here. |
+| **`feature/*`** | Additive capabilities (e.g. `feature/passport-agent-photo-v1`) branched from `dev`. Merge to `main` only after review. |
+| **`main`** | Production-aligned; receives reviewed merges from `dev` / feature branches. |
+
+```bash
+git checkout dev
+git pull origin dev   # when remote exists
+git checkout -b feature/<short-description>
+```
+
+The **`dev`** tip includes forensics/read-only tooling (`verify:receipt`) and ops docs; it does not include in-flight feature work until merged.
+
+---
+
 ## Frozen substrate boundary (hard rule)
 
 Do **not** merge changes that touch any of the following without explicit founder/engineering approval:
@@ -42,7 +60,8 @@ npm run check:contract -- --base-url <deployed-url>   # when a server is reachab
 Examples:
 
 - `feature/passport-branching-and-angelcoin-review`
-- `feature/passport-action-primary-forensics` — docs + read-only `verify:receipt` CLI (no substrate changes)
+- `feature/passport-action-primary-forensics` — docs + read-only `verify:receipt` CLI (merged into `dev` baseline)
+- `feature/passport-agent-photo-v1` — signed external photo reference (branched from `dev`)
 - `docs/pilot-support-runbook-clarity`
 - `fix/flaky-angelcoin-rate-limit-test`
 
