@@ -11,7 +11,8 @@ export type SourceType =
   | "github_commit_payload"
   | "github_issue_event"
   | "compliance_report"
-  | "otel_genai_trace";
+  | "otel_genai_trace"
+  | "task_deliverable";
 
 export type NormalizedEventType =
   | "AGENT_RUN_OBSERVED"
@@ -32,7 +33,8 @@ export type ArtifactType =
   | "webhook_event"
   | "issue"
   | "issue_label"
-  | "compliance_report";
+  | "compliance_report"
+  | "task_deliverable";
 
 export interface NormalizedEvidence {
   source_type: SourceType;
@@ -187,6 +189,16 @@ export const ComplianceReportPayloadSchema = z
       .optional(),
     action: z.string().optional(),
     transcript_url: z.string().optional(),
+    observed_at: z.string().optional(),
+  })
+  .passthrough();
+
+export const TaskDeliverablePayloadSchema = z
+  .object({
+    task_id: z.string().min(1),
+    digest: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/i, "digest must be a 64-character hex string"),
     observed_at: z.string().optional(),
   })
   .passthrough();
@@ -707,6 +719,42 @@ function mapComplianceAction(action: string | undefined): {
 }
 
 /**
+ * Normalizes HostHub task deliverable payloads into evidence records.
+ */
+export function normalizeTaskDeliverableEvidence(
+  payload: unknown
+): NormalizedEvidence[] {
+  const parsed = TaskDeliverablePayloadSchema.safeParse(payload);
+  if (!parsed.success) return [];
+
+  const data = parsed.data;
+  const taskId = data.task_id.trim();
+
+  return [
+    {
+      source_type: "task_deliverable",
+      source_url: null,
+      observed_at: parseIsoDate(data.observed_at ?? undefined) ?? new Date(0),
+      agent_identity_raw: null,
+      repository_raw: null,
+      commit_sha: data.digest.toLowerCase(),
+      branch_name: null,
+      session_log_url: null,
+      execution_started_at: null,
+      execution_finished_at: null,
+      token_usage_input: null,
+      token_usage_output: null,
+      tool_call_count: null,
+      validation_signal_present: true,
+      artifact_type: "task_deliverable",
+      raw_error_classification: "UNKNOWN",
+      normalized_event_type: "AGENT_ARTIFACT_CREATED",
+      artifact_identifier: taskId,
+    },
+  ];
+}
+
+/**
  * Normalizes compliance-evidence agent report payloads into evidence records.
  */
 export function normalizeComplianceEvidence(
@@ -765,6 +813,8 @@ export function normalizeEvidence(input: NormalizeEvidenceInput): NormalizedEvid
       return normalizeIssueTriageEvidence(input.payload);
     case "compliance_report":
       return normalizeComplianceEvidence(input.payload);
+    case "task_deliverable":
+      return normalizeTaskDeliverableEvidence(input.payload);
     default:
       return [];
   }

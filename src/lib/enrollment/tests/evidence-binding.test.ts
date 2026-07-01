@@ -229,6 +229,38 @@ describe("ingestEnrolledEvidence", () => {
     ).rejects.toThrow(InvalidEnrollmentProofError);
   });
 
+  it("accepts signed task_deliverable evidence from HostHub task accept", async () => {
+    findUniqueEnrollmentMock.mockResolvedValue({
+      subjectCommitment: SUBJECT_COMMITMENT,
+      publicKey: PUBLIC_KEY_HEX,
+      status: EnrollmentStatus.ISSUED,
+    });
+
+    const payload = {
+      task_id: "task_smoke_001",
+      digest: "d".repeat(64),
+    };
+    const signature = await signDigest(payload);
+
+    const result = await ingestEnrolledEvidence({
+      subjectCommitment: SUBJECT_COMMITMENT,
+      sourceType: "task_deliverable",
+      payload,
+      signature,
+    });
+
+    const persisted = upsertEvidenceMock.mock.calls[0][0].create;
+    expect(result.enrollment_status).toBe("ENROLLED");
+    expect(result.event_commitment_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(persisted.sourceType).toBe("task_deliverable");
+    expect(persisted.artifactType).toBe("task_deliverable");
+    expect(persisted.normalizedEventType).toBe("AGENT_ARTIFACT_CREATED");
+    expect(persisted.commitSha).toBe("d".repeat(64));
+    expect(persisted.agentIdentityCommitment).toBe(SUBJECT_COMMITMENT);
+    expect(persisted.sourceDigest).toBe(computePayloadDigest(payload));
+    expect(upsertEvidenceMock).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects APF evidence when the signature was produced for a different payload digest", async () => {
     findUniqueEnrollmentMock.mockResolvedValue({
       subjectCommitment: SUBJECT_COMMITMENT,

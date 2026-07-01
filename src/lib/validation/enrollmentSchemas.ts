@@ -38,6 +38,7 @@ export const ingestEvidenceBodySchema = z.object({
     "github_issue_event",
     "compliance_report",
     "otel_genai_trace",
+    "task_deliverable",
   ]),
   payload: z.unknown(),
   signature: signatureSchema,
