@@ -18,3 +18,28 @@
 
 ### Blocked
 - Running baseline 3× against verify container (needs docker up — human or later loop)
+
+---
+
+## Loop 2 — Environment manifest
+
+**Agent:** Layer 6 (Cloud/compute) + Layer 5 docs  
+**Status:** Done  
+**Gap:** No environment reproducibility beyond railway.json — need environment-manifest.md
+
+### Files created
+- `docs/environment-manifest.md`
+- `src/lib/release/tests/environment-manifest.test.ts`
+
+### Test evidence
+- Red: `npm test -- environment-manifest` → 6 failed (ENOENT manifest)
+- Green: `npm test -- environment-manifest` → 6 passed
+- Full `npm test`: 487 passed, 19 failed (parallel-worker gaps; manifest 6/6)
+
+### Remaining gaps (next loops)
+- `assertDatabaseUrlMatchesProvider` in env.ts (other agent)
+- ENROLLED_NO_EVIDENCE portal-service + profiles UI (Loop 1 frontend)
+- Route-wrapper / observability logger (other agent)
+- Rate limiter + enrollment route timeouts (other agent)
+- jsdom vitest project worker startup (Loop 1 frontend)
+- `scripts/check-deploy-docs.ts` / deploy-docs-check landed separately — manifest test kept standalone

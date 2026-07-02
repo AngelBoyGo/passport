@@ -17,6 +17,7 @@
     "smoke:presentation": "tsx scripts/smoke-presentation.ts",
     "check:env": "tsx scripts/check-env.ts",
     "check:contract": "tsx scripts/check-passport-contract.ts",
+    "load:baseline": "tsx scripts/load-baseline.ts",
     "backup:db": "tsx scripts/backup-db.ts",
     "restore:verify": "tsx scripts/restore-verify.ts",
     "verify:receipt": "tsx scripts/verify-receipt.ts",
