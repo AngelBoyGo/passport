@@ -8,6 +8,7 @@ Related docs:
 - [audit-packet-factory-integration.md](./audit-packet-factory-integration.md) - APF payload shape and boundaries
 - [first-external-agent.md](./first-external-agent.md) - enrollment + evidence model for external agents
 - [accountability-without-surveillance.md](./accountability-without-surveillance.md) - action-first forensic model vs identity surveillance
+- [disaster-recovery.md](./disaster-recovery.md) - PostgreSQL backup, restore verify, RPO/RTO placeholders
 
 ---
 
