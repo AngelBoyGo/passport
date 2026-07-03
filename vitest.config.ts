@@ -11,7 +11,7 @@ export default defineConfig({
         test: {
           name: "node",
           environment: "node",
-          include: ["src/**/*.test.ts"],
+          include: ["src/**/*.test.ts", "scripts/**/*.test.ts"],
           setupFiles: ["./vitest.setup.ts"],
           testTimeout: 30_000,
         },
@@ -23,7 +23,12 @@ export default defineConfig({
           environment: "jsdom",
           include: ["src/**/*.test.tsx"],
           setupFiles: ["./vitest.setup.dom.ts"],
-          pool: "threads",
+          // forks + single worker avoids vitest-pool worker timeout on jsdom teardown (Windows)
+          pool: "forks",
+          fileParallelism: false,
+          testTimeout: 30_000,
+          hookTimeout: 30_000,
+          teardownTimeout: 30_000,
         },
       },
     ],

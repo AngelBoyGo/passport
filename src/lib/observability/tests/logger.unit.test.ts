@@ -67,4 +67,39 @@ describe("logPassportEvent", () => {
       logPassportEvent(circular as Parameters<typeof logPassportEvent>[0])
     ).not.toThrow();
   });
+
+  it("includes request_id when provided", async () => {
+    const { logPassportEvent } = await import("@/lib/observability/logger");
+    const requestId = "550e8400-e29b-41d4-a716-446655440000";
+
+    logPassportEvent({
+      event: "gate_verify",
+      outcome: "issued",
+      http_status: 200,
+      request_id: requestId,
+      latency_ms: 7,
+    });
+
+    expect(stdoutWrite).toHaveBeenCalledTimes(1);
+    const parsed = JSON.parse(String(stdoutWrite.mock.calls[0][0]).trim());
+    expect(parsed.request_id).toBe(requestId);
+    expect(parsed.event).toBe("gate_verify");
+  });
+
+  it("writes unhandled_error events to stderr", async () => {
+    const { logPassportEvent } = await import("@/lib/observability/logger");
+
+    logPassportEvent({
+      event: "unhandled_error",
+      outcome: "error",
+      http_status: 500,
+      request_id: "660e8400-e29b-41d4-a716-446655440001",
+      latency_ms: 3,
+    });
+
+    expect(stderrWrite).toHaveBeenCalledTimes(1);
+    const parsed = JSON.parse(String(stderrWrite.mock.calls[0][0]).trim());
+    expect(parsed.event).toBe("unhandled_error");
+    expect(parsed.outcome).toBe("error");
+  });
 });

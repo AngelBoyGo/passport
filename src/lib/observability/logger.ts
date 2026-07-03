@@ -5,7 +5,11 @@ export type PassportLogEvent = {
     | "enroll_start"
     | "enroll_complete"
     | "evidence_ingest"
-    | "presentation_update";
+    | "presentation_update"
+    | "gate_verify"
+    | "receipt_issue"
+    | "credits_read"
+    | "unhandled_error";
   outcome: PassportLogOutcome;
   http_status: number;
   reason_code?: string;
@@ -15,6 +19,7 @@ export type PassportLogEvent = {
   photo_content_sha256?: string;
   cleared?: boolean;
   rate_limited?: boolean;
+  request_id?: string;
   latency_ms?: number;
 };
 
@@ -29,6 +34,7 @@ const ALLOWED_LOG_KEYS: (keyof PassportLogEvent)[] = [
   "photo_content_sha256",
   "cleared",
   "rate_limited",
+  "request_id",
   "latency_ms",
 ];
 
@@ -53,7 +59,11 @@ export function logPassportEvent(event: PassportLogEvent): void {
   try {
     const payload = sanitizeLogEvent(event);
     const line = `${JSON.stringify(payload)}\n`;
-    if (event.http_status >= 500 || event.outcome === "error") {
+    if (
+      event.http_status >= 500 ||
+      event.outcome === "error" ||
+      event.event === "unhandled_error"
+    ) {
       process.stderr.write(line);
     } else {
       process.stdout.write(line);
