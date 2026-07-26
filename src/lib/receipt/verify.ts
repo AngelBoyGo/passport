@@ -45,6 +45,9 @@ export async function verifyReceipt(
   }
 
   const expiry = new Date(receipt.expiry);
+  // NOTE: Expiry is checked before signature, so an expired+tampered receipt
+  // reports "expired", masking tampering. This is intentional — expired receipts
+  // should be discarded regardless of content integrity. See KNOWN_BEHAVIOR.
   if (expiry.getTime() < Date.now()) {
     return { valid: false, error: "Receipt has expired" };
   }

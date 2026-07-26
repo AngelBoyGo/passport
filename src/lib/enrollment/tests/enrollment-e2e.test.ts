@@ -167,8 +167,8 @@ describe("enrollment end-to-end flow", () => {
 
     const eligibility = evaluateReceiptEligibility({
       agentIdentityCommitment: started.subjectCommitment,
-      sourceType: String(stored.sourceType),
-      normalizedEventType: String(stored.normalizedEventType),
+      sourceType: stored.sourceType as unknown as import("@/lib/ingestion/github-agent-adapter").SourceType,
+      normalizedEventType: stored.normalizedEventType as unknown as import("@/lib/ingestion/github-agent-adapter").NormalizedEventType,
       observedAt: stored.observedAt as Date,
       eventCommitmentHash: String(stored.eventCommitmentHash),
       commitSha: (stored.commitSha as string | null) ?? null,

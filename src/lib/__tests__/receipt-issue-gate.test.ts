@@ -65,7 +65,7 @@ describe("POST /api/v1/receipts gate enforcement", () => {
       body: JSON.stringify(issueBody),
     });
 
-    const response = await POST(request as import("next/server").NextRequest);
+    const response = await POST(request as import("next/server").NextRequest, {});
     const body = await response.json();
 
     expect(response.status).toBe(403);
@@ -91,7 +91,7 @@ describe("POST /api/v1/receipts gate enforcement", () => {
       body: JSON.stringify(issueBody),
     });
 
-    const response = await POST(request as import("next/server").NextRequest);
+    const response = await POST(request as import("next/server").NextRequest, {});
 
     expect(response.status).toBe(201);
     expect(verifyGatePassMock).toHaveBeenCalledWith(

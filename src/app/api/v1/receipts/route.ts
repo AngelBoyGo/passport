@@ -4,6 +4,7 @@ import {
   operatorIdFromStripe,
 } from "@/lib/operator";
 import { verifyGatePass } from "@/lib/gate/verifyGatePass";
+import { withRouteObservability } from "@/lib/observability/route-wrapper";
 import { issueReceipt } from "@/lib/receipt-service";
 import {
   parseIssueReceiptBody,
@@ -13,7 +14,7 @@ import {
 /**
  * POST /api/v1/receipts — issue a pending signed receipt (verifier write-only).
  */
-export async function POST(request: NextRequest) {
+async function postReceiptIssue(request: NextRequest) {
   const operator = await authenticateApiKey(
     request.headers.get("authorization")
   );
@@ -62,3 +63,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: message }, { status });
   }
 }
+
+export const POST = withRouteObservability(postReceiptIssue, "receipt_issue");

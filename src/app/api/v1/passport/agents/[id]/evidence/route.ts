@@ -3,6 +3,7 @@ import {
   checkEnrollmentRateLimit,
   clientIpFromRequest,
 } from "@/lib/rateLimit";
+import { requireTaskDeliverableServiceAuth } from "@/lib/enrollment/service-auth";
 import { ingestEnrolledEvidence } from "@/lib/enrollment/evidence-binding";
 import { enrollmentErrorResponse } from "@/lib/enrollment/route-errors";
 import {
@@ -93,6 +94,24 @@ export async function POST(
     return NextResponse.json(zodValidationErrorResponse(parsed.error), {
       status: 400,
     });
+  }
+
+  const serviceAuthError = requireTaskDeliverableServiceAuth(
+    request,
+    parsed.data.source_type
+  );
+  if (serviceAuthError) {
+    logPassportEvent({
+      event: "evidence_ingest",
+      outcome: "rejected",
+      http_status: 401,
+      reason_code: "service_auth_failed",
+      subject_commitment: id,
+      source_type: parsed.data.source_type,
+      rate_limited: false,
+      latency_ms: Date.now() - startedAt,
+    });
+    return serviceAuthError;
   }
 
   try {

@@ -12,8 +12,13 @@ const DEMO_WINDOW_MS = 60 * 60 * 1000;
 
 /**
  * POST /api/demo/run — public landing-page demo (issue + finalize server-side).
+ * Returns 404 in production — demo endpoints are dev-only.
  */
 export async function POST(request: NextRequest) {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Not available" }, { status: 404 });
+  }
+
   const ip = clientIpFromRequest(request.headers);
   const rate = checkInMemoryRateLimit(
     `demo-run:${ip}`,

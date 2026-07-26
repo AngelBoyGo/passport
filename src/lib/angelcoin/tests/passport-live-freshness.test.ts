@@ -3,6 +3,8 @@ import {
   AccessTier,
   AngelCoinCreditState,
 } from "@prisma/client";
+import { GET as getLive } from "@/app/api/v1/passport/agents/[id]/passport-live/route";
+import { GET as getTier } from "@/app/api/v1/passport/agents/[id]/access-tier/route";
 
 const VALID_ID = "a".repeat(64);
 
@@ -42,7 +44,6 @@ function makeStaleAccount() {
 }
 
 beforeEach(async () => {
-  vi.resetModules();
   loadAccountWithJournalMock.mockReset();
   prismaUpdateMock.mockReset();
   const { resetInMemoryRateLimits } = await import("@/lib/rateLimit");
@@ -52,11 +53,6 @@ beforeEach(async () => {
 describe("passport-live tier freshness routes", () => {
   it("passport-live accessTier matches access-tier evaluation for same account", async () => {
     loadAccountWithJournalMock.mockResolvedValue(makeStaleAccount());
-
-    const { GET: getLive } =
-      await import("@/app/api/v1/passport/agents/[id]/passport-live/route");
-    const { GET: getTier } =
-      await import("@/app/api/v1/passport/agents/[id]/access-tier/route");
 
     const liveResponse = await getLive(
       new Request(
@@ -85,9 +81,7 @@ describe("passport-live tier freshness routes", () => {
   it("GET passport-live performs no DB write", async () => {
     loadAccountWithJournalMock.mockResolvedValue(makeStaleAccount());
 
-    const { GET } =
-      await import("@/app/api/v1/passport/agents/[id]/passport-live/route");
-    await GET(
+    await getLive(
       new Request(
         `http://localhost/api/v1/passport/agents/${VALID_ID}/passport-live`
       ) as import("next/server").NextRequest,

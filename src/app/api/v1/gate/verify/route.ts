@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyGatePass } from "@/lib/gate/verifyGatePass";
 import { parsePublicOperatorId, resolveOperatorByPublicId } from "@/lib/operator";
+import { withRouteObservability } from "@/lib/observability/route-wrapper";
 import {
   checkInMemoryRateLimit,
   clientIpFromRequest,
@@ -9,7 +10,7 @@ import { OperationalDomain } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(request: NextRequest) {
+async function postGateVerify(request: NextRequest) {
   const ip = clientIpFromRequest(request.headers);
   const rate = checkInMemoryRateLimit(`gate-verify:${ip}`);
   if (!rate.allowed) {
@@ -64,3 +65,5 @@ export async function POST(request: NextRequest) {
   );
   return NextResponse.json(result);
 }
+
+export const POST = withRouteObservability(postGateVerify, "gate_verify");

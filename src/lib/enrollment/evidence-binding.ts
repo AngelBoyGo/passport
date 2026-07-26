@@ -10,6 +10,7 @@ import {
 import { isValidAgentCommitmentHash } from "@/lib/public-portal/portal-service";
 import { verifyPayloadSignature } from "@/lib/enrollment/proof";
 import { requireEnrolled } from "@/lib/enrollment/enrollment-service";
+import { markEngagementDelivered } from "@/lib/engagement/engagement-service";
 import {
   InvalidEnrollmentInputError,
   InvalidEnrollmentProofError,
@@ -100,10 +101,28 @@ export async function ingestEnrolledEvidence(
       ...masked,
       agentIdentityCommitment: input.subjectCommitment,
       sourceDigest: digest,
+      externalTaskId:
+        input.sourceType === "task_deliverable" && record.artifact_identifier
+          ? record.artifact_identifier
+          : null,
     };
   });
 
   await persistEvidence(maskedRecords);
+
+  if (input.sourceType === "task_deliverable") {
+    const parsed = normalized[0];
+    const taskId = parsed?.artifact_identifier;
+    const deliverableDigest = parsed?.commit_sha;
+    if (taskId && deliverableDigest) {
+      await markEngagementDelivered({
+        taskId,
+        workerCommitment: input.subjectCommitment,
+        eventCommitmentHash: maskedRecords[0].eventCommitmentHash,
+        deliverableDigest,
+      });
+    }
+  }
 
   return {
     event_commitment_hash: maskedRecords[0].eventCommitmentHash,

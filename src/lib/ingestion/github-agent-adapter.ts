@@ -78,6 +78,7 @@ export interface MaskedAgentEvidence {
   validationSignalPresent: boolean;
   eventCommitmentHash: string;
   sourceDigest: string | null;
+  externalTaskId?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -854,6 +855,7 @@ export async function persistEvidence(
         validationSignalPresent: record.validationSignalPresent,
         eventCommitmentHash: record.eventCommitmentHash,
         sourceDigest: record.sourceDigest,
+        externalTaskId: record.externalTaskId ?? null,
       },
       update: {},
     });

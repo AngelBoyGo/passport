@@ -92,14 +92,15 @@ describe("checkPassportContract", () => {
   function mockBaseFetchImpl(
     overrides: Partial<Record<string, Response>> = {}
   ) {
-    return vi.fn(async (url: string) => {
-      if (url.endsWith("/api/health")) {
+    return vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.endsWith("/api/health")) {
         return (
           overrides.health ??
           new Response(JSON.stringify({ status: "ok" }), { status: 200 })
         );
       }
-      if (url.endsWith("/api/v1/public-key")) {
+      if (urlStr.endsWith("/api/v1/public-key")) {
         return (
           overrides.publicKey ??
           new Response(
@@ -108,7 +109,7 @@ describe("checkPassportContract", () => {
           )
         );
       }
-      if (url.endsWith(passportProbeUrl)) {
+      if (urlStr.endsWith(passportProbeUrl)) {
         return (
           overrides.enrollmentReadiness ??
           new Response(JSON.stringify({ error: "Passport not found" }), {
@@ -165,22 +166,23 @@ describe("checkPassportContract", () => {
 
   it("fails profile readback when completeness/gaps leak", async () => {
     const commitment = "b".repeat(64);
-    const fetchImpl = vi.fn(async (url: string) => {
-      if (url.endsWith("/api/health")) {
+    const fetchImpl = vi.fn(async (url: string | URL | Request) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.endsWith("/api/health")) {
         return new Response(JSON.stringify({ status: "ok" }), { status: 200 });
       }
-      if (url.endsWith("/api/v1/public-key")) {
+      if (urlStr.endsWith("/api/v1/public-key")) {
         return new Response(
           JSON.stringify({ algorithm: "ed25519", public_key: "a".repeat(64) }),
           { status: 200 }
         );
       }
-      if (url.endsWith(passportProbeUrl)) {
+      if (urlStr.endsWith(passportProbeUrl)) {
         return new Response(JSON.stringify({ error: "Passport not found" }), {
           status: 404,
         });
       }
-      if (url.endsWith(`/api/v1/profiles/${commitment}`)) {
+      if (urlStr.endsWith(`/api/v1/profiles/${commitment}`)) {
         return new Response(
           JSON.stringify({
             agent_commitment_hash: commitment,

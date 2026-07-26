@@ -288,6 +288,92 @@ export async function lockCredits(
 }
 
 /**
+ * Releases locked escrow to a worker in one atomic transaction.
+ * Hard gate: locked balance must cover amount before UNLOCK + SPEND + TASK_PAYMENT.
+ */
+export async function releaseEscrowToWorker(
+  hirerCommitment: string,
+  workerCommitment: string,
+  amount: number,
+  metadata?: string
+) {
+  assertValidSubjectCommitment(hirerCommitment);
+  assertValidSubjectCommitment(workerCommitment);
+  if (amount <= 0) {
+    throw new InvalidAngelCoinAmountError();
+  }
+  if (hirerCommitment === workerCommitment) {
+    throw new InvalidAngelCoinAmountError(
+      "Cannot release escrow to the same account"
+    );
+  }
+
+  await assertEnrollmentIfRequired(hirerCommitment);
+
+  return prisma.$transaction(async (tx) => {
+    const sender = await tx.angelCoinAccount.upsert({
+      where: { subjectCommitment: hirerCommitment },
+      create: { subjectCommitment: hirerCommitment },
+      update: {},
+    });
+    const receiver = await tx.angelCoinAccount.upsert({
+      where: { subjectCommitment: workerCommitment },
+      create: { subjectCommitment: workerCommitment },
+      update: {},
+    });
+
+    await lockAccountForUpdate(tx, sender.id);
+
+    const senderEntries = await loadJournalEntries(sender.id, tx);
+    const senderBalances = computeBalances(senderEntries);
+    if (senderBalances.lockedBalance < amount) {
+      throw new InsufficientAngelCoinFundsError(
+        "Insufficient locked escrow balance"
+      );
+    }
+
+    const unlockEntry = await appendEntry(
+      tx,
+      sender.id,
+      AngelCoinEntryType.UNLOCK,
+      amount,
+      { metadata }
+    );
+
+    const afterUnlockEntries = await loadJournalEntries(sender.id, tx);
+    const afterUnlockBalances = computeBalances(afterUnlockEntries);
+    if (afterUnlockBalances.availableBalance < amount) {
+      throw new InsufficientAngelCoinFundsError();
+    }
+
+    const spendEntry = await appendEntry(
+      tx,
+      sender.id,
+      AngelCoinEntryType.SPEND,
+      amount,
+      { counterpartyCommitment: workerCommitment, metadata }
+    );
+    const paymentEntry = await appendEntry(
+      tx,
+      receiver.id,
+      AngelCoinEntryType.TASK_PAYMENT,
+      amount,
+      { counterpartyCommitment: hirerCommitment, metadata }
+    );
+
+    const finalSenderEntries = await loadJournalEntries(sender.id, tx);
+    return {
+      sender,
+      receiver,
+      unlockEntry,
+      spendEntry,
+      paymentEntry,
+      balances: computeBalances(finalSenderEntries),
+    };
+  });
+}
+
+/**
  * Unlocks previously locked credits.
  */
 export async function unlockCredits(

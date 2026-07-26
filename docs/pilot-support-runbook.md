@@ -9,6 +9,7 @@ Related docs:
 - [first-external-agent.md](./first-external-agent.md) - enrollment + evidence model for external agents
 - [accountability-without-surveillance.md](./accountability-without-surveillance.md) - action-first forensic model vs identity surveillance
 - [disaster-recovery.md](./disaster-recovery.md) - PostgreSQL backup, restore verify, RPO/RTO placeholders
+- [key-management.md](./key-management.md) - signing key escrow, manual rotation, `/api/v1/public-key` verification
 
 ---
 

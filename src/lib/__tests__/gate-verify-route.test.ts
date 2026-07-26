@@ -41,7 +41,7 @@ describe("POST /api/v1/gate/verify operator_id resolution", () => {
       }),
     });
 
-    const response = await POST(request as import("next/server").NextRequest);
+    const response = await POST(request as import("next/server").NextRequest, {});
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -66,7 +66,7 @@ describe("POST /api/v1/gate/verify operator_id resolution", () => {
       }),
     });
 
-    const response = await POST(request as import("next/server").NextRequest);
+    const response = await POST(request as import("next/server").NextRequest, {});
     const body = await response.json();
 
     expect(response.status).toBe(404);
@@ -85,7 +85,7 @@ describe("POST /api/v1/gate/verify operator_id resolution", () => {
       }),
     });
 
-    const response = await POST(request as import("next/server").NextRequest);
+    const response = await POST(request as import("next/server").NextRequest, {});
     const body = await response.json();
 
     expect(response.status).toBe(400);

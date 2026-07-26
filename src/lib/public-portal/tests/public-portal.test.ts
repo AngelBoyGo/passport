@@ -428,6 +428,29 @@ describe("getAgentProfile", () => {
 
   it("returns null for unknown agent", async () => {
     findManyMock.mockResolvedValue([]);
+    findEnrollmentMock.mockResolvedValue(null);
+    const profile = await getAgentProfile(AGENT_A);
+    expect(profile).toBeNull();
+  });
+
+  it("returns ENROLLED_NO_EVIDENCE profile when enrolled but zero evidence rows", async () => {
+    findManyMock.mockResolvedValue([]);
+    findEnrollmentMock.mockResolvedValue({ status: "ISSUED" });
+
+    const profile = await getAgentProfile(AGENT_A);
+    expect(profile).not.toBeNull();
+    expect(profile!.enrollment_status).toBe("ENROLLED_NO_EVIDENCE");
+    expect(profile!.agent_commitment_hash).toBe(AGENT_A);
+    expect(profile!.totals.evidence_count).toBe(0);
+    expect(profile!.timeline).toEqual([]);
+    expect(profile!.distributions.normalized_event_type).toEqual({});
+    assertNoRawLeakage(profile);
+  });
+
+  it("returns null for unenrolled commitment with zero evidence", async () => {
+    findManyMock.mockResolvedValue([]);
+    findEnrollmentMock.mockResolvedValue(null);
+
     const profile = await getAgentProfile(AGENT_A);
     expect(profile).toBeNull();
   });
@@ -857,11 +880,28 @@ describe("GET /api/v1/profiles/[hash]", () => {
     expect(bad.status).toBe(400);
 
     findManyMock.mockResolvedValue([]);
+    findEnrollmentMock.mockResolvedValue(null);
     const missing = await GET(
       new Request(`http://localhost/api/v1/profiles/${AGENT_A}`) as import("next/server").NextRequest,
       { params: Promise.resolve({ hash: AGENT_A }) }
     );
     expect(missing.status).toBe(404);
+  });
+
+  it("returns 200 with ENROLLED_NO_EVIDENCE when enrolled but no evidence", async () => {
+    const { GET } = await import("@/app/api/v1/profiles/[hash]/route");
+
+    findManyMock.mockResolvedValue([]);
+    findEnrollmentMock.mockResolvedValue({ status: "ISSUED" });
+
+    const response = await GET(
+      new Request(`http://localhost/api/v1/profiles/${AGENT_A}`) as import("next/server").NextRequest,
+      { params: Promise.resolve({ hash: AGENT_A }) }
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.enrollment_status).toBe("ENROLLED_NO_EVIDENCE");
+    expect(body.totals.evidence_count).toBe(0);
   });
 });
 

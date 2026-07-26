@@ -28,7 +28,7 @@ describe("withRouteObservability", () => {
     const request = new NextRequest("http://localhost/api/v1/gate/verify", {
       method: "POST",
     });
-    const response = await wrapped(request);
+    const response = await wrapped(request, {});
 
     expect(response.status).toBe(200);
     expect(handler).toHaveBeenCalledTimes(1);
@@ -54,7 +54,8 @@ describe("withRouteObservability", () => {
     const wrapped = withRouteObservability(handler, "receipt_issue");
 
     const response = await wrapped(
-      new NextRequest("http://localhost/api/v1/receipts", { method: "POST" })
+      new NextRequest("http://localhost/api/v1/receipts", { method: "POST" }),
+      {}
     );
 
     expect(response.status).toBe(401);
@@ -78,7 +79,8 @@ describe("withRouteObservability", () => {
     const wrapped = withRouteObservability(handler, "gate_verify");
 
     const response = await wrapped(
-      new NextRequest("http://localhost/api/v1/gate/verify", { method: "POST" })
+      new NextRequest("http://localhost/api/v1/gate/verify", { method: "POST" }),
+      {}
     );
     const body = await response.json();
 
@@ -147,7 +149,8 @@ describe("withRouteObservability", () => {
           agent_id: "agent-1",
           email: "user@stripe.com",
         }),
-      })
+      }),
+      {}
     );
 
     const logged = JSON.stringify(logPassportEventMock.mock.calls[0][0]);

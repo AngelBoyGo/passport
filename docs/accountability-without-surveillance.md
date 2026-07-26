@@ -2,6 +2,8 @@
 
 How Passport maps **action-first accountability** to a forensic record — without building an identity surveillance product. This doc is additive ops guidance only; it does not change protocol, schema, routes, signing, or receipt format.
 
+> **Status (on `dev` today):** This doc and the read-only `npm run verify:receipt` CLI are merged on the `dev` branch — docs and forensic tooling only, no substrate changes. The note at the bottom of this page about `feature/passport-action-primary-forensics` is historical; use `dev` as the current baseline.
+
 Related: [pilot-support-runbook.md](./pilot-support-runbook.md) · [passport-agent-enrollment.md](./passport-agent-enrollment.md) · [audit-packet-factory-integration.md](./audit-packet-factory-integration.md)
 
 ---

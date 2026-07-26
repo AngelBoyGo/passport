@@ -8,6 +8,11 @@ import { signReceipt, getPublicKeyHex } from "@/lib/receipt/signer";
 import { verifyReceipt, verifySignature } from "@/lib/receipt/verify";
 import type { ReceiptPayload } from "@/lib/receipt/types";
 
+/** Returns an ISO expiry string `secondsFromNow` in the future. */
+function futureExpiry(secondsFromNow = 3600): string {
+  return new Date(Date.now() + secondsFromNow * 1000).toISOString();
+}
+
 function baseReceipt(overrides: Partial<ReceiptPayload> = {}): ReceiptPayload {
   const content = {
     receipt_id: "rcpt_test_001",
@@ -18,7 +23,7 @@ function baseReceipt(overrides: Partial<ReceiptPayload> = {}): ReceiptPayload {
     status: "pending" as const,
     input_digest: sha256Hex("task context payload"),
     authority_scope: "fulfillment.example.com",
-    expiry: "2026-07-13T12:00:00.000Z",
+    expiry: futureExpiry(),
     revocation_status: "active" as const,
     prev_receipt_hash: undefined,
     ...overrides,
@@ -169,7 +174,7 @@ describe("verification and tamper detection", () => {
 
   it("rejects expired receipts", async () => {
     const expired = await signReceipt(
-      baseReceipt({ expiry: "2020-01-01T00:00:00.000Z" })
+      baseReceipt({ expiry: new Date(Date.now() - 60_000).toISOString() })
     );
     const result = await verifyReceipt(expired);
     expect(result.valid).toBe(false);

@@ -21,10 +21,12 @@ const SUBJECT_COMMITMENT = deriveAgentCommitment(
   DEFAULT_ENROLLMENT_CONTEXT
 );
 
-const { findUniqueEnrollmentMock, upsertEvidenceMock } = vi.hoisted(() => ({
-  findUniqueEnrollmentMock: vi.fn(),
-  upsertEvidenceMock: vi.fn(),
-}));
+const { findUniqueEnrollmentMock, upsertEvidenceMock, markEngagementDeliveredMock } =
+  vi.hoisted(() => ({
+    findUniqueEnrollmentMock: vi.fn(),
+    upsertEvidenceMock: vi.fn(),
+    markEngagementDeliveredMock: vi.fn(),
+  }));
 
 vi.mock("@/lib/db", () => ({
   prisma: {
@@ -35,6 +37,10 @@ vi.mock("@/lib/db", () => ({
       upsert: upsertEvidenceMock,
     },
   },
+}));
+
+vi.mock("@/lib/engagement/engagement-service", () => ({
+  markEngagementDelivered: markEngagementDeliveredMock,
 }));
 
 import {
@@ -52,6 +58,7 @@ async function signDigest(payload: unknown): Promise<string> {
 beforeEach(() => {
   vi.clearAllMocks();
   upsertEvidenceMock.mockResolvedValue({});
+  markEngagementDeliveredMock.mockResolvedValue(null);
 });
 
 describe("resolveEnrollmentStatus", () => {
@@ -259,6 +266,13 @@ describe("ingestEnrolledEvidence", () => {
     expect(persisted.agentIdentityCommitment).toBe(SUBJECT_COMMITMENT);
     expect(persisted.sourceDigest).toBe(computePayloadDigest(payload));
     expect(upsertEvidenceMock).toHaveBeenCalledTimes(1);
+    expect(markEngagementDeliveredMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        taskId: "task_smoke_001",
+        workerCommitment: SUBJECT_COMMITMENT,
+        deliverableDigest: "d".repeat(64),
+      })
+    );
   });
 
   it("rejects APF evidence when the signature was produced for a different payload digest", async () => {

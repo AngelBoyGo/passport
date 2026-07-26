@@ -40,6 +40,53 @@ export type ValidateEnvOptions = {
   mode?: string;
 };
 
+export type DatabaseProvider = "postgresql";
+
+/**
+ * Throws when DATABASE_URL scheme does not match the Prisma datasource provider.
+ * When called without arguments, reads DATABASE_URL from process.env and applies mode rules.
+ */
+export function assertDatabaseUrlMatchesProvider(
+  databaseUrl?: string,
+  provider: DatabaseProvider = "postgresql"
+): void {
+  if (databaseUrl === undefined) {
+    if (isTestMode()) {
+      return;
+    }
+    const mode = process.env.NODE_ENV ?? "development";
+    const url = process.env.DATABASE_URL ?? "";
+    if (
+      mode === "development" &&
+      (url.trim().startsWith("file:") || url.trim().startsWith("sqlite:"))
+    ) {
+      return;
+    }
+    if (!url.trim()) {
+      return;
+    }
+    assertDatabaseUrlMatchesProvider(url, provider);
+    return;
+  }
+
+  const trimmed = databaseUrl.trim();
+  if (provider === "postgresql") {
+    if (trimmed.startsWith("file:") || trimmed.startsWith("sqlite:")) {
+      throw new Error(
+        "DATABASE_URL uses SQLite/file scheme but Prisma schema requires PostgreSQL"
+      );
+    }
+    if (
+      !trimmed.startsWith("postgresql://") &&
+      !trimmed.startsWith("postgres://")
+    ) {
+      throw new Error(
+        "DATABASE_URL must use postgresql:// or postgres:// for postgresql provider"
+      );
+    }
+  }
+}
+
 /**
  * Returns true when running under Vitest or NODE_ENV=test (matches ingestion adapter ergonomics).
  */

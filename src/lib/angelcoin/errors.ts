@@ -16,8 +16,8 @@ export class InvalidAngelCoinAmountError extends Error {
 
 /** Thrown when a transfer or spend exceeds available AngelCoin balance. */
 export class InsufficientAngelCoinFundsError extends Error {
-  constructor() {
-    super("Insufficient AngelCoin credits");
+  constructor(message = "Insufficient AngelCoin credits") {
+    super(message);
     this.name = "InsufficientAngelCoinFundsError";
   }
 }

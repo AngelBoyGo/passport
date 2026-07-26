@@ -92,8 +92,8 @@ describe("evaluateReceiptEligibility", () => {
   it("rejects insufficiently formed evidence missing required fields", () => {
     const result = evaluateReceiptEligibility(
       wellFormedEvidence({
-        sourceType: "",
-        normalizedEventType: "",
+        sourceType: "" as unknown as import("@/lib/ingestion/github-agent-adapter").SourceType,
+        normalizedEventType: "" as unknown as import("@/lib/ingestion/github-agent-adapter").NormalizedEventType,
         observedAt: new Date("invalid"),
       })
     );

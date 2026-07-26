@@ -41,7 +41,7 @@ function baseReceipt(overrides: Partial<ReceiptPayload> = {}): ReceiptPayload {
     status: "pending" as const,
     input_digest: sha256Hex("blind task context"),
     authority_scope: "blind.example.com",
-    expiry: "2026-07-16T12:00:00.000Z",
+    expiry: new Date(Date.now() + 3600_000).toISOString(),
     revocation_status: "active" as const,
     ...overrides,
   };
@@ -115,7 +115,7 @@ describe("blinded canonical signing", () => {
       status: "pending" as const,
       input_digest: sha256Hex("legacy"),
       authority_scope: "legacy.example.com",
-      expiry: "2026-07-16T12:00:00.000Z",
+      expiry: new Date(Date.now() + 3600_000).toISOString(),
       revocation_status: "active" as const,
       domain: PLAIN_DOMAIN,
     };
@@ -172,7 +172,7 @@ describe("dbReceiptToPayload blinded mapping", () => {
       status: "success",
       inputDigest: sha256Hex("db blind input"),
       authorityScope: "blind.example.com",
-      expiry: new Date("2026-07-16T12:00:00.000Z"),
+      expiry: new Date(Date.now() + 3600_000),
       revocationStatus: "active",
       outputHash: sha256Hex("output"),
       refusalReason: null,

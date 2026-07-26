@@ -1,8 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { readFileSync } from "fs";
+import { resolve } from "path";
 import {
   validateEnv,
   getEnvReport,
   REQUIRED_PROD_ENV,
+  assertDatabaseUrlMatchesProvider,
 } from "@/lib/config/env";
 
 const SECRET_VALUES = {
@@ -15,25 +18,28 @@ const SECRET_VALUES = {
   NEXT_PUBLIC_APP_URL: "https://passport.example.com",
 };
 
-describe("validateEnv", () => {
-  const originalEnv = { ...process.env };
+/** Mutable reference for test env manipulation. */
+function env(): Record<string, string | undefined> {
+  return process.env as Record<string, string | undefined>;
+}
 
+describe("validateEnv", () => {
   beforeEach(() => {
-    process.env = { ...originalEnv };
-    delete process.env.NODE_ENV;
-    delete process.env.VITEST;
+    delete env().NODE_ENV;
+    delete env().VITEST;
   });
 
   afterEach(() => {
-    process.env = { ...originalEnv };
+    delete env().NODE_ENV;
+    delete env().VITEST;
   });
 
   it("throws in production when required vars are missing and names all missing vars without secret values", () => {
-    process.env.NODE_ENV = "production";
+    env().NODE_ENV = "production";
     for (const name of REQUIRED_PROD_ENV) {
-      delete process.env[name];
+      delete env()[name];
     }
-    process.env.SIGNING_PRIVATE_KEY = SECRET_VALUES.SIGNING_PRIVATE_KEY;
+    env().SIGNING_PRIVATE_KEY = SECRET_VALUES.SIGNING_PRIVATE_KEY;
 
     let thrown: Error | undefined;
     try {
@@ -51,10 +57,10 @@ describe("validateEnv", () => {
   });
 
   it("returns ok when all required vars are present in production", () => {
-    process.env.NODE_ENV = "production";
-    process.env.DATABASE_URL = SECRET_VALUES.DATABASE_URL;
-    process.env.SIGNING_PRIVATE_KEY = SECRET_VALUES.SIGNING_PRIVATE_KEY;
-    process.env.INGESTION_COMMITMENT_SALT =
+    env().NODE_ENV = "production";
+    env().DATABASE_URL = SECRET_VALUES.DATABASE_URL;
+    env().SIGNING_PRIVATE_KEY = SECRET_VALUES.SIGNING_PRIVATE_KEY;
+    env().INGESTION_COMMITMENT_SALT =
       SECRET_VALUES.INGESTION_COMMITMENT_SALT;
 
     const result = validateEnv({ mode: "production" });
@@ -63,14 +69,14 @@ describe("validateEnv", () => {
   });
 
   it("allows missing optional vars with warnings in development", () => {
-    process.env.NODE_ENV = "development";
-    process.env.DATABASE_URL = SECRET_VALUES.DATABASE_URL;
-    process.env.SIGNING_PRIVATE_KEY = SECRET_VALUES.SIGNING_PRIVATE_KEY;
-    process.env.INGESTION_COMMITMENT_SALT =
+    env().NODE_ENV = "development";
+    env().DATABASE_URL = SECRET_VALUES.DATABASE_URL;
+    env().SIGNING_PRIVATE_KEY = SECRET_VALUES.SIGNING_PRIVATE_KEY;
+    env().INGESTION_COMMITMENT_SALT =
       SECRET_VALUES.INGESTION_COMMITMENT_SALT;
-    delete process.env.EVIDENCE_BRIDGE_OPERATOR_ID;
-    delete process.env.EVIDENCE_ENFORCEMENT_ENABLED;
-    delete process.env.NEXT_PUBLIC_APP_URL;
+    delete env().EVIDENCE_BRIDGE_OPERATOR_ID;
+    delete env().EVIDENCE_ENFORCEMENT_ENABLED;
+    delete env().NEXT_PUBLIC_APP_URL;
 
     const result = validateEnv({ mode: "development" });
     expect(result.ok).toBe(true);
@@ -80,10 +86,10 @@ describe("validateEnv", () => {
   });
 
   it("skips enforcement in test mode", () => {
-    process.env.NODE_ENV = "test";
-    delete process.env.DATABASE_URL;
-    delete process.env.SIGNING_PRIVATE_KEY;
-    delete process.env.INGESTION_COMMITMENT_SALT;
+    env().NODE_ENV = "test";
+    delete env().DATABASE_URL;
+    delete env().SIGNING_PRIVATE_KEY;
+    delete env().INGESTION_COMMITMENT_SALT;
 
     const result = validateEnv({ mode: "test" });
     expect(result.ok).toBe(true);
@@ -91,23 +97,23 @@ describe("validateEnv", () => {
   });
 
   it("skips enforcement when VITEST=true", () => {
-    process.env.VITEST = "true";
-    delete process.env.DATABASE_URL;
+    env().VITEST = "true";
+    delete env().DATABASE_URL;
 
     const result = validateEnv({ mode: "production" });
     expect(result.ok).toBe(true);
   });
 
   it("requires Stripe conditional group when STRIPE_SECRET_KEY is set", () => {
-    process.env.NODE_ENV = "production";
-    process.env.DATABASE_URL = SECRET_VALUES.DATABASE_URL;
-    process.env.SIGNING_PRIVATE_KEY = SECRET_VALUES.SIGNING_PRIVATE_KEY;
-    process.env.INGESTION_COMMITMENT_SALT =
+    env().NODE_ENV = "production";
+    env().DATABASE_URL = SECRET_VALUES.DATABASE_URL;
+    env().SIGNING_PRIVATE_KEY = SECRET_VALUES.SIGNING_PRIVATE_KEY;
+    env().INGESTION_COMMITMENT_SALT =
       SECRET_VALUES.INGESTION_COMMITMENT_SALT;
-    process.env.STRIPE_SECRET_KEY = SECRET_VALUES.STRIPE_SECRET_KEY;
-    delete process.env.STRIPE_WEBHOOK_SECRET;
-    delete process.env.STRIPE_PRICE_PRO;
-    delete process.env.NEXT_PUBLIC_APP_URL;
+    env().STRIPE_SECRET_KEY = SECRET_VALUES.STRIPE_SECRET_KEY;
+    delete env().STRIPE_WEBHOOK_SECRET;
+    delete env().STRIPE_PRICE_PRO;
+    delete env().NEXT_PUBLIC_APP_URL;
 
     let thrown: Error | undefined;
     try {
@@ -124,15 +130,15 @@ describe("validateEnv", () => {
   });
 
   it("passes Stripe conditional group when all Stripe vars are set", () => {
-    process.env.NODE_ENV = "production";
-    process.env.DATABASE_URL = SECRET_VALUES.DATABASE_URL;
-    process.env.SIGNING_PRIVATE_KEY = SECRET_VALUES.SIGNING_PRIVATE_KEY;
-    process.env.INGESTION_COMMITMENT_SALT =
+    env().NODE_ENV = "production";
+    env().DATABASE_URL = SECRET_VALUES.DATABASE_URL;
+    env().SIGNING_PRIVATE_KEY = SECRET_VALUES.SIGNING_PRIVATE_KEY;
+    env().INGESTION_COMMITMENT_SALT =
       SECRET_VALUES.INGESTION_COMMITMENT_SALT;
-    process.env.STRIPE_SECRET_KEY = SECRET_VALUES.STRIPE_SECRET_KEY;
-    process.env.STRIPE_WEBHOOK_SECRET = SECRET_VALUES.STRIPE_WEBHOOK_SECRET;
-    process.env.STRIPE_PRICE_PRO = SECRET_VALUES.STRIPE_PRICE_PRO;
-    process.env.NEXT_PUBLIC_APP_URL = SECRET_VALUES.NEXT_PUBLIC_APP_URL;
+    env().STRIPE_SECRET_KEY = SECRET_VALUES.STRIPE_SECRET_KEY;
+    env().STRIPE_WEBHOOK_SECRET = SECRET_VALUES.STRIPE_WEBHOOK_SECRET;
+    env().STRIPE_PRICE_PRO = SECRET_VALUES.STRIPE_PRICE_PRO;
+    env().NEXT_PUBLIC_APP_URL = SECRET_VALUES.NEXT_PUBLIC_APP_URL;
 
     const result = validateEnv({ mode: "production" });
     expect(result.ok).toBe(true);
@@ -140,16 +146,80 @@ describe("validateEnv", () => {
   });
 });
 
-describe("getEnvReport", () => {
-  const originalEnv = { ...process.env };
-
-  afterEach(() => {
-    process.env = { ...originalEnv };
+describe("assertDatabaseUrlMatchesProvider", () => {
+  beforeEach(() => {
+    delete env().VITEST;
   });
 
+  afterEach(() => {
+    delete env().VITEST;
+  });
+
+  it("rejects file: URLs when provider is postgresql", () => {
+    expect(() =>
+      assertDatabaseUrlMatchesProvider("file:./dev.db", "postgresql")
+    ).toThrow(/file:|sqlite|postgresql/i);
+  });
+
+  it("accepts postgresql:// URLs when provider is postgresql", () => {
+    expect(() =>
+      assertDatabaseUrlMatchesProvider(
+        "postgresql://passport:passport@localhost:5433/passport?schema=public",
+        "postgresql"
+      )
+    ).not.toThrow();
+  });
+
+  it(".env.example DATABASE_URL matches postgresql provider", () => {
+    const examplePath = resolve(process.cwd(), ".env.example");
+    const content = readFileSync(examplePath, "utf8");
+    const match = content.match(/^DATABASE_URL=(.+)$/m);
+    expect(match).toBeTruthy();
+    let value = match![1].trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    expect(() =>
+      assertDatabaseUrlMatchesProvider(value, "postgresql")
+    ).not.toThrow();
+    expect(content).not.toMatch(/SQLite|file:\/\//i);
+  });
+
+  it("allows sqlite file URLs in development", () => {
+    env().NODE_ENV = "development";
+    env().DATABASE_URL = "file:./dev.db";
+    expect(() => assertDatabaseUrlMatchesProvider()).not.toThrow();
+  });
+
+  it("throws in production when DATABASE_URL is sqlite", () => {
+    env().NODE_ENV = "production";
+    env().DATABASE_URL = "file:./dev.db";
+
+    expect(() => assertDatabaseUrlMatchesProvider()).toThrow(
+      /PostgreSQL/i
+    );
+  });
+
+  it("passes in production when DATABASE_URL is postgresql", () => {
+    env().NODE_ENV = "production";
+    env().DATABASE_URL = SECRET_VALUES.DATABASE_URL;
+    expect(() => assertDatabaseUrlMatchesProvider()).not.toThrow();
+  });
+
+  it("skips enforcement in test mode", () => {
+    env().NODE_ENV = "test";
+    env().DATABASE_URL = "file:./dev.db";
+    expect(() => assertDatabaseUrlMatchesProvider()).not.toThrow();
+  });
+});
+
+describe("getEnvReport", () => {
   it("returns presence booleans without secret values", () => {
-    process.env.DATABASE_URL = SECRET_VALUES.DATABASE_URL;
-    process.env.EVIDENCE_ENFORCEMENT_ENABLED = "true";
+    env().DATABASE_URL = SECRET_VALUES.DATABASE_URL;
+    env().EVIDENCE_ENFORCEMENT_ENABLED = "true";
 
     const report = getEnvReport();
     expect(report.presence.DATABASE_URL).toBe(true);

@@ -52,13 +52,15 @@ describe("POST /api/v1/gate/verify rate limiting", () => {
 
     for (let i = 0; i < 30; i++) {
       const response = await POST(
-        gateVerifyRequest() as import("next/server").NextRequest
+        gateVerifyRequest() as import("next/server").NextRequest,
+        {}
       );
       expect(response.status).toBe(200);
     }
 
     const blocked = await POST(
-      gateVerifyRequest() as import("next/server").NextRequest
+      gateVerifyRequest() as import("next/server").NextRequest,
+      {}
     );
     const body = await blocked.json();
 
@@ -72,12 +74,14 @@ describe("POST /api/v1/gate/verify rate limiting", () => {
 
     for (let i = 0; i < 30; i++) {
       await POST(
-        gateVerifyRequest("198.51.100.1") as import("next/server").NextRequest
+        gateVerifyRequest("198.51.100.1") as import("next/server").NextRequest,
+        {}
       );
     }
 
     const otherIp = await POST(
-      gateVerifyRequest("198.51.100.2") as import("next/server").NextRequest
+      gateVerifyRequest("198.51.100.2") as import("next/server").NextRequest,
+      {}
     );
     expect(otherIp.status).toBe(200);
   });

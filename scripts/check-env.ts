@@ -9,6 +9,7 @@ import {
   getEnvReport,
   REQUIRED_PROD_ENV,
   OPTIONAL_ENV,
+  assertDatabaseUrlMatchesProvider,
 } from "../src/lib/config/env";
 
 /**
@@ -83,6 +84,7 @@ function main(): void {
   }
 
   try {
+    assertDatabaseUrlMatchesProvider();
     const result = validateEnv({ mode });
     printReport();
 

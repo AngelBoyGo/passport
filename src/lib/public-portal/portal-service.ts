@@ -263,10 +263,10 @@ export async function getLeaderboard(opts: {
 
 export type AgentProfile = {
   agent_commitment_hash: string;
-  enrollment_status: "ENROLLED" | "UNENROLLED";
+  enrollment_status: "ENROLLED" | "UNENROLLED" | "ENROLLED_NO_EVIDENCE";
   presentation: AgentPresentation | null;
-  first_observed_at: string;
-  last_observed_at: string;
+  first_observed_at: string | null;
+  last_observed_at: string | null;
   totals: {
     evidence_count: number;
     artifact_count: number;
@@ -297,6 +297,12 @@ export type AgentProfile = {
 export async function getAgentProfile(
   agentCommitmentHash: string
 ): Promise<AgentProfile | null> {
+  const enrollment_status = await resolveEnrollmentStatus(agentCommitmentHash);
+  const presentation =
+    enrollment_status === "ENROLLED"
+      ? await getPresentation(agentCommitmentHash)
+      : null;
+
   const events = await prisma.agentEvidence.findMany({
     where: { agentIdentityCommitment: agentCommitmentHash },
     select: EVIDENCE_SELECT,
@@ -304,7 +310,32 @@ export async function getAgentProfile(
   });
 
   if (events.length === 0) {
-    return null;
+    if (enrollment_status !== "ENROLLED") {
+      return null;
+    }
+
+    return {
+      agent_commitment_hash: agentCommitmentHash,
+      enrollment_status: "ENROLLED_NO_EVIDENCE",
+      presentation,
+      first_observed_at: null,
+      last_observed_at: null,
+      totals: {
+        evidence_count: 0,
+        artifact_count: 0,
+        correction_count: 0,
+        failure_count: 0,
+      },
+      distributions: {
+        normalized_event_type: {},
+        error_tranche: {},
+      },
+      timeline: [],
+      trend_windows: {
+        "7d": computeRates([]),
+        "30d": computeRates([]),
+      },
+    };
   }
 
   const since30d = windowStart(30);
@@ -328,9 +359,6 @@ export async function getAgentProfile(
   const sortedAsc = [...events].sort(
     (a, b) => a.observedAt.getTime() - b.observedAt.getTime()
   );
-
-  const enrollment_status = await resolveEnrollmentStatus(agentCommitmentHash);
-  const presentation = await getPresentation(agentCommitmentHash);
 
   return {
     agent_commitment_hash: agentCommitmentHash,

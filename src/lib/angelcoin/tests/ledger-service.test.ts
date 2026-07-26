@@ -233,7 +233,7 @@ describe("transferCredits", () => {
         },
         angelCoinJournalEntry: {
           create: vi.fn(async (args: { data: typeof journalStore[0] }) => {
-            const entry = { id: `tx_${txJournal.length}`, ...args.data, createdAt: new Date() };
+            const entry = { ...args.data, createdAt: new Date() };
             txJournal.push(entry);
             return entry;
           }),
@@ -328,7 +328,7 @@ describe("lockCredits and unlockCredits", () => {
   it("lock reduces available balance via LOCK entry", async () => {
     const account = makeAccount(VALID_COMMITMENT, "acct_lock");
     upsertMock.mockResolvedValue(account);
-    const entries = [
+    const entries: Array<{ id: string; accountId: string; entryType: AngelCoinEntryType; amount: number; createdAt: Date }> = [
       {
         id: "e1",
         accountId: "acct_lock",

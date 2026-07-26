@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getAccessTierEvaluation } from "@/lib/angelcoin/access-tiers";
+import { angelcoinErrorResponse } from "@/lib/angelcoin/route-errors";
 import {
   checkInMemoryRateLimit,
   clientIpFromRequest,
 } from "@/lib/rateLimit";
 import { isValidAgentCommitmentHash } from "@/lib/public-portal/portal-service";
-import { getAccessTierEvaluation } from "@/lib/angelcoin/access-tiers";
-import { angelcoinErrorResponse } from "@/lib/angelcoin/route-errors";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +39,8 @@ export async function GET(
   }
 
   try {
-    const { evaluation, balances, account } = await getAccessTierEvaluation(id);
+    const { account, balances, evaluation } = await getAccessTierEvaluation(id);
+
     return NextResponse.json({
       subject_commitment: account.subjectCommitment,
       tier: evaluation.tier,
