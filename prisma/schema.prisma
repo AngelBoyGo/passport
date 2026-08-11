@@ -84,6 +84,7 @@ model Operator {
   id                  String                @id @default(cuid())
   stripeCustomerId    String                @unique
   email               String?
+  passwordHash        String?
   credits             Int                   @default(100)
   tier                String                @default("free")
   stakeBalanceCents   Int                   @default(0)
@@ -97,6 +98,8 @@ model Operator {
   matchLedger        MatchLedgerEntry[]
   capabilityLedger   CapabilityLedgerEntry[]
   slashingLedger     SlashingLedger[]
+  sessions           Session[]
+  webhookSubscriptions WebhookSubscription[]
 }
 
 model Agent {
@@ -325,4 +328,32 @@ model Engagement {
   @@index([hirerCommitment])
   @@index([workerCommitment])
   @@index([status])
+}
+
+model Session {
+  id         String   @id @default(cuid())
+  operatorId String
+  token      String   @unique
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  operator Operator @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+
+  @@index([operatorId])
+  @@index([expiresAt])
+}
+
+model WebhookSubscription {
+  id         String   @id @default(cuid())
+  operatorId String
+  url        String
+  secret     String
+  events     String[]
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  operator Operator @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+
+  @@index([operatorId])
 }

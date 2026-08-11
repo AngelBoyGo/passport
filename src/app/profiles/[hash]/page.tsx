@@ -1,11 +1,43 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { ProfileCard } from "@/app/profiles/ProfileCard";
 import {
   getAgentProfile,
   isValidAgentCommitmentHash,
 } from "@/lib/public-portal/portal-service";
 import { mapAgentProfileToViewModel } from "@/lib/public-portal/profile-view-model";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ hash: string }>;
+}): Promise<Metadata> {
+  const { hash } = await params;
+  const profile = isValidAgentCommitmentHash(hash)
+    ? await getAgentProfile(hash)
+    : null;
+  const evidenceCount = profile?.totals.evidence_count ?? 0;
+  const title = profile
+    ? `Agent ${hash.slice(0, 8)}… — ${evidenceCount} evidence receipts`
+    : "Agent profile — Passport";
+
+  return {
+    title,
+    description:
+      profile && evidenceCount > 0
+        ? `${evidenceCount} evidence records, ${profile.totals.artifact_count} artifacts. Verified via Passport.`
+        : "Public agent profile on Passport.",
+    openGraph: {
+      title,
+      description:
+        profile && evidenceCount > 0
+          ? `${evidenceCount} evidence records on Passport`
+          : "Agent profile on Passport",
+      type: "profile",
+    },
+  };
+}
 
 export default async function ProfilePage({
   params,

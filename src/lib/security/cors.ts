@@ -21,6 +21,7 @@ export const PUBLIC_API_PATTERNS = [
 
 export const ADMIN_API_PATTERNS = [
   /^\/api\/v1\/receipts(\/.*)?$/,
+  /^\/api\/v1\/operator(\/.*)?$/,
   /^\/api\/stripe\/checkout$/,
   /^\/api\/dev\/provision$/,
   /^\/api\/demo\/run$/,

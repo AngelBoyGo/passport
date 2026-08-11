@@ -15,8 +15,48 @@ import {
   ingestEvidenceBodySchema,
   zodValidationErrorResponse,
 } from "@/lib/validation/enrollmentSchemas";
+import { authenticateApiKey } from "@/lib/operator";
+import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * GET /api/v1/passport/agents/:id/evidence — query evidence entries for a commitment hash.
+ */
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const operator = await authenticateApiKey(
+    request.headers.get("authorization")
+  );
+  if (!operator) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id } = await params;
+  if (!isValidAgentCommitmentHash(id)) {
+    return NextResponse.json(
+      { error: "agent_commitment_hash must be a full 64-character hex string" },
+      { status: 400 }
+    );
+  }
+
+  const { searchParams } = new URL(request.url);
+  const sourceType = searchParams.get("source_type");
+  const limit = Math.min(Number(searchParams.get("limit")) || 50, 100);
+
+  const entries = await prisma.agentEvidence.findMany({
+    where: {
+      agentIdentityCommitment: id,
+      ...(sourceType ? { sourceType } : {}),
+    },
+    orderBy: { observedAt: "desc" },
+    take: limit,
+  });
+
+  return NextResponse.json(entries);
+}
 
 /**
  * POST /api/v1/passport/agents/:id/evidence — authenticated enrolled evidence ingestion.

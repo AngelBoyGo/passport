@@ -10,6 +10,47 @@ import {
   parseIssueReceiptBody,
   zodValidationErrorResponse,
 } from "@/lib/validation/receiptSchemas";
+import type { Prisma } from "@prisma/client";
+import { OperationalDomain } from "@prisma/client";
+import { prisma } from "@/lib/db";
+
+/**
+ * GET /api/v1/receipts — search receipts with filters.
+ */
+export async function GET(request: NextRequest) {
+  const operator = await authenticateApiKey(
+    request.headers.get("authorization")
+  );
+  if (!operator) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const domain = searchParams.get("domain");
+  const status = searchParams.get("status");
+  const from = searchParams.get("from");
+  const to = searchParams.get("to");
+  const limit = Math.min(Number(searchParams.get("limit")) || 50, 100);
+
+  const where: Prisma.ReceiptWhereInput = { operatorId: operator.id };
+  if (domain && Object.values(OperationalDomain).includes(domain as OperationalDomain)) {
+    where.domain = domain as OperationalDomain;
+  }
+  if (status) where.status = status;
+  if (from || to) {
+    where.issuedAt = {};
+    if (from) where.issuedAt.gte = new Date(from);
+    if (to) where.issuedAt.lte = new Date(to);
+  }
+
+  const receipts = await prisma.receipt.findMany({
+    where,
+    orderBy: { issuedAt: "desc" },
+    take: limit,
+  });
+
+  return NextResponse.json(receipts);
+}
 
 /**
  * POST /api/v1/receipts — issue a pending signed receipt (verifier write-only).

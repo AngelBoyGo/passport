@@ -7,8 +7,44 @@ import { validateChain } from "@/lib/receipt/chain";
 import { operatorIdFromStripe } from "@/lib/operator";
 import { TERMINAL_STATUSES } from "@/lib/receipt/types";
 import { receiptVerifyDisplayFields, confirmBlindedDomainMatch } from "@/lib/receipt/verifyDisplay";
+import { isValidAgentCommitmentHash } from "@/lib/public-portal/portal-service";
+import { prisma } from "@/lib/db";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const isReceiptId = id.startsWith("rcpt_");
+  const isCommitment = /^[0-9a-f]{64}$/i.test(id);
+
+  let status = "unknown";
+  if (isReceiptId) {
+    const data = await getReceiptWithHistory(id);
+    if (data) status = data.receipt.status;
+  } else if (isCommitment) {
+    const enrollment = await prisma.agentEnrollment.findUnique({
+      where: { subjectCommitment: id },
+      select: { status: true },
+    });
+    if (enrollment) status = enrollment.status;
+  }
+
+  const title = `Verification — ${id.slice(0, 12)}… (${status})`;
+  return {
+    title,
+    description: `Receipt verification via Passport. Status: ${status}. Tamper-evident ed25519 signature verification.`,
+    openGraph: {
+      title,
+      description: `Verify receipt ${id.slice(0, 16)}… on Passport — signed behavioral receipt verification.`,
+      type: "website",
+    },
+  };
+}
 
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
@@ -38,8 +74,70 @@ export default async function VerifyPage({
 }) {
   const { id } = await params;
   const { domain: domainQuery } = await searchParams;
-  const data = await getReceiptWithHistory(id);
-  if (!data) notFound();
+
+  const isReceiptId = id.startsWith("rcpt_");
+  const isCommitment = /^[0-9a-f]{64}$/i.test(id) && !id.startsWith("rcpt_");
+
+  if (!isReceiptId && !isCommitment) {
+    notFound();
+  }
+
+  let data;
+  let profileLink: string | null = null;
+
+  if (isReceiptId) {
+    data = await getReceiptWithHistory(id);
+  } else {
+    data = null;
+  }
+
+  if (!data) {
+    if (isCommitment) {
+      const enrollment = await prisma.agentEnrollment.findUnique({
+        where: { subjectCommitment: id },
+        select: { status: true },
+      });
+      if (!enrollment) {
+        return (
+          <main className="mx-auto max-w-3xl px-6 py-12 text-center">
+            <Link href="/" className="text-sm text-indigo-600 hover:underline">← Passport</Link>
+            <h1 className="mt-6 text-3xl font-bold tracking-tight">No receipt found</h1>
+            <p className="mt-4 text-slate-600">
+              No receipt or agent was found with this ID:{" "}
+              <span className="font-mono text-xs">{id}</span>
+            </p>
+            {isCommitment && (
+              <p className="mt-2 text-sm text-slate-500">
+                Did you mean to view an{" "}
+                <Link href={`/profiles/${id}`} className="text-indigo-600 hover:underline">agent profile</Link>?
+              </p>
+            )}
+            <Link href="/" className="mt-6 inline-block text-sm text-indigo-600 hover:underline">
+              Back to Passport
+            </Link>
+          </main>
+        );
+      }
+      return (
+        <main className="mx-auto max-w-3xl px-6 py-12 text-center">
+          <Link href="/" className="text-sm text-indigo-600 hover:underline">← Passport</Link>
+          <h1 className="mt-6 text-3xl font-bold tracking-tight">Agent passport</h1>
+          <p className="mt-4 text-slate-600">
+            This is an agent commitment hash, not a receipt ID.
+          </p>
+          <div className="mt-6 flex justify-center gap-4">
+            <Link
+              href={`/profiles/${id}`}
+              className="rounded-lg bg-indigo-600 px-6 py-3 text-white hover:bg-indigo-700"
+            >
+              View agent profile →
+            </Link>
+          </div>
+        </main>
+      );
+    }
+    notFound();
+  }
 
   const { receipt, history } = data;
   const payload = dbReceiptToPayload({
