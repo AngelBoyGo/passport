@@ -26,7 +26,8 @@ export default function LoginPage() {
         setError(body.error || "Login failed");
         return;
       }
-      router.push("/admin");
+      const next = new URLSearchParams(window.location.search).get("next");
+      router.push(next?.startsWith("/") ? next : "/admin");
     } catch {
       setError("Network error");
     } finally {

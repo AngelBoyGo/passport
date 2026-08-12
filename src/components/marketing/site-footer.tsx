@@ -15,13 +15,14 @@ const footerLinks = [
     links: [
       { href: "/leaderboard", label: "Leaderboard" },
       { href: "/docs/integrations", label: "Integrations" },
+      { href: "/security", label: "Security" },
     ],
   },
   {
     title: "Verify",
     links: [
       { href: "/api/v1/public-key", label: "Public Key" },
-      { href: "/api/v1/badge", label: "Agent Badge" },
+      { href: "/badge", label: "Agent Badge" },
     ],
   },
   {

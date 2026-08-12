@@ -1,25 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   createCheckoutSession,
-  getOrCreateStripeCustomer,
 } from "@/lib/stripe";
 import { ensureOperator } from "@/lib/operator";
+import { getSessionFromToken } from "@/lib/auth/auth-service";
 
 /**
  * POST /api/stripe/checkout — create Stripe Checkout session.
  */
 export async function POST(request: NextRequest) {
-  let body: { stripe_customer_id?: string; email?: string } = {};
-  try {
-    body = await request.json();
-  } catch {
-    /* optional body */
+  const sessionToken =
+    request.cookies?.get("session_token")?.value ??
+    request.headers.get("cookie")?.match(/(?:^|;\s*)session_token=([^;]+)/)?.[1];
+  const session = sessionToken ? await getSessionFromToken(sessionToken) : null;
+  if (!session) {
+    return NextResponse.json(
+      { error: "Authentication required to start a subscription" },
+      { status: 401 }
+    );
   }
 
-  const stripeCustomerId =
-    body.stripe_customer_id ??
-    (await getOrCreateStripeCustomer(body.email));
-  const operator = await ensureOperator(stripeCustomerId, body.email);
+  const operator = await ensureOperator(
+    session.operator.stripeCustomerId,
+    session.operator.email
+  );
 
   try {
     const session = await createCheckoutSession(

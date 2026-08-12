@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
+import { LiveVerifyDemo } from "@/components/marketing/live-verify-demo";
+import { SubscribeButton } from "@/components/marketing/subscribe-button";
 import { ReceiptFeaturesSection } from "@/components/marketing/receipt-features";
 import { EconomyFeaturesSection } from "@/components/marketing/economy-features";
 import { MarketplaceFeaturesSection } from "@/components/marketing/marketplace-features";
@@ -11,23 +12,6 @@ import { IntegrationFeaturesSection } from "@/components/marketing/integration-f
 import { EnterpriseFeaturesSection } from "@/components/marketing/enterprise-features";
 
 export default function LandingPage() {
-  const [demoId, setDemoId] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  async function runDemo() {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/demo/run", { method: "POST" });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? "Demo failed");
-      setDemoId(body.receipt_id);
-    } catch (e) {
-      alert(e instanceof Error ? e.message : "Demo failed");
-    } finally {
-      setLoading(false);
-    }
-  }
-
   return (
     <div className="flex min-h-screen flex-col">
       <SiteHeader />
@@ -51,13 +35,7 @@ export default function LandingPage() {
             Domain-scoped history — not a universal trust score.
           </p>
           <div className="mt-10 flex flex-wrap justify-center gap-4">
-            <button
-              onClick={runDemo}
-              disabled={loading}
-              className="rounded-lg bg-indigo-600 px-6 py-3 font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
-            >
-              {loading ? "Running demo…" : "Live verify demo"}
-            </button>
+            <LiveVerifyDemo />
             <Link
               href="/docs/getting-started"
               className="rounded-lg border px-6 py-3 font-medium hover:bg-slate-50"
@@ -65,16 +43,49 @@ export default function LandingPage() {
               Read the docs
             </Link>
           </div>
-          {demoId && (
-            <p className="mt-6">
-              <Link
-                href={`/verify/${demoId}`}
-                className="font-mono text-indigo-600 underline"
-              >
-                Verify demo receipt →
-              </Link>
-            </p>
-          )}
+        </section>
+
+        <section className="border-y bg-slate-50 py-16">
+          <div className="mx-auto grid max-w-6xl gap-6 px-6 md:grid-cols-3">
+            <Link href="/verify/demo" className="rounded-xl border bg-white p-6 transition hover:border-indigo-400">
+              <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600">Verify a receipt</p>
+              <h2 className="mt-2 text-xl font-semibold">Inspect the artifact before you trust it.</h2>
+              <p className="mt-2 text-sm text-slate-600">See signature, expiry, revocation, chain, and outcome state in one public view.</p>
+            </Link>
+            <Link href="/docs/getting-started" className="rounded-xl border bg-white p-6 transition hover:border-indigo-400">
+              <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600">Integrate Passport</p>
+              <h2 className="mt-2 text-xl font-semibold">Issue your first receipt in 5 minutes.</h2>
+              <p className="mt-2 text-sm text-slate-600">Enroll an agent, post evidence, and verify the signed result with copy-paste API calls.</p>
+            </Link>
+            <Link href="/leaderboard" className="rounded-xl border bg-white p-6 transition hover:border-indigo-400">
+              <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600">Evaluate agents</p>
+              <h2 className="mt-2 text-xl font-semibold">Check evidence, not a universal score.</h2>
+              <p className="mt-2 text-sm text-slate-600">Review domain-scoped history, outcomes, and failure behavior before you ship.</p>
+            </Link>
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-6xl px-6 py-20">
+          <div className="grid gap-10 md:grid-cols-[1fr_1.2fr] md:items-start">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600">Inspect the outcome</p>
+              <h2 className="mt-3 text-3xl font-bold tracking-tight">A receipt is more than success.</h2>
+              <p className="mt-4 text-slate-600">Passport preserves the operational result so counterparties can evaluate recovery and refusal behavior, not just a polished success count.</p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {[
+                ["success", "Completed and signed"],
+                ["refusal", "Declined within authority"],
+                ["timeout", "Did not complete in time"],
+                ["failure", "Recorded logic or execution error"],
+              ].map(([status, description]) => (
+                <div key={status} className="rounded-lg border p-4">
+                  <p className="font-mono text-sm font-semibold text-slate-900">{status}</p>
+                  <p className="mt-1 text-sm text-slate-600">{description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
         </section>
 
         {/* How it works */}
@@ -131,11 +142,11 @@ export default function LandingPage() {
           <h2 className="text-center text-3xl font-bold tracking-tight">
             Simple pricing
           </h2>
-          <p className="mx-auto mt-3 max-w-xl text-center text-slate-600">
-            Start free. Scale as your agents ship more.
+           <p className="mx-auto mt-3 max-w-xl text-center text-slate-600">
+             100 receipts/mo for experiments. 10,000 receipts/mo for a production agent fleet.
           </p>
           <div className="mt-12 grid gap-8 md:grid-cols-3">
-            <PricingCard
+         <PricingCard
               name="Free"
               price="$0"
               features={[
@@ -145,6 +156,7 @@ export default function LandingPage() {
                 "Evidence ingestion",
                 "Leaderboard listing",
               ]}
+              description="Solo builders testing a trustworthy workflow."
             />
             <PricingCard
               name="Pro"
@@ -159,6 +171,7 @@ export default function LandingPage() {
                 "Operator dashboard",
                 "Stripe billing",
               ]}
+              description="Production agent fleets with operator controls."
             />
             <PricingCard
               name="Enterprise"
@@ -171,6 +184,7 @@ export default function LandingPage() {
                 "Dedicated support",
                 "Custom integration",
               ]}
+              description="A dedicated trust boundary with custom controls."
             />
           </div>
         </section>
@@ -186,11 +200,13 @@ function PricingCard({
   price,
   features,
   highlight,
+  description,
 }: {
   name: string;
   price: string;
   features: string[];
   highlight?: boolean;
+  description: string;
 }) {
   return (
     <div
@@ -198,15 +214,14 @@ function PricingCard({
     >
       <h3 className="text-lg font-semibold">{name}</h3>
       <p className="mt-2 text-3xl font-bold">{price}</p>
+      <p className="mt-2 text-sm text-slate-600">{description}</p>
       <ul className="mt-6 space-y-2 text-sm text-slate-600">
         {features.map((f) => (
           <li key={f}>✓ {f}</li>
         ))}
       </ul>
       {highlight && (
-        <button className="mt-6 w-full rounded-lg bg-indigo-600 py-2 text-sm font-medium text-white hover:bg-indigo-700">
-          Subscribe
-        </button>
+        <SubscribeButton />
       )}
     </div>
   );
