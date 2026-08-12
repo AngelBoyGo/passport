@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionFromToken } from "@/lib/auth/auth-service";
+import { isExecutiveAdmin } from "@/lib/admin/admin-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     authenticated: true,
+    executiveAdmin: isExecutiveAdmin(session.operator),
     operator: {
       id: session.operator.id,
       email: session.operator.email,

@@ -15,10 +15,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         if (!res.ok) throw new Error("not authenticated");
         return res.json();
       })
-      .then((data) => setAuthed(data.authenticated))
+       .then((data) => {
+         if (!data.executiveAdmin) throw new Error("executive admin access required");
+         setAuthed(data.authenticated);
+       })
       .catch(() => {
         setAuthed(false);
-        router.push("/login");
+         router.push(`/login?next=${encodeURIComponent(pathname)}`);
       });
   }, [pathname, router]);
 
@@ -32,6 +35,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (!authed) {
     return null;
+  }
+
+  if (pathname === "/admin") {
+    return <>{children}</>;
   }
 
   return (

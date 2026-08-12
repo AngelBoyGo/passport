@@ -1,0 +1,74 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { ADMIN_TABS, type AdminTabId } from "@/app/admin/config/tabs";
+
+type DashboardData = {
+  generatedAt: string;
+  operator: { email?: string | null; tier: string; credits: number; accountStatus: string; stakeBalanceCents: number };
+  metrics: { receipts: number; receiptsToday: number; issuedAgents: number; evidence: number; engagements: number; slashingEvents: number; slashedCents: number };
+  health: { overall: string; components: { id: string; label: string; status: string; detail: string }[] };
+  activity: { type: string; label: string; detail: string; at: string; href: string }[];
+  copilotContext: unknown;
+};
+
+const number = new Intl.NumberFormat("en-US");
+
+export function ExecutiveDashboard() {
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [tab, setTab] = useState<AdminTabId>("command-center");
+  const [error, setError] = useState("");
+  const [copilotMessage, setCopilotMessage] = useState("Ask about the current operating picture.");
+
+  async function load() {
+    const response = await fetch("/api/admin/overview", { cache: "no-store" });
+    if (!response.ok) throw new Error(`Unable to load command center (${response.status})`);
+    setData(await response.json());
+  }
+
+  useEffect(() => { load().catch((reason) => setError(reason instanceof Error ? reason.message : "Unable to load dashboard")); }, []);
+
+  const context = useMemo(() => JSON.stringify({ tab, data: data?.copilotContext }, null, 2), [tab, data]);
+
+  async function prepareCopilot() {
+    const response = await fetch("/api/admin/copilot/context", { method: "POST", headers: { "Content-Type": "application/json" }, body: context });
+    setCopilotMessage(response.ok ? "Context snapshot prepared. Connect an LLM provider to enable conversational actions." : "Copilot context could not be prepared.");
+  }
+
+  if (error) return <Panel><p className="text-red-300">{error}</p><button onClick={() => load().catch((reason) => setError(String(reason)))} className="mt-4 rounded-lg bg-white/10 px-3 py-2 text-sm text-white">Retry</button></Panel>;
+  if (!data) return <div className="flex min-h-[60vh] items-center justify-center text-sm text-slate-400">Loading command center...</div>;
+
+  const metrics = data.metrics;
+  return (
+    <div className="min-h-screen bg-[#080b12] text-slate-100">
+      <div className="mx-auto flex max-w-[1500px] gap-6 px-4 py-5 lg:px-8">
+        <aside className="hidden w-60 shrink-0 lg:block">
+          <div className="sticky top-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-300">Passport / Executive</p>
+            <h1 className="mt-3 text-2xl font-semibold tracking-tight">Command Center</h1>
+            <p className="mt-2 text-sm leading-relaxed text-slate-400">Developer and CEO operating view for trust, receipts, and economic safety.</p>
+            <nav className="mt-8 space-y-1">{ADMIN_TABS.map((item) => <button key={item.id} onClick={() => setTab(item.id)} className={`w-full rounded-xl px-3 py-3 text-left transition ${tab === item.id ? "bg-indigo-500/15 text-white ring-1 ring-indigo-400/30" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}><span className="block text-[10px] font-semibold uppercase tracking-widest text-indigo-300">{item.eyebrow}</span><span className="mt-1 block text-sm font-medium">{item.label}</span><span className="mt-1 block text-xs text-slate-500">{item.description}</span></button>)}</nav>
+            <div className="mt-8 rounded-xl border border-white/10 bg-white/[0.03] p-4 text-xs text-slate-500"><p>Signed in as</p><p className="mt-1 truncate text-slate-300">{data.operator.email ?? "operator"}</p><Link href="/" className="mt-4 inline-block text-indigo-300 hover:text-white">View public site →</Link></div>
+          </div>
+        </aside>
+        <main className="min-w-0 flex-1">
+          <header className="flex flex-wrap items-end justify-between gap-4 border-b border-white/10 pb-5"><div><p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-300">{ADMIN_TABS.find((item) => item.id === tab)?.eyebrow}</p><h2 className="mt-2 text-3xl font-semibold tracking-tight">{ADMIN_TABS.find((item) => item.id === tab)?.label}</h2><p className="mt-1 text-sm text-slate-400">Live snapshot · {new Date(data.generatedAt).toLocaleTimeString()}</p></div><button onClick={() => load().catch((reason) => setError(String(reason)))} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300 hover:bg-white/10">Refresh data</button></header>
+          <div className="mt-4 flex gap-2 overflow-x-auto pb-1 lg:hidden">{ADMIN_TABS.map((item) => <button key={item.id} onClick={() => setTab(item.id)} className={`shrink-0 rounded-full px-3 py-2 text-xs ${tab === item.id ? "bg-indigo-500 text-white" : "bg-white/5 text-slate-400"}`}>{item.label}</button>)}</div>
+          <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Metric label="Receipts issued" value={number.format(metrics.receipts)} detail={`+${number.format(metrics.receiptsToday)} in 24h`} tone="indigo" href="/admin/receipts" /><Metric label="Issued passports" value={number.format(metrics.issuedAgents)} detail="Enrolled agents" tone="emerald" href="/leaderboard" /><Metric label="Evidence observed" value={number.format(metrics.evidence)} detail="Privacy-safe events" tone="sky" href="/leaderboard" /><Metric label="Health posture" value={data.health.overall} detail={`${data.health.components.filter((item) => item.status === "operational").length}/${data.health.components.length} components operational`} tone={data.health.overall === "operational" ? "emerald" : "amber"} href="#reliability" /></div>
+          <div className="mt-6 grid gap-6 xl:grid-cols-[1.5fr_1fr]">
+            <Panel title="Operating posture" eyebrow="At a glance"><div className="grid gap-3 sm:grid-cols-2"><Posture label="Operator account" value={data.operator.accountStatus} detail={`${data.operator.tier} tier`} /><Posture label="Credits available" value={number.format(data.operator.credits)} detail={`Stake $${(data.operator.stakeBalanceCents / 100).toFixed(2)}`} /><Posture label="Marketplace engagements" value={number.format(metrics.engagements)} detail="Held, delivered, paid, or cancelled" /><Posture label="Slashing exposure" value={`$${(metrics.slashedCents / 100).toFixed(2)}`} detail={`${metrics.slashingEvents} recorded events`} /></div></Panel>
+            <Panel title="Executive Copilot" eyebrow="Context-aware"><div className="rounded-lg border border-indigo-400/20 bg-indigo-400/10 p-4"><p className="text-sm leading-relaxed text-slate-300">{copilotMessage}</p><button onClick={prepareCopilot} className="mt-4 rounded-lg bg-indigo-500 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-400">Sync this view</button></div><p className="mt-3 text-xs text-slate-500">No LLM provider is configured in Passport yet. Context capture is ready and mutation tools remain disabled until a provider and confirmation flow are enabled.</p></Panel>
+          </div>
+          <div id="reliability" className="mt-6"><Panel title="Reliability checkpoints" eyebrow="CTO"><div className="grid gap-3 md:grid-cols-2">{data.health.components.map((component) => <div key={component.id} className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.02] p-4"><div><p className="text-sm font-medium text-slate-200">{component.label}</p><p className="mt-1 text-xs text-slate-500">{component.detail}</p></div><Status status={component.status} /></div>)}</div></Panel></div>
+          <div className="mt-6"><Panel title="Recent activity" eyebrow="Traceable"><div className="divide-y divide-white/10">{data.activity.length === 0 ? <p className="py-8 text-sm text-slate-500">No activity has been recorded yet.</p> : data.activity.map((item) => <Link href={item.href} key={`${item.type}-${item.at}-${item.detail}`} className="flex items-center justify-between gap-4 py-3 hover:bg-white/[0.03]"><div className="min-w-0"><p className="truncate text-sm text-slate-200">{item.label}</p><p className="mt-1 truncate text-xs text-slate-500">{item.detail}</p></div><time className="shrink-0 text-xs text-slate-500">{new Date(item.at).toLocaleString()}</time></Link>)}</div></Panel></div>
+        </main>
+      </div>
+    </div>
+  );
+}
+
+function Panel({ title, eyebrow, children }: { title?: string; eyebrow?: string; children: React.ReactNode }) { return <section className="rounded-2xl border border-white/10 bg-[#0e131d] p-5 shadow-2xl shadow-black/10">{title && <div className="mb-5"><p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-indigo-300">{eyebrow}</p><h3 className="mt-1 text-lg font-medium text-white">{title}</h3></div>}{children}</section>; }
+function Metric({ label, value, detail, tone, href }: { label: string; value: string; detail: string; tone: string; href: string }) { const toneClass = { indigo: "bg-indigo-400", emerald: "bg-emerald-400", sky: "bg-sky-400", amber: "bg-amber-400" }[tone] ?? "bg-slate-400"; return <Link href={href} className="rounded-2xl border border-white/10 bg-[#0e131d] p-5 transition hover:-translate-y-0.5 hover:border-indigo-400/40"><div className={`h-2 w-2 rounded-full ${toneClass}`} /><p className="mt-4 text-xs font-medium uppercase tracking-wider text-slate-500">{label}</p><p className="mt-2 text-2xl font-semibold capitalize text-white">{value}</p><p className="mt-1 text-xs text-slate-500">{detail}</p></Link>; }
+function Posture({ label, value, detail }: { label: string; value: string; detail: string }) { return <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4"><p className="text-xs text-slate-500">{label}</p><p className="mt-2 text-xl font-semibold capitalize text-slate-100">{value}</p><p className="mt-1 text-xs text-slate-500">{detail}</p></div>; }
+function Status({ status }: { status: string }) { return <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${status === "operational" ? "bg-emerald-400/10 text-emerald-300" : "bg-amber-400/10 text-amber-300"}`}>{status}</span>; }
