@@ -23,7 +23,19 @@ export function hashEmail(email: string): string {
 
 function generateSessionToken(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
-  return "sess_" + bytesToHex(sha256(bytes));
+  const raw = bytesToHex(sha256(bytes));
+  const secret = process.env.SESSION_SECRET || "dev-session-secret";
+  const signature = bytesToHex(sha256(utf8ToBytes(raw + secret)));
+  return "sess_" + raw + signature;
+}
+
+function verifySessionTokenSignature(token: string): boolean {
+  if (!token.startsWith("sess_")) return false;
+  const raw = token.slice(5, 69);
+  const sig = token.slice(69);
+  const secret = process.env.SESSION_SECRET || "dev-session-secret";
+  const expected = bytesToHex(sha256(utf8ToBytes(raw + secret)));
+  return sig === expected;
 }
 
 export async function createSession(operatorId: string) {
@@ -36,6 +48,9 @@ export async function createSession(operatorId: string) {
 }
 
 export async function getSessionFromToken(token: string) {
+  if (!verifySessionTokenSignature(token)) {
+    return null;
+  }
   const session = await prisma.session.findUnique({
     where: { token },
     include: { operator: true },
