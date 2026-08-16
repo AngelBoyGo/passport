@@ -180,6 +180,7 @@ export const ComplianceReportPayloadSchema = z
   .object({
     agent_identity: z.string().optional(),
     control_domain: z.string().optional(),
+    report_id: z.string().optional(),
     report: z
       .object({
         id: z.string().optional(),
@@ -765,7 +766,7 @@ export function normalizeComplianceEvidence(
   if (!parsed.success) return [];
 
   const data = parsed.data;
-  const reportId = data.report?.id?.trim();
+  const reportId = data.report?.id?.trim() ?? data.report_id?.trim();
   if (!reportId) return [];
 
   const eventMapping = mapComplianceAction(data.action);

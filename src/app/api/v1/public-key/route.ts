@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getPublicKeyHex } from "@/lib/receipt/signer";
 
-export const PUBLIC_KEY_CACHE_CONTROL = "public, max-age=3600, immutable";
+export const PUBLIC_KEY_CACHE_CONTROL = "public, max-age=3600";
 
 /**
  * GET /api/v1/public-key — published ed25519 verifying key.

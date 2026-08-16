@@ -155,6 +155,127 @@ export default function DocsApiReference() {
         </ApiMethod>
       </Section>
 
+      <Section title="Webhooks">
+        <p className="text-sm text-slate-600">
+          Passport dispatches webhooks for evidence anchoring and enrollment
+          completion. Delivery is best-effort (no retry queue yet).
+        </p>
+        <h3 className="mt-4 text-sm font-semibold">Events</h3>
+        <table className="mt-2 w-full text-sm">
+          <thead>
+            <tr className="border-b text-left">
+              <th className="pb-2 font-medium">Event</th>
+              <th className="pb-2 font-medium">Trigger</th>
+              <th className="pb-2 font-medium">Payload shape</th>
+            </tr>
+          </thead>
+          <tbody className="text-slate-600">
+            <tr className="border-b">
+              <td className="py-1.5 font-mono text-xs">evidence.anchored</td>
+              <td className="py-1.5">Evidence ingested for an enrolled agent</td>
+              <td className="py-1.5 font-mono text-xs">{`{ event, data: { event_commitment_hash, subject_commitment, source_type }, timestamp }`}</td>
+            </tr>
+            <tr className="border-b">
+              <td className="py-1.5 font-mono text-xs">enrollment.completed</td>
+              <td className="py-1.5">Agent enrollment finished (ISSUED)</td>
+              <td className="py-1.5 font-mono text-xs">{`{ event, data: { subject_commitment, public_key, context }, timestamp }`}</td>
+            </tr>
+          </tbody>
+        </table>
+        <h3 className="mt-4 text-sm font-semibold">Headers</h3>
+        <div className="text-sm text-slate-600">
+          <p><code className="rounded bg-slate-100 px-1 font-mono text-xs">X-Passport-Event</code> — the event type string</p>
+          <p><code className="rounded bg-slate-100 px-1 font-mono text-xs">X-Passport-Signature</code> — the subscription&apos;s webhook secret (use to verify authenticity)</p>
+        </div>
+        <h3 className="mt-4 text-sm font-semibold">Delivery semantics</h3>
+        <p className="text-sm text-slate-600">
+          Currently fire-and-forget with no retry or dead-letter queue. Timeouts
+          and network errors are silently caught. Subscribe at
+          <code className="rounded bg-slate-100 px-1 font-mono text-xs">POST /api/v1/webhooks</code>
+          with a URL and event filter list.
+        </p>
+      </Section>
+
+      <Section title="Receipt canonicalization & verification">
+        <p className="text-sm text-slate-600">
+          Every receipt&apos;s <code>content_hash</code> is computed from a deterministic
+          canonical field set, signed with Ed25519, and verifiable offline.
+        </p>
+        <h3 className="mt-4 text-sm font-semibold">Canonical field set</h3>
+        <p className="text-sm text-slate-600">
+          The following fields are <em>always included</em> in the canonical payload,
+          in the order shown (sorted alphabetically by key name):
+        </p>
+        <table className="mt-2 w-full text-sm">
+          <thead>
+            <tr className="border-b text-left">
+              <th className="pb-2 font-medium">Field</th>
+              <th className="pb-2 font-medium">Type</th>
+              <th className="pb-2 font-medium">Always present</th>
+            </tr>
+          </thead>
+          <tbody className="text-slate-600">
+            {[
+              ["receipt_id", "string", "Yes"],
+              ["issued_at", "ISO-8601 string", "Yes"],
+              ["operator_id", "string (op_cus_…)","Yes"],
+              ["agent_id", "string","Yes"],
+              ["receipt_type", '"custody" | "competence"',"Yes"],
+              ["status", "ReceiptStatus","Yes"],
+              ["input_digest", "64-char hex","Yes"],
+              ["authority_scope", "string","Yes"],
+              ["expiry", "ISO-8601 string","Yes"],
+              ["revocation_status", '"active" | "revoked"',"Yes"],
+              ["output_hash", "64-char hex","Only on success finalization"],
+              ["refusal_reason", "string","Only on refusal/null finalization"],
+              ["terminal_reason", "string","Only on terminal states"],
+              ["prev_receipt_hash", "64-char hex","Only if chained"],
+              ["domain", "OperationalDomain","If no domain_commitment"],
+              ["error_tranche", "ErrorTranche","If status is not pending"],
+            ].map(([field, type, condition]) => (
+              <tr key={field} className="border-b">
+                <td className="py-1.5 font-mono text-xs">{field}</td>
+                <td className="py-1.5 font-mono text-xs">{type}</td>
+                <td className="py-1.5 text-xs">{condition}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <h3 className="mt-4 text-sm font-semibold">Domain blinding</h3>
+        <p className="text-sm text-slate-600">
+          When a receipt is issued with <code>blind: true</code>, the plaintext
+          <code>domain</code> is replaced by <code>domain_commitment =
+          sha256(domain + blind_salt)</code>. In the canonical payload, if
+          <code>domain_commitment</code> is present it is stored in the
+          <code>domain</code> field of the canonical object (the key is always
+          <code>"domain"</code> in the sorted JSON). The <code>blind_salt</code>
+          itself is <em>not</em> part of the canonical payload — it is stored
+          alongside in the database and exposed only to the receipt creator.
+        </p>
+        <h3 className="mt-4 text-sm font-semibold">Computation steps</h3>
+        <div className="rounded-lg border bg-slate-50 p-4 text-sm text-slate-700">
+          <ol className="ml-4 list-decimal space-y-2">
+            <li>Build the canonical object from the fields above, omitting <code>signature</code> and <code>content_hash</code>.</li>
+            <li>Serialize to compact JSON with <strong>sorted keys</strong> lexicographically (the <code>canonicalJson()</code> function).</li>
+            <li>Compute <code>content_hash = sha256(utf8ToBytes(canonicalJson))</code>.</li>
+            <li>The signing message is <code>utf8ToBytes(content_hash)</code> — a UTF-8 encoding of the 64-hex string itself.</li>
+            <li>Sign with Ed25519: <code>sign(signingMessage, privateKey)</code>.</li>
+          </ol>
+        </div>
+        <h3 className="mt-4 text-sm font-semibold">Verification</h3>
+        <p className="text-sm text-slate-600">
+          To verify a receipt offline:
+        </p>
+        <div className="rounded-lg border bg-slate-50 p-4 text-sm text-slate-700">
+          <ol className="ml-4 list-decimal space-y-2">
+            <li>Check <code>revocation_status !== "revoked"</code>.</li>
+            <li>Check <code>expiry</code> is in the future (expired receipts are rejected before signature check).</li>
+            <li>Recompute <code>expectedHash = computeContentHash(buildCanonicalPayload(receipt))</code> and verify <code>expectedHash === receipt.content_hash</code>.</li>
+            <li>Verify <code>ed25519.verify(hexToBytes(signature), utf8ToBytes(content_hash), hexToBytes(publicKey))</code> using the key from <code>GET /api/v1/public-key</code>.</li>
+          </ol>
+        </div>
+      </Section>
+
       <Section title="Error Responses">
         <p className="text-sm text-slate-600">
           All endpoints return JSON errors with an <code className="rounded bg-slate-100 px-1 font-mono text-xs">error</code> field.

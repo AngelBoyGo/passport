@@ -64,6 +64,25 @@ export async function getSessionFromToken(token: string) {
   return session;
 }
 
+/**
+ * Resolves a session from every session_token cookie the browser sent.
+ *
+ * Browsers can hold multiple cookies with the same name (host-only vs
+ * Domain-scoped, differing paths from older deployments). The first cookie
+ * in the header can be a stale token that shadows a freshly-issued one,
+ * producing a login loop. Trying every candidate makes login resilient to
+ * stale-cookie shadowing.
+ */
+export async function resolveSessionFromTokens(tokens: string[]) {
+  for (const token of tokens) {
+    const session = await getSessionFromToken(token);
+    if (session) {
+      return session;
+    }
+  }
+  return null;
+}
+
 export async function deleteSession(token: string) {
   await prisma.session.deleteMany({ where: { token } });
 }

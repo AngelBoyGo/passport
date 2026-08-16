@@ -8,33 +8,71 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const pathname = usePathname();
   const [authed, setAuthed] = useState<boolean | null>(null);
+  const [checkError, setCheckError] = useState("");
 
-  useEffect(() => {
-    fetch("/api/auth/session")
-      .then((res) => {
-        if (!res.ok) throw new Error("not authenticated");
-        return res.json();
-      })
-       .then((data) => {
-         if (!data.executiveAdmin) throw new Error("executive admin access required");
-         setAuthed(data.authenticated);
-       })
-      .catch(() => {
-        setAuthed(false);
-         router.push(`/login?next=${encodeURIComponent(pathname)}`);
+  async function checkSession() {
+    setCheckError("");
+    let res: Response;
+    try {
+      res = await fetch("/api/auth/session", {
+        cache: "no-store",
+        credentials: "same-origin",
       });
-  }, [pathname, router]);
+    } catch {
+      setCheckError("Network error. Check your connection and try again.");
+      return;
+    }
 
-  if (authed === null) {
-    return (
-      <div className="flex min-h-screen items-center justify-center text-sm text-slate-500">
-        Loading…
-      </div>
-    );
+    if (res.status === 401) {
+      router.push(`/login?next=${encodeURIComponent(pathname)}`);
+      return;
+    }
+
+    if (!res.ok) {
+      setCheckError(`Server error (${res.status}). Retrying…`);
+      return;
+    }
+
+    let data: { authenticated?: boolean };
+    try {
+      data = await res.json();
+    } catch {
+      setCheckError("Invalid response from server.");
+      return;
+    }
+
+    if (!data.authenticated) {
+      router.push(`/login?next=${encodeURIComponent(pathname)}`);
+      return;
+    }
+
+    setAuthed(true);
   }
 
-  if (!authed) {
-    return null;
+  useEffect(() => {
+    checkSession();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
+  if (authed === null) {
+    const showError = checkError && pathname !== "/login";
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 text-sm text-slate-500">
+        {showError ? (
+          <>
+            <p className="text-red-600">{checkError}</p>
+            <button
+              onClick={checkSession}
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700"
+            >
+              Retry
+            </button>
+          </>
+        ) : (
+          <p>Loading…</p>
+        )}
+      </div>
+    );
   }
 
   if (pathname === "/admin") {

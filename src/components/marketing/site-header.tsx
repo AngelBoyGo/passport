@@ -29,7 +29,7 @@ export function SiteHeader() {
             </Link>
           ))}
           <Link
-            href="/api/v1/public-key"
+            href="/public-key"
             className="rounded-lg border px-3 py-1.5 text-xs font-mono hover:bg-slate-50"
           >
             Public Key

@@ -18,8 +18,11 @@ vi.mock("@/lib/operator", () => ({
   ensureOperator: (...args: unknown[]) => ensureOperatorMock(...args),
 }));
 
+// The checkout route resolves sessions via sessionFromRequest → resolveSessionFromTokens.
 vi.mock("@/lib/auth/auth-service", () => ({
   getSessionFromToken: (...args: unknown[]) => getSessionFromTokenMock(...args),
+  resolveSessionFromTokens: (...args: unknown[]) =>
+    getSessionFromTokenMock(...args),
 }));
 
 beforeEach(async () => {

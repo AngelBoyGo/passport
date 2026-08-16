@@ -3,16 +3,13 @@ import {
   createCheckoutSession,
 } from "@/lib/stripe";
 import { ensureOperator } from "@/lib/operator";
-import { getSessionFromToken } from "@/lib/auth/auth-service";
+import { sessionFromRequest } from "@/lib/auth/cookies";
 
 /**
  * POST /api/stripe/checkout — create Stripe Checkout session.
  */
 export async function POST(request: NextRequest) {
-  const sessionToken =
-    request.cookies?.get("session_token")?.value ??
-    request.headers.get("cookie")?.match(/(?:^|;\s*)session_token=([^;]+)/)?.[1];
-  const session = sessionToken ? await getSessionFromToken(sessionToken) : null;
+  const session = await sessionFromRequest(request);
   if (!session) {
     return NextResponse.json(
       { error: "Authentication required to start a subscription" },

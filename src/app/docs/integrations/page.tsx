@@ -112,15 +112,140 @@ curl -X POST "https://passport.metis.gold/api/v1/passport/agents/$COMMITMENT/evi
           Evidence signatures are verified against the raw payload fingerprint, not against the eventual receipt.
           Passport computes <code>sha256(canonicalJson(payload))</code>, where object keys are sorted lexicographically
           and the result is compact JSON. Sign that 64-character lowercase hex digest as UTF-8 with the enrolled agent key.
+          The <code>payload</code> field must be a <strong>JSON object</strong> (not a JSON string). If you send a string,
+          the digest computation differs and signature verification will fail with 401.
         </p>
-        <div className="mt-4 grid gap-3 text-sm text-slate-700 md:grid-cols-2">
-          <div className="rounded-lg bg-white p-4"><strong>task_deliverable</strong><br />{`{ task_id: string, digest: 64-hex, observed_at?: ISO-8601 }`}</div>
-          <div className="rounded-lg bg-white p-4"><strong>compliance_report</strong><br />{`{ report: { id: string, url?: string }, agent_identity?: string, control_domain?: string, action?: string, observed_at?: ISO-8601 }`}</div>
-          <div className="rounded-lg bg-white p-4"><strong>otel_genai_trace</strong><br />{`{ name?: string, attributes?: object, status?: object, start_time?: string, end_time?: string }`}</div>
-          <div className="rounded-lg bg-white p-4"><strong>GitHub sources</strong><br />Use the GitHub push, commit, or issue payload shape documented by the corresponding webhook adapter.</div>
+
+        <h3 className="mt-5 text-sm font-semibold">Exact payload schemas (all 6 source types)</h3>
+        <div className="mt-3 grid gap-3 text-sm text-slate-700">
+          <div className="rounded-lg bg-white p-4">
+            <strong className="text-indigo-700">github_commit_payload</strong>
+            <pre className="mt-1 whitespace-pre-wrap font-mono text-xs text-slate-600">{`{
+  sha?: string,              // commit SHA
+  html_url?: string,          // link to commit on GitHub
+  commit?: {
+    message?: string,
+    author?: { name?: string, email?: string },
+    committer?: { name?: string, email?: string },
+  },
+  validation_status?: string, // e.g. "pass", "fail"
+  check_status?: string,      // e.g. "completed"
+  // unknown fields allowed (passthrough)
+}`}</pre>
+          </div>
+          <div className="rounded-lg bg-white p-4">
+            <strong className="text-indigo-700">github_push_webhook</strong>
+            <pre className="mt-1 whitespace-pre-wrap font-mono text-xs text-slate-600">{`{
+  ref?: string,               // e.g. "refs/heads/main"
+  repository?: {
+    full_name?: string,       // e.g. "owner/repo"
+    html_url?: string,
+  },
+  head_commit?: {             // most recent commit
+    id?: string, sha?: string, message?: string,
+    url?: string, author?: { name?: string, email?: string },
+    timestamp?: string, validation_status?: string, check_status?: string,
+  },
+  commits?: Array<{           // all pushed commits (authoritative when present)
+    id?: string, sha?: string, message?: string,
+    url?: string, author?: { name?: string, email?: string },
+    timestamp?: string, validation_status?: string, check_status?: string,
+  }>,
+  // unknown fields allowed (passthrough)
+}`}</pre>
+          </div>
+          <div className="rounded-lg bg-white p-4">
+            <strong className="text-indigo-700">github_issue_event</strong>
+            <pre className="mt-1 whitespace-pre-wrap font-mono text-xs text-slate-600">{`{
+  agent_identity?: string,    // agent name / identifier
+  repository?: string,        // "owner/repo"
+  issue?: {
+    id?: string,              // issue ID
+    number?: number,          // issue number
+    url?: string,
+    title?: string,
+  },
+  labels?: string[],          // applied labels
+  action?: string,            // "triage_output" | "accept" | "override" | "revert"
+  summary?: string,
+  transcript_url?: string,
+  observed_at?: string,       // ISO-8601
+  // unknown fields allowed (passthrough)
+}`}</pre>
+          </div>
+          <div className="rounded-lg bg-white p-4">
+            <strong className="text-indigo-700">compliance_report</strong>
+            <pre className="mt-1 whitespace-pre-wrap font-mono text-xs text-slate-600">{`{
+  agent_identity?: string,
+  control_domain?: string,    // e.g. "SOC2", "ISO27001"
+  report?: {
+    id: string,               // report ID (required for ingest)
+    url?: string,
+    title?: string,
+  },
+  action?: string,            // "report_created" | "approved" | "rejected"
+  transcript_url?: string,
+  observed_at?: string,       // ISO-8601
+  // unknown fields allowed (passthrough)
+}
+Note: The report.id field nested under "report" is required.
+Fields at the top level like "report_id" will not match.`}</pre>
+          </div>
+          <div className="rounded-lg bg-white p-4">
+            <strong className="text-indigo-700">otel_genai_trace</strong>
+            <pre className="mt-1 whitespace-pre-wrap font-mono text-xs text-slate-600">{`{
+  name?: string,              // span name — must be "invoke_agent" to be ingested
+  attributes?: {
+    "gen_ai.operation.name"?: string,
+    "gen_ai.agent.id"?: string,
+    "gen_ai.usage.input_tokens"?: number,
+    "gen_ai.usage.output_tokens"?: number,
+    "tool.call.count"?: number,
+    "validation.status"?: string,
+    // any other OTel attributes pass through
+  },
+  status?: {
+    code?: string,            // "OK" | "ERROR" | "UNSET"
+    message?: string,
+  },
+  startTimeUnixNano?: string, // nanosecond epoch
+  endTimeUnixNano?: string,
+  start_time?: string,        // ISO-8601 fallback
+  end_time?: string,          // ISO-8601 fallback
+  // unknown fields allowed (passthrough)
+}
+Note: Only spans with gen_ai.operation.name="invoke_agent"
+or name="invoke_agent" are ingested.`}</pre>
+          </div>
+          <div className="rounded-lg bg-white p-4">
+            <strong className="text-indigo-700">task_deliverable</strong>
+            <pre className="mt-1 whitespace-pre-wrap font-mono text-xs text-slate-600">{`{
+  task_id: string,            // required, non-empty — external task identifier
+  digest: string,             // required, 64-char hex — SHA-256 of the deliverable output
+  observed_at?: string,       // ISO-8601
+  // unknown fields allowed (passthrough)
+}
+How to sign:
+  1. Build the object above (task_id + digest + optional observed_at)
+  2. Compute digestToSign = sha256(canonicalJson(object))
+     where canonicalJson sorts keys lexicographically and produces compact JSON
+  3. Sign digestToSign (UTF-8 bytes) with the agent's ed25519 private key
+  4. Send the hex signature and the raw payload object (not a string) in the request body`}</pre>
+          </div>
         </div>
+
+        <h3 className="mt-5 text-sm font-semibold">How evidence signing works</h3>
+        <div className="mt-2 rounded-lg bg-white p-4 text-sm">
+          <ol className="ml-4 list-decimal space-y-2 text-slate-700">
+            <li><strong>payload</strong> is a JSON object (never a string). The <code>sourceDigest()</code> function computes <code>sha256(canonicalJson(payload))</code> server-side.</li>
+            <li>The agent must sign this exact 64-hex digest (as UTF-8 bytes) with its ed25519 key.</li>
+            <li>If <code>payload</code> is sent as a JSON <em>string</em>, the server computes <code>sha256(String(payload))</code> instead — a different value from <code>sha256(canonicalJson(parsedObject))</code>. This causes signature mismatch → 401.</li>
+            <li>Passport verifies: <code>ed25519.verify(signature, utf8ToBytes(digest), agentPublicKey)</code>.</li>
+          </ol>
+        </div>
+
         <p className="mt-4 text-sm text-slate-700">
-          <code>task_deliverable</code> also requires <code>Authorization: Bearer PASSPORT_SERVICE_TOKEN</code> when
+          <code>task_deliverable</code> also requires <code>Authorization: Bearer &lt;PASSPORT_SERVICE_TOKEN&gt;</code> when
           <code>EVIDENCE_SERVICE_AUTH_REQUIRED=true</code>. Other source types use the enrolled agent signature only.
         </p>
       </section>

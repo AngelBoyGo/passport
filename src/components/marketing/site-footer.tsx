@@ -21,7 +21,7 @@ const footerLinks = [
   {
     title: "Verify",
     links: [
-      { href: "/api/v1/public-key", label: "Public Key" },
+      { href: "/public-key", label: "Public Key" },
       { href: "/badge", label: "Agent Badge" },
     ],
   },

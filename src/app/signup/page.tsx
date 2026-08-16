@@ -1,11 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 export default function SignupPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -27,14 +25,18 @@ export default function SignupPage() {
       const res = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        cache: "no-store",
         body: JSON.stringify({ email, password }),
       });
       if (!res.ok) {
-        const body = await res.json();
-        setError(body.error || "Signup failed");
+        const body = await res.json().catch(() => ({}));
+        setError(body.error || `Signup failed (${res.status})`);
         return;
       }
-      router.push("/admin");
+      // Full-page navigation so the fresh session cookie is guaranteed to be
+      // sent on the next document request (avoids client-router cache loops).
+      window.location.assign("/welcome");
     } catch {
       setError("Network error");
     } finally {

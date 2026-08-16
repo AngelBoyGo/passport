@@ -1,22 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getSessionFromToken } from "@/lib/auth/auth-service";
+import { sessionFromRequest } from "@/lib/auth/cookies";
 import { getPublicKeyHex } from "@/lib/receipt/signer";
 import { isExecutiveAdmin } from "@/lib/admin/admin-auth";
 
 export const dynamic = "force-dynamic";
 
-async function getOperator(request: NextRequest) {
-  const token = request.cookies.get("session_token")?.value;
-  if (!token) return null;
-  const session = await getSessionFromToken(token);
-  return session?.operator ?? null;
-}
+const NO_STORE = { "Cache-Control": "no-store, max-age=0" };
 
 export async function GET(request: NextRequest) {
-  const operator = await getOperator(request);
-  if (!operator) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isExecutiveAdmin(operator)) return NextResponse.json({ error: "Executive admin access required" }, { status: 403 });
+  const session = await sessionFromRequest(request);
+  if (!session) {
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401, headers: NO_STORE }
+    );
+  }
+  const operator = session.operator;
+  const executiveAdmin = isExecutiveAdmin(operator);
 
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const [receipts, receiptsToday, enrollments, evidence, engagements, slashing, recentReceipts, recentEvidence, recentEngagements] = await Promise.all([
@@ -38,15 +39,27 @@ export async function GET(request: NextRequest) {
     ...recentEngagements.map((item) => ({ type: "engagement", label: `${item.status.toLowerCase()} engagement`, detail: `${item.taskId} · $${(item.amount / 100).toFixed(2)}`, at: item.updatedAt, href: "/admin" })),
   ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime()).slice(0, 12);
 
-  return NextResponse.json({
-    generatedAt: new Date().toISOString(),
-    operator: { email: operator.email, tier: operator.tier, credits: operator.credits, accountStatus: operator.accountStatus, stakeBalanceCents: operator.stakeBalanceCents },
-    metrics: { receipts, receiptsToday, issuedAgents: enrollments, evidence, engagements, slashingEvents: slashing._count, slashedCents: slashing._sum.penaltyCents ?? 0 },
-    health,
-    activity,
-    copilotContext: { view: "command-center", operatorTier: operator.tier, metrics: { receipts, receiptsToday, issuedAgents: enrollments, evidence, engagements }, health, recentActivity: activity.slice(0, 5) },
-    publicKey: getPublicKeyHex(),
-  });
+  return NextResponse.json(
+    {
+      generatedAt: new Date().toISOString(),
+      executiveAdmin,
+      operator: { email: operator.email, tier: operator.tier, credits: operator.credits, accountStatus: operator.accountStatus, stakeBalanceCents: operator.stakeBalanceCents },
+      metrics: { receipts, receiptsToday, issuedAgents: enrollments, evidence, engagements, slashingEvents: slashing._count, slashedCents: slashing._sum.penaltyCents ?? 0 },
+      health,
+      activity,
+      copilotContext: { view: "command-center", operatorTier: operator.tier, metrics: { receipts, receiptsToday, issuedAgents: enrollments, evidence, engagements }, health, recentActivity: activity.slice(0, 5) },
+      publicKey: safePublicKey(),
+    },
+    { headers: NO_STORE }
+  );
+}
+
+function safePublicKey(): string | null {
+  try {
+    return getPublicKeyHex();
+  } catch {
+    return null;
+  }
 }
 
 async function checkHealth() {

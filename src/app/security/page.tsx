@@ -29,7 +29,7 @@ export default function SecurityPage() {
           A valid receipt proves that Passport signed the exact canonical payload and that the receipt has not expired or been revoked. It does not prove the underlying claim was true, prevent a compromised operator from signing bad data, or turn domain-scoped history into a universal trust score.
         </p>
       </section>
-      <Link href="/api/v1/public-key" className="mt-8 inline-block text-sm font-medium text-indigo-600 underline">
+      <Link href="/public-key" className="mt-8 inline-block text-sm font-medium text-indigo-600 underline">
         Inspect the current public key →
       </Link>
     </main>

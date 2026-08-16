@@ -77,6 +77,18 @@ export async function ingestEnrolledEvidence(
   }
 
   const enrollment = await requireEnrolled(input.subjectCommitment);
+
+  if (input.payload === null || input.payload === undefined) {
+    throw new InvalidEnrollmentInputError("payload is required");
+  }
+  if (typeof input.payload === "string") {
+    throw new InvalidEnrollmentInputError(
+      "payload must be a JSON object, not a raw string. " +
+      "The agent must sign sha256(canonicalJson(payload)) with payload as the parsed object. " +
+      "See /docs/integrations for exact per-source-type schemas."
+    );
+  }
+
   const digest = computePayloadDigest(input.payload);
   const valid = await verifyPayloadSignature(
     enrollment.publicKey,

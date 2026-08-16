@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionFromToken } from "@/lib/auth/auth-service";
+import { sessionFromRequest } from "@/lib/auth/cookies";
 import { isExecutiveAdmin } from "@/lib/admin/admin-auth";
 
 export async function POST(request: NextRequest) {
-  const token = request.cookies.get("session_token")?.value;
-  const session = token ? await getSessionFromToken(token) : null;
+  const session = await sessionFromRequest(request);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!isExecutiveAdmin(session.operator)) return NextResponse.json({ error: "Executive admin access required" }, { status: 403 });
   let snapshot: unknown = {};

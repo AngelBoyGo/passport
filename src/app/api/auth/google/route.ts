@@ -13,24 +13,24 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/login?error=no_code", request.url));
   }
 
-  const clientId = process.env.GITHUB_CLIENT_ID;
-  const clientSecret = process.env.GITHUB_CLIENT_SECRET;
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
   if (!clientId || !clientSecret) {
-    return NextResponse.redirect(new URL("/login?error=github_not_configured", request.url));
+    return NextResponse.redirect(
+      new URL("/login?error=google_not_configured", request.url)
+    );
   }
 
-  // Exchange code for access token
-  const tokenRes = await fetch("https://github.com/login/oauth/access_token", {
+  const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      code,
       client_id: clientId,
       client_secret: clientSecret,
-      code,
+      redirect_uri: `${new URL(request.url).origin}/api/auth/google`,
+      grant_type: "authorization_code",
     }),
   });
 
@@ -38,32 +38,29 @@ export async function GET(request: NextRequest) {
   const accessToken = tokenData.access_token;
 
   if (!accessToken) {
-    return NextResponse.redirect(new URL("/login?error=github_auth_failed", request.url));
+    return NextResponse.redirect(
+      new URL("/login?error=google_auth_failed", request.url)
+    );
   }
 
-  // Get user info from GitHub
-  const userRes = await fetch("https://api.github.com/user", {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+  const userRes = await fetch(
+    "https://www.googleapis.com/oauth2/v2/userinfo",
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
   const user = await userRes.json();
 
   if (!user.email) {
-    // Fetch emails if primary email is private
-    const emailsRes = await fetch("https://api.github.com/user/emails", {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    const emails = await emailsRes.json();
-    const primary = emails.find((e: { primary: boolean }) => e.primary);
-    user.email = primary?.email || `${user.id}@github.user`;
+    return NextResponse.redirect(
+      new URL("/login?error=google_email_required", request.url)
+    );
   }
 
-  // Find or create operator
   let operator = await prisma.operator.findFirst({
     where: { email: user.email.toLowerCase() },
   });
 
   if (!operator) {
-    const stripeCustomerId = `cus_gh_${user.id}`;
+    const stripeCustomerId = `cus_google_${user.id}`;
     operator = await prisma.operator.create({
       data: {
         stripeCustomerId,
@@ -72,7 +69,6 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  // Create session
   const session = await createSession(operator.id);
 
   const response = NextResponse.redirect(new URL("/welcome", request.url));

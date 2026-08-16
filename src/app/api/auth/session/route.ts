@@ -1,28 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionFromToken } from "@/lib/auth/auth-service";
+import { sessionFromRequest } from "@/lib/auth/cookies";
 import { isExecutiveAdmin } from "@/lib/admin/admin-auth";
 
 export const dynamic = "force-dynamic";
 
+const NO_STORE = { "Cache-Control": "no-store, max-age=0" };
+
 export async function GET(request: NextRequest) {
-  const token = request.cookies.get("session_token")?.value;
-  if (!token) {
-    return NextResponse.json({ authenticated: false }, { status: 401 });
-  }
-
-  const session = await getSessionFromToken(token);
+  const session = await sessionFromRequest(request);
   if (!session) {
-    return NextResponse.json({ authenticated: false }, { status: 401 });
+    return NextResponse.json(
+      { authenticated: false },
+      { status: 401, headers: NO_STORE }
+    );
   }
 
-  return NextResponse.json({
-    authenticated: true,
-    executiveAdmin: isExecutiveAdmin(session.operator),
-    operator: {
-      id: session.operator.id,
-      email: session.operator.email,
-      credits: session.operator.credits,
-      tier: session.operator.tier,
+  return NextResponse.json(
+    {
+      authenticated: true,
+      executiveAdmin: isExecutiveAdmin(session.operator),
+      operator: {
+        id: session.operator.id,
+        email: session.operator.email,
+        credits: session.operator.credits,
+        tier: session.operator.tier,
+      },
     },
-  });
+    { headers: NO_STORE }
+  );
 }

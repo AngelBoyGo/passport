@@ -329,7 +329,7 @@ export default async function VerifyPage({
       <p className="mt-12 text-xs text-slate-400">
         Passport provides tamper-evident, verifiable integrity — not unforgeable
         honesty. Verify independently via{" "}
-        <a href="/api/v1/public-key" className="underline">
+        <a href="/public-key" className="underline">
           published public key
         </a>
         .

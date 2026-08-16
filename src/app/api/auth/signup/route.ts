@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { signup, createSession } from "@/lib/auth/auth-service";
+import { sessionCookieOptions } from "@/lib/auth/cookies";
 import { ensureOperator } from "@/lib/operator";
 
 export const dynamic = "force-dynamic";
@@ -38,13 +39,7 @@ export async function POST(request: NextRequest) {
     { status: 201 }
   );
 
-  response.cookies.set("session_token", session.token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 7 * 24 * 60 * 60,
-  });
+  response.cookies.set("session_token", session.token, sessionCookieOptions(request));
 
   return response;
 }

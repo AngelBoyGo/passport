@@ -7,6 +7,7 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
         <nav className="sticky top-20 space-y-1 text-sm">
           <p className="mb-2 font-semibold text-slate-900">Getting Started</p>
           <DocLink href="/docs/getting-started">Quickstart</DocLink>
+          <DocLink href="/docs/integrate">Integrate your agent</DocLink>
           <p className="mb-2 mt-6 font-semibold text-slate-900">API Reference</p>
           <DocLink href="/docs/api-reference">Overview</DocLink>
           <p className="mb-2 mt-6 font-semibold text-slate-900">Guides</p>
