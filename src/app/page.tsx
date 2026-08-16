@@ -18,35 +18,35 @@ export default function LandingPage() {
 
       <main className="flex-1">
         {/* Hero */}
-        <section className="mx-auto max-w-6xl px-6 py-24 text-center">
-          <p className="text-sm font-medium uppercase tracking-wide text-indigo-600">
+        <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24 text-center">
+          <p className="text-xs font-medium uppercase tracking-wide text-indigo-600 sm:text-sm">
             Receipts, not promises
           </p>
-          <h1 className="mt-4 text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
+          <h1 className="mt-4 text-3xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
             Identity gets your agent in the door.
             <br />
             <span className="text-indigo-600">
               A Passport tells the other side whether to ship.
             </span>
           </h1>
-          <p className="mx-auto mt-6 max-w-3xl text-lg text-slate-600">
+          <p className="mx-auto mt-4 max-w-3xl text-base text-slate-600 sm:mt-6 sm:text-lg">
             Portable, signed, tamper-evident behavioral receipts for AI agents.
             Hash-only storage, ed25519 signatures, public verification.
             Domain-scoped history — not a universal trust score.
           </p>
-          <div className="mt-10 flex flex-wrap justify-center gap-4">
+          <div className="mt-8 flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
             <LiveVerifyDemo />
             <Link
               href="/docs/getting-started"
-              className="rounded-lg border px-6 py-3 font-medium hover:bg-slate-50"
+              className="rounded-lg border px-6 py-3 text-sm font-medium hover:bg-slate-50 text-center"
             >
               Read the docs
             </Link>
           </div>
         </section>
 
-        <section className="border-y bg-slate-50 py-16">
-          <div className="mx-auto grid max-w-6xl gap-6 px-6 md:grid-cols-3">
+        <section className="border-y bg-slate-50 py-12 sm:py-16">
+          <div className="mx-auto grid max-w-6xl gap-4 px-4 sm:gap-6 sm:px-6 md:grid-cols-3">
             <Link href="/verify/demo" className="rounded-xl border bg-white p-6 transition hover:border-indigo-400">
               <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600">Verify a receipt</p>
               <h2 className="mt-2 text-xl font-semibold">Inspect the artifact before you trust it.</h2>
@@ -65,14 +65,14 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section className="mx-auto max-w-6xl px-6 py-20">
-          <div className="grid gap-10 md:grid-cols-[1fr_1.2fr] md:items-start">
+        <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-20">
+          <div className="grid gap-8 sm:gap-10 md:grid-cols-[1fr_1.2fr] md:items-start">
             <div>
-              <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600">Inspect the outcome</p>
-              <h2 className="mt-3 text-3xl font-bold tracking-tight">A receipt is more than success.</h2>
-              <p className="mt-4 text-slate-600">Passport preserves the operational result so counterparties can evaluate recovery and refusal behavior, not just a polished success count.</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600 sm:text-sm">Inspect the outcome</p>
+              <h2 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">A receipt is more than success.</h2>
+              <p className="mt-3 text-sm text-slate-600 sm:mt-4 sm:text-base">Passport preserves the operational result so counterparties can evaluate recovery and refusal behavior, not just a polished success count.</p>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-2 sm:gap-3 sm:grid-cols-2">
               {[
                 ["success", "Completed and signed"],
                 ["refusal", "Declined within authority"],
@@ -89,12 +89,12 @@ export default function LandingPage() {
         </section>
 
         {/* How it works */}
-        <section className="border-t bg-white py-20">
-          <div className="mx-auto max-w-6xl px-6">
-            <h2 className="text-center text-3xl font-bold tracking-tight">
+        <section className="border-t bg-white py-12 sm:py-20">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6">
+            <h2 className="text-center text-2xl font-bold tracking-tight sm:text-3xl">
               How it works
             </h2>
-            <div className="mt-12 grid gap-8 md:grid-cols-4">
+            <div className="mt-8 grid gap-6 sm:mt-12 sm:grid-cols-2 md:grid-cols-4">
               {[
                 {
                   step: "1",
@@ -138,14 +138,14 @@ export default function LandingPage() {
         <EnterpriseFeaturesSection />
 
         {/* Pricing */}
-        <section id="pricing" className="mx-auto max-w-6xl px-6 py-20">
-          <h2 className="text-center text-3xl font-bold tracking-tight">
+<section className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-20">
+          <h2 className="text-center text-2xl font-bold tracking-tight sm:text-3xl">
             Simple pricing
           </h2>
-           <p className="mx-auto mt-3 max-w-xl text-center text-slate-600">
+           <p className="mx-auto mt-3 max-w-xl text-center text-sm text-slate-600 sm:text-base">
              100 receipts/mo for experiments. 10,000 receipts/mo for a production agent fleet.
-          </p>
-          <div className="mt-12 grid gap-8 md:grid-cols-3">
+           </p>
+          <div className="mt-10 grid gap-6 sm:mt-12 md:grid-cols-3">
          <PricingCard
               name="Free"
               price="$0"

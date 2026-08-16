@@ -37,8 +37,8 @@ const footerLinks = [
 export function SiteFooter() {
   return (
     <footer className="border-t bg-slate-50">
-      <div className="mx-auto max-w-6xl px-6 py-12">
-        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-12">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {footerLinks.map((group) => (
             <div key={group.title}>
               <h4 className="mb-3 text-sm font-semibold text-slate-900">
