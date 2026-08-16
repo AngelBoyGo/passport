@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, Suspense, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
@@ -28,6 +28,19 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleClientId, setGoogleClientId] = useState("");
+  const [githubClientId, setGithubClientId] = useState("");
+
+  useEffect(() => {
+    fetch("/api/auth/google/config")
+      .then((r) => r.json())
+      .then((data) => setGoogleClientId(data.clientId || ""))
+      .catch(() => {});
+    fetch("/api/auth/github/config")
+      .then((r) => r.json())
+      .then((data) => setGithubClientId(data.clientId || ""))
+      .catch(() => {});
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -126,7 +139,7 @@ export default function LoginPage() {
             </div>
           </div>
           <a
-            href={`https://github.com/login/oauth/authorize?client_id=${process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID || "your_client_id"}&redirect_uri=${typeof window !== "undefined" ? `${window.location.origin}/api/auth/github` : ""}&scope=user:email`}
+            href={`https://github.com/login/oauth/authorize?client_id=${githubClientId}&redirect_uri=${typeof window !== "undefined" ? `${window.location.origin}/api/auth/github` : ""}&scope=user:email`}
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border py-2 text-sm font-medium hover:bg-slate-50"
           >
             <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
@@ -135,7 +148,7 @@ export default function LoginPage() {
             Continue with GitHub
           </a>
           <a
-            href={`https://accounts.google.com/o/oauth2/v2/auth?client_id=${typeof window !== "undefined" ? (process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "") : ""}&redirect_uri=${typeof window !== "undefined" ? `${window.location.origin}/api/auth/google` : ""}&response_type=code&scope=openid%20email%20profile`}
+            href={`https://accounts.google.com/o/oauth2/v2/auth?client_id=${googleClientId}&redirect_uri=${typeof window !== "undefined" ? `${window.location.origin}/api/auth/google` : ""}&response_type=code&scope=openid%20email%20profile`}
             className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border py-2 text-sm font-medium hover:bg-slate-50"
           >
             <svg className="h-5 w-5" viewBox="0 0 24 24">
