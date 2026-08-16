@@ -425,6 +425,7 @@ export type ReceiptPublicManifest = {
   parent_hash: null;
   observed_at: string;
   verification_status: "verified" | "failed" | null;
+  signature: string | null;
   masked_fields: readonly string[];
   proof_chain_available: boolean;
   inclusion_path: InclusionPathEntry[] | null;
@@ -526,6 +527,7 @@ export async function getReceiptPublicManifest(
     parent_hash: null,
     observed_at: receipt.issuedAt.toISOString(),
     verification_status,
+    signature: receipt.signature,
     masked_fields: [...MANIFEST_MASKED_FIELDS],
     proof_chain_available,
     inclusion_path,

@@ -1,33 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
 import { signup, createSession } from "@/lib/auth/auth-service";
 import { sessionCookieOptions } from "@/lib/auth/cookies";
-import { ensureOperator } from "@/lib/operator";
+import {
+  signupBodySchema,
+  zodValidationErrorResponse,
+} from "@/lib/validation/enrollmentSchemas";
+import {
+  checkInMemoryRateLimit,
+  clientIpFromRequest,
+  rateLimitResponse,
+} from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
-  let body: { email?: string; password?: string };
+  const ip = clientIpFromRequest(request.headers);
+  const rate = checkInMemoryRateLimit(`auth-signup:${ip}`, 5, 60_000);
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: "Too many signup attempts. Try again later." },
+      rateLimitResponse(rate, 5)
+    );
+  }
+
+  let body: unknown;
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  if (!body.email || !body.password) {
-    return NextResponse.json(
-      { error: "Email and password are required" },
-      { status: 400 }
-    );
+  const parsed = signupBodySchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(zodValidationErrorResponse(parsed.error), {
+      status: 400,
+    });
   }
 
-  if (body.password.length < 8) {
-    return NextResponse.json(
-      { error: "Password must be at least 8 characters" },
-      { status: 400 }
-    );
-  }
-
-  const result = await signup(body.email, body.password);
+  const result = await signup(parsed.data.email, parsed.data.password);
   if (result.error) {
     return NextResponse.json({ error: result.error }, { status: 409 });
   }

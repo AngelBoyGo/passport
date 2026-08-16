@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   checkEnrollmentRateLimit,
   clientIpFromRequest,
+  getEnrollmentRateLimitMax,
+  rateLimitResponse,
 } from "@/lib/rateLimit";
 import { requireTaskDeliverableServiceAuth } from "@/lib/enrollment/service-auth";
 import { ingestEnrolledEvidence } from "@/lib/enrollment/evidence-binding";
@@ -79,13 +81,15 @@ export async function POST(
     });
     return NextResponse.json(
       { error: "Rate limit exceeded" },
-      {
-        status: 429,
-        headers: rate.retryAfterSec
-          ? { "Retry-After": String(rate.retryAfterSec) }
-          : undefined,
-      }
+      rateLimitResponse(rate, getEnrollmentRateLimitMax())
     );
+  }
+
+  // Reject oversized payloads before parsing
+  const contentLength = request.headers.get("content-length");
+  const MAX_BODY_SIZE = 1_048_576; // 1 MB
+  if (contentLength && parseInt(contentLength, 10) > MAX_BODY_SIZE) {
+    return NextResponse.json({ error: "Payload too large" }, { status: 413 });
   }
 
   const { id } = await params;

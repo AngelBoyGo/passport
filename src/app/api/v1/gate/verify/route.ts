@@ -5,6 +5,8 @@ import { withRouteObservability } from "@/lib/observability/route-wrapper";
 import {
   checkInMemoryRateLimit,
   clientIpFromRequest,
+  rateLimitResponse,
+  GATE_VERIFY_MAX_REQUESTS,
 } from "@/lib/rateLimit";
 import { OperationalDomain } from "@prisma/client";
 
@@ -16,12 +18,7 @@ async function postGateVerify(request: NextRequest) {
   if (!rate.allowed) {
     return NextResponse.json(
       { error: "Rate limit exceeded" },
-      {
-        status: 429,
-        headers: rate.retryAfterSec
-          ? { "Retry-After": String(rate.retryAfterSec) }
-          : undefined,
-      }
+      rateLimitResponse(rate, GATE_VERIFY_MAX_REQUESTS)
     );
   }
 

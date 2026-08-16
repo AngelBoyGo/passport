@@ -1,13 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { deleteSession } from "@/lib/auth/auth-service";
-import { sessionCookieOptions, sessionTokensFromRequest } from "@/lib/auth/cookies";
+import { deleteAllSessionsForOperator, safeQuery } from "@/lib/auth/auth-service";
+import { sessionCookieOptions, sessionTokensFromRequest, sessionFromRequest } from "@/lib/auth/cookies";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
-  // Delete every session candidate the browser sent, not just the first.
+  // Resolve the session to find the operator ID, then delete ALL their sessions
+  const session = await sessionFromRequest(request);
+
+  // Delete every session token the browser sent
   for (const token of sessionTokensFromRequest(request)) {
-    await deleteSession(token);
+    await safeQuery(() =>
+      import("@/lib/db").then(({ prisma }) =>
+        prisma.session.deleteMany({ where: { token } })
+      )
+    );
+  }
+
+  // If we resolved the session, also delete all other sessions for this operator
+  if (session) {
+    await deleteAllSessionsForOperator(session.operator.id);
   }
 
   const response = NextResponse.json({ ok: true });

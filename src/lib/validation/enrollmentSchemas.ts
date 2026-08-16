@@ -60,4 +60,17 @@ export type EnrollStartBody = z.infer<typeof enrollStartBodySchema>;
 export type EnrollCompleteBody = z.infer<typeof enrollCompleteBodySchema>;
 export type UpdatePresentationBody = z.infer<typeof updatePresentationBodySchema>;
 
+export const loginBodySchema = z.object({
+  email: z.string().email("email must be a valid email address"),
+  password: z.string().min(1, "password is required"),
+});
+
+export const signupBodySchema = z.object({
+  email: z.string().email("email must be a valid email address"),
+  password: z.string().min(8, "password must be at least 8 characters"),
+});
+
+export type LoginBody = z.infer<typeof loginBodySchema>;
+export type SignupBody = z.infer<typeof signupBodySchema>;
+
 export { zodValidationErrorResponse } from "@/lib/validation/receiptSchemas";

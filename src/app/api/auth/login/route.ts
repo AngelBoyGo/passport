@@ -1,27 +1,46 @@
 import { NextRequest, NextResponse } from "next/server";
 import { login, createSession } from "@/lib/auth/auth-service";
 import { sessionCookieOptions } from "@/lib/auth/cookies";
+import {
+  loginBodySchema,
+  zodValidationErrorResponse,
+} from "@/lib/validation/enrollmentSchemas";
+import {
+  checkInMemoryRateLimit,
+  clientIpFromRequest,
+  rateLimitResponse,
+} from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
-  let body: { email?: string; password?: string };
+  const ip = clientIpFromRequest(request.headers);
+  const rate = checkInMemoryRateLimit(`auth-login:${ip}`, 10, 60_000);
+if (!rate.allowed) {
+    return NextResponse.json(
+      { error: "Too many login attempts. Try again later." },
+      rateLimitResponse(rate, 10)
+    );
+  }
+
+  let body: unknown;
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  if (!body.email || !body.password) {
-    return NextResponse.json(
-      { error: "Email and password are required" },
-      { status: 400 }
-    );
+  const parsed = loginBodySchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(zodValidationErrorResponse(parsed.error), {
+      status: 400,
+    });
   }
 
-  const result = await login(body.email, body.password);
+  const result = await login(parsed.data.email, parsed.data.password);
   if (result.error) {
-    return NextResponse.json({ error: result.error }, { status: 401 });
+    // Use generic message — don't leak whether email exists
+    return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
   }
 
   const session = await createSession(result.operator!.id);

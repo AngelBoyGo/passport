@@ -70,9 +70,17 @@ export async function ingestEnrolledEvidence(
       "subject_commitment must be a full 64-character hex string"
     );
   }
-  if (!/^[0-9a-f]{128}$/i.test(input.signature)) {
+  if (typeof input.signature !== "string" || input.signature.length === 0) {
+    throw new InvalidEnrollmentInputError("signature is required");
+  }
+  if (input.signature.length !== 128) {
     throw new InvalidEnrollmentInputError(
-      "signature must be a 128-character hex ed25519 signature"
+      `signature must be exactly 128 hex characters (got ${input.signature.length})`
+    );
+  }
+  if (/[^0-9a-f]/i.test(input.signature)) {
+    throw new InvalidEnrollmentInputError(
+      "signature contains non-hexadecimal characters"
     );
   }
 

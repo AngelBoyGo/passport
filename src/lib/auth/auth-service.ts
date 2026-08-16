@@ -1,10 +1,11 @@
 import { prisma } from "@/lib/db";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
+import { timingSafeEqual } from "node:crypto";
 
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
-function hashPassword(password: string): string {
+export function hashPassword(password: string): string {
   const iterations = 100_000;
   let hash = password;
   for (let i = 0; i < iterations; i++) {
@@ -13,8 +14,20 @@ function hashPassword(password: string): string {
   return hash;
 }
 
+export function timingSafeVerifyPassword(password: string, storedHash: string): boolean {
+  const inputHash = hashPassword(password);
+  try {
+    return (
+      inputHash.length === storedHash.length &&
+      timingSafeEqual(Buffer.from(inputHash), Buffer.from(storedHash))
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function verifyPassword(password: string, storedHash: string): boolean {
-  return hashPassword(password) === storedHash;
+  return timingSafeVerifyPassword(password, storedHash);
 }
 
 export function hashEmail(email: string): string {
@@ -125,4 +138,25 @@ export async function login(email: string, password: string) {
   }
 
   return { operator };
+}
+
+/**
+ * Deletes every session belonging to an operator (full logout).
+ * Used when rotating logout — clears stale shadowing tokens too.
+ */
+export async function deleteAllSessionsForOperator(operatorId: string) {
+  await prisma.session.deleteMany({ where: { operatorId } });
+}
+
+/**
+ * Wraps a Prisma query to return null instead of throwing on
+ * connection or migration errors. Routes that degrade gracefully
+ * should use this for non-critical queries.
+ */
+export async function safeQuery<T>(query: () => Promise<T>): Promise<T | null> {
+  try {
+    return await query();
+  } catch {
+    return null;
+  }
 }

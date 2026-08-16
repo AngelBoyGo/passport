@@ -140,3 +140,26 @@ export function clientIpFromRequest(headers: {
   }
   return headers.get("x-real-ip") ?? "unknown";
 }
+
+/**
+ * Builds 429 response headers with standard rate-limit fields.
+ * Routes should use this when returning a rate-limit rejection.
+ */
+export function rateLimitResponse(
+  rate: { allowed: boolean; retryAfterSec?: number },
+  limit: number
+): { status: 429; headers: Record<string, string> } {
+  const headers: Record<string, string> = {
+    "X-RateLimit-Limit": String(limit),
+    "X-RateLimit-Remaining": "0",
+    "X-RateLimit-Reset": String(
+      Math.ceil(
+        (Date.now() + (rate.retryAfterSec ?? 60) * 1000) / 1000
+      )
+    ),
+  };
+  if (rate.retryAfterSec) {
+    headers["Retry-After"] = String(rate.retryAfterSec);
+  }
+  return { status: 429, headers };
+}
