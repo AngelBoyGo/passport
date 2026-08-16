@@ -5,20 +5,24 @@ import { sessionCookieOptions } from "@/lib/auth/cookies";
 
 export const dynamic = "force-dynamic";
 
+function getBaseUrl(request: NextRequest): string {
+  return process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
+  const baseUrl = getBaseUrl(request);
 
   if (!code) {
-    return NextResponse.redirect(new URL("/login?error=no_code", request.url));
+    return NextResponse.redirect(new URL("/login?error=no_code", baseUrl));
   }
 
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-
   if (!clientId || !clientSecret) {
     return NextResponse.redirect(
-      new URL("/login?error=google_not_configured", request.url)
+      new URL("/login?error=google_not_configured", baseUrl)
     );
   }
 
@@ -29,17 +33,15 @@ export async function GET(request: NextRequest) {
       code,
       client_id: clientId,
       client_secret: clientSecret,
-      redirect_uri: `${new URL(request.url).origin}/api/auth/google`,
+      redirect_uri: `${baseUrl}/api/auth/google`,
       grant_type: "authorization_code",
     }),
   });
-
   const tokenData = await tokenRes.json();
   const accessToken = tokenData.access_token;
-
   if (!accessToken) {
     return NextResponse.redirect(
-      new URL("/login?error=google_auth_failed", request.url)
+      new URL("/login?error=google_auth_failed", baseUrl)
     );
   }
 
@@ -48,17 +50,15 @@ export async function GET(request: NextRequest) {
     { headers: { Authorization: `Bearer ${accessToken}` } }
   );
   const user = await userRes.json();
-
   if (!user.email) {
     return NextResponse.redirect(
-      new URL("/login?error=google_email_required", request.url)
+      new URL("/login?error=google_email_required", baseUrl)
     );
   }
 
   let operator = await prisma.operator.findFirst({
     where: { email: user.email.toLowerCase() },
   });
-
   if (!operator) {
     const stripeCustomerId = `cus_google_${user.id}`;
     operator = await prisma.operator.create({
@@ -70,9 +70,7 @@ export async function GET(request: NextRequest) {
   }
 
   const session = await createSession(operator.id);
-
-  const response = NextResponse.redirect(new URL("/welcome", request.url));
+  const response = NextResponse.redirect(new URL("/welcome", baseUrl));
   response.cookies.set("session_token", session.token, sessionCookieOptions(request));
-
   return response;
 }
