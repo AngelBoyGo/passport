@@ -48,6 +48,22 @@ export type CorsResolveResult = {
   block?: boolean;
 };
 
+/** Content-Security-Policy applied to all responses. Hosted Stripe Checkout only — no client-side Stripe.js on this domain, so script-src stays self-only. */
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data:",
+  "connect-src 'self' https://api.stripe.com",
+  "frame-src 'self' https://checkout.stripe.com https://js.stripe.com",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self' https://checkout.stripe.com",
+  "frame-ancestors 'none'",
+  "upgrade-insecure-requests",
+].join("; ");
+
 /** Static security headers applied to all responses via next.config.ts. */
 export const PRODUCTION_SECURITY_HEADERS: ReadonlyArray<{
   key: string;
@@ -64,6 +80,12 @@ export const PRODUCTION_SECURITY_HEADERS: ReadonlyArray<{
     key: "Strict-Transport-Security",
     value: "max-age=63072000; includeSubDomains; preload",
   },
+  {
+    key: "Content-Security-Policy",
+    value: CONTENT_SECURITY_POLICY,
+  },
+  { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+  { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
 ];
 
 /**
@@ -117,16 +139,13 @@ function buildCorsHeaderRecord(options: CorsOptions, origin: string | null): Rec
     "Access-Control-Max-Age": String(options.maxAge),
     Vary: "Origin",
   };
-
   if (options.allowedOrigins === "*") {
     headers["Access-Control-Allow-Origin"] = "*";
     return headers;
   }
-
   if (origin && isAllowedAdminOrigin(origin)) {
     headers["Access-Control-Allow-Origin"] = origin;
   }
-
   return headers;
 }
 
@@ -135,28 +154,23 @@ function buildCorsHeaderRecord(options: CorsOptions, origin: string | null): Rec
  */
 export function resolveCorsHeaders(input: CorsResolveInput): CorsResolveResult {
   const routeClass = classifyApiRoute(input.pathname);
-
   if (routeClass === "webhook" || routeClass === "other") {
     return { headers: {} };
   }
-
   if (routeClass === "public") {
     return {
       headers: buildCorsHeaderRecord(getPublicApiCorsOptions(), input.origin),
     };
   }
-
   // Admin corridor — server-side calls (no Origin) and Stripe-style integrations pass through.
   if (!input.origin) {
     return {
       headers: buildCorsHeaderRecord(getAdminApiCorsOptions(), input.origin),
     };
   }
-
   if (input.isProduction && !isAllowedAdminOrigin(input.origin)) {
     return { headers: {}, block: true };
   }
-
   return {
     headers: buildCorsHeaderRecord(getAdminApiCorsOptions(), input.origin),
   };
