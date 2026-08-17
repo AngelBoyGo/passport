@@ -36,6 +36,8 @@ function baseProfile(
         outcome: "produced",
       },
     ],
+    source_breakdown: [],
+    project_summary: [],
     trend_windows: {
       "7d": {
         success_rate: 1,
@@ -103,7 +105,7 @@ describe("mapAgentProfileToViewModel", () => {
     expect(view!.timelineRows).toHaveLength(1);
     expect(view!.timelineRows[0]).toMatchObject({
       outcome: "produced",
-      sourceType: "github_push_webhook",
+      sourceType: "GitHub Push",
     });
   });
 });

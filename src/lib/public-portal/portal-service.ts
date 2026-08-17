@@ -121,6 +121,10 @@ const EVIDENCE_SELECT = {
   artifactType: true,
   observedAt: true,
   agentIdentityCommitment: true,
+  commitSha: true,
+  externalTaskId: true,
+  repositoryCommitment: true,
+  sourceUrl: true,
 } as const;
 
 type EvidenceRow = {
@@ -132,6 +136,10 @@ type EvidenceRow = {
   artifactType: string;
   observedAt: Date;
   agentIdentityCommitment: string;
+  commitSha: string | null;
+  externalTaskId: string | null;
+  repositoryCommitment: string | null;
+  sourceUrl: string | null;
 };
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -277,6 +285,18 @@ export type AgentProfile = {
     normalized_event_type: Record<string, number>;
     error_tranche: Record<string, number>;
   };
+  source_breakdown: Array<{
+    source_type: string;
+    count: number;
+    artifacts: number;
+    successes: number;
+    failures: number;
+  }>;
+  project_summary: Array<{
+    label: string;
+    evidence_count: number;
+    last_seen: string;
+  }>;
   timeline: Array<{
     source_type: string;
     artifact_type: string;
@@ -330,6 +350,8 @@ export async function getAgentProfile(
         normalized_event_type: {},
         error_tranche: {},
       },
+      source_breakdown: [],
+      project_summary: [],
       timeline: [],
       trend_windows: {
         "7d": computeRates([]),
@@ -360,6 +382,45 @@ export async function getAgentProfile(
     (a, b) => a.observedAt.getTime() - b.observedAt.getTime()
   );
 
+  // ── Source breakdown ──
+  const sourceMap = new Map<string, { count: number; artifacts: number; successes: number; failures: number }>();
+  for (const e of events) {
+    let entry = sourceMap.get(e.sourceType);
+    if (!entry) {
+      entry = { count: 0, artifacts: 0, successes: 0, failures: 0 };
+      sourceMap.set(e.sourceType, entry);
+    }
+    entry.count++;
+    if (e.normalizedEventType === "AGENT_ARTIFACT_CREATED") entry.artifacts++;
+    if (e.normalizedEventType === "EXECUTION_FAILURE_OBSERVED") entry.failures++;
+    if (e.normalizedEventType === "VALIDATION_OBSERVED" || e.normalizedEventType === "AGENT_ARTIFACT_CREATED") entry.successes++;
+  }
+  const source_breakdown = Array.from(sourceMap.entries())
+    .map(([source_type, stats]) => ({ source_type, ...stats }))
+    .sort((a, b) => b.count - a.count);
+
+  // ── Project/repo summary ──
+  const projectMap = new Map<string, { evidence_count: number; last_seen: Date }>();
+  for (const e of events) {
+    const projectLabel =
+      e.externalTaskId ? `task:${e.externalTaskId}` :
+      e.commitSha ? `commit:${e.commitSha.slice(0, 12)}` :
+      e.repositoryCommitment ? `repo:${e.repositoryCommitment.slice(0, 12)}` :
+      e.sourceUrl ? `url:${new URL(e.sourceUrl).hostname}` :
+      e.sourceType;
+    const existing = projectMap.get(projectLabel);
+    if (existing) {
+      existing.evidence_count++;
+      if (e.observedAt > existing.last_seen) existing.last_seen = e.observedAt;
+    } else {
+      projectMap.set(projectLabel, { evidence_count: 1, last_seen: e.observedAt });
+    }
+  }
+  const project_summary = Array.from(projectMap.entries())
+    .map(([label, stats]) => ({ label, ...stats, last_seen: stats.last_seen.toISOString() }))
+    .sort((a, b) => b.evidence_count - a.evidence_count)
+    .slice(0, 10);
+
   return {
     agent_commitment_hash: agentCommitmentHash,
     enrollment_status,
@@ -382,6 +443,8 @@ export async function getAgentProfile(
       normalized_event_type: normalizedEventType,
       error_tranche: errorTranche,
     },
+    source_breakdown,
+    project_summary,
     timeline: events.slice(0, 50).map((e) => ({
       source_type: e.sourceType,
       artifact_type: e.artifactType,

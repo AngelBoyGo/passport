@@ -14,10 +14,20 @@ const baseViewModel: ProfileViewModel = {
   photoUrl: null,
   photoSha256Badge: null,
   showPhotoPlaceholder: true,
+  firstObservedAt: null,
+  lastObservedAt: null,
   timelineRows: [],
   totals: {
     evidenceCount: 1,
     artifactCount: 1,
+    correctionCount: 0,
+    failureCount: 0,
+  },
+  sourceBreakdown: [],
+  projectSummary: [],
+  trendWindows: {
+    "7d": { successRate: null, correctionRate: null, failureRate: null },
+    "30d": { successRate: null, correctionRate: null, failureRate: null },
   },
 };
 
