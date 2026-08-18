@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
+import { timingSafeEqual } from "node:crypto";
 import { hash as argon2Hash, verify as argon2Verify } from "@node-rs/argon2";
 
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -9,12 +10,38 @@ export async function hashPassword(password: string): Promise<string> {
   return argon2Hash(password, { algorithm: 2 as any, memoryCost: 19456, timeCost: 2, outputLen: 32 });
 }
 
-export async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
-  try {
-    return await argon2Verify(storedHash, password);
-  } catch {
-    return false;
+export function legacySha256HashPassword(password: string): string {
+  const iterations = 100_000;
+  let hash = password;
+  for (let i = 0; i < iterations; i++) {
+    hash = bytesToHex(sha256(utf8ToBytes(hash + "passport_salt_" + i)));
   }
+  return hash;
+}
+
+export async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
+  if (storedHash.startsWith("$argon2")) {
+    try {
+      return await argon2Verify(storedHash, password);
+    } catch {
+      return false;
+    }
+  }
+
+  // Legacy 100k SHA-256 hash backward-compatibility
+  if (/^[0-9a-f]{64}$/i.test(storedHash)) {
+    try {
+      const computed = legacySha256HashPassword(password);
+      return (
+        computed.length === storedHash.length &&
+        timingSafeEqual(Buffer.from(computed), Buffer.from(storedHash))
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
 }
 
 export function hashEmail(email: string): string {
@@ -68,10 +95,8 @@ export async function getSessionFromToken(token: string) {
  * Resolves a session from every session_token cookie the browser sent.
  *
  * Browsers can hold multiple cookies with the same name (host-only vs
- * Domain-scoped, differing paths from older deployments). The first cookie
- * in the header can be a stale token that shadows a freshly-issued one,
- * producing a login loop. Trying every candidate makes login resilient to
- * stale-cookie shadowing.
+ * Domain-scoped, differing paths from older deployments). Trying every
+ * candidate makes login resilient to stale-cookie shadowing.
  */
 export async function resolveSessionFromTokens(tokens: string[]) {
   for (const token of tokens) {
@@ -120,8 +145,22 @@ export async function login(email: string, password: string) {
     return { error: "Invalid email or password" };
   }
 
-  if (!await verifyPassword(password, operator.passwordHash)) {
+  const isValid = await verifyPassword(password, operator.passwordHash);
+  if (!isValid) {
     return { error: "Invalid email or password" };
+  }
+
+  // Transparently upgrade legacy SHA-256 hashes to Argon2id on successful login
+  if (!operator.passwordHash.startsWith("$argon2")) {
+    try {
+      const newHash = await hashPassword(password);
+      await prisma.operator.update({
+        where: { id: operator.id },
+        data: { passwordHash: newHash },
+      });
+    } catch {
+      // Non-critical background upgrade
+    }
   }
 
   return { operator };
@@ -129,7 +168,6 @@ export async function login(email: string, password: string) {
 
 /**
  * Deletes every session belonging to an operator (full logout).
- * Used when rotating logout — clears stale shadowing tokens too.
  */
 export async function deleteAllSessionsForOperator(operatorId: string) {
   await prisma.session.deleteMany({ where: { operatorId } });
@@ -137,8 +175,7 @@ export async function deleteAllSessionsForOperator(operatorId: string) {
 
 /**
  * Wraps a Prisma query to return null instead of throwing on
- * connection or migration errors. Routes that degrade gracefully
- * should use this for non-critical queries.
+ * connection or migration errors.
  */
 export async function safeQuery<T>(query: () => Promise<T>): Promise<T | null> {
   try {
