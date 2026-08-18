@@ -16,6 +16,9 @@ const { prismaMock } = vi.hoisted(() => ({
       create: vi.fn(),
       findMany: vi.fn(),
     },
+    operator: {
+      findFirst: vi.fn(),
+    },
     $queryRaw: vi.fn(),
   },
 }));
