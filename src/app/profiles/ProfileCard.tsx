@@ -36,7 +36,7 @@ export function ProfileCard({ view }: ProfileCardProps) {
         <header className="flex flex-col gap-6 sm:flex-row sm:items-start">
           <div className="shrink-0">
             {view.showPhotoPlaceholder ? (
-              <div className="flex h-32 w-32 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-xs text-slate-500">
+              <div data-testid="profile-photo-placeholder" className="flex h-32 w-32 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-xs text-slate-500">
                 No signed photo
               </div>
             ) : (
@@ -52,7 +52,7 @@ export function ProfileCard({ view }: ProfileCardProps) {
             <p className="text-sm text-slate-500">Agent commitment</p>
             <p className="mt-1 font-mono text-sm break-all">{view.fullCommitmentHash}</p>
             <p className="mt-1 font-mono text-xs text-slate-400">Footprint {view.commitmentShort}</p>
-            <span className="mt-3 inline-block rounded-full bg-indigo-50 px-3 py-1 text-sm font-medium text-indigo-800">
+            <span data-testid="enrollment-status" className="mt-3 inline-block rounded-full bg-indigo-50 px-3 py-1 text-sm font-medium text-indigo-800">
               {view.enrollmentStatusLabel}
             </span>
             {view.isEnrolledNoEvidence && (

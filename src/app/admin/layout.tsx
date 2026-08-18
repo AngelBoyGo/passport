@@ -98,6 +98,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <Link href="/admin/receipts" className="text-slate-600 hover:text-slate-900">
             Receipts
           </Link>
+          <Link href="/admin/webhooks" className="text-slate-600 hover:text-slate-900">
+            Webhooks
+          </Link>
           <Link href="/" className="text-slate-600 hover:text-slate-900">
             Site
           </Link>
