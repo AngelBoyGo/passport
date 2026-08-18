@@ -101,6 +101,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <Link href="/admin/webhooks" className="text-slate-600 hover:text-slate-900">
             Webhooks
           </Link>
+          <Link href="/admin/change-password" className="text-slate-600 hover:text-slate-900">
+            Password
+          </Link>
           <Link href="/" className="text-slate-600 hover:text-slate-900">
             Site
           </Link>

@@ -56,6 +56,7 @@ On the **Passport app service** → **Variables**, set:
 | `DATABASE_URL` | From Postgres plugin (internal URL is fine) |
 | `SIGNING_PRIVATE_KEY` | 64-hex from Section 1 (handoff) |
 | `INGESTION_COMMITMENT_SALT` | Long random string (same value across all app instances; never commit to git) |
+| `SESSION_SECRET` | 64-hex random string (generate with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`) |
 | `NEXT_PUBLIC_APP_URL` | `https://passport.metis.gold` |
 | `STRIPE_SECRET_KEY` | `sk_test_...` (rotate if previously exposed) |
 | `STRIPE_PRICE_PRO` | `price_...` from Section 3 |

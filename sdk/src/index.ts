@@ -6,6 +6,8 @@ export type {
   FinalizeStatus,
   GateVerifyResult,
   SignedReceipt,
+  EvidencePayload,
+  SignEvidenceResult,
 } from "./client.js";
 export {
   OPERATIONAL_DOMAINS,

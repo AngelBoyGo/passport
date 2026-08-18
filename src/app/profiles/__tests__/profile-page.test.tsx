@@ -25,6 +25,9 @@ const baseViewModel: ProfileViewModel = {
   },
   sourceBreakdown: [],
   projectSummary: [],
+  attributes: [],
+  archetype: "Generalist",
+  activitySummary: "Active agent",
   trendWindows: {
     "7d": { successRate: null, correctionRate: null, failureRate: null },
     "30d": { successRate: null, correctionRate: null, failureRate: null },

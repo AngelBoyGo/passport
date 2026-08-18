@@ -1,33 +1,20 @@
 import { prisma } from "@/lib/db";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { timingSafeEqual } from "node:crypto";
+import { hash as argon2Hash, verify as argon2Verify } from "@node-rs/argon2";
 
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
-export function hashPassword(password: string): string {
-  const iterations = 100_000;
-  let hash = password;
-  for (let i = 0; i < iterations; i++) {
-    hash = bytesToHex(sha256(utf8ToBytes(hash + "passport_salt_" + i)));
-  }
-  return hash;
+export async function hashPassword(password: string): Promise<string> {
+  return argon2Hash(password, { algorithm: 2 as any, memoryCost: 19456, timeCost: 2, outputLen: 32 });
 }
 
-export function timingSafeVerifyPassword(password: string, storedHash: string): boolean {
-  const inputHash = hashPassword(password);
+export async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
   try {
-    return (
-      inputHash.length === storedHash.length &&
-      timingSafeEqual(Buffer.from(inputHash), Buffer.from(storedHash))
-    );
+    return await argon2Verify(storedHash, password);
   } catch {
     return false;
   }
-}
-
-export function verifyPassword(password: string, storedHash: string): boolean {
-  return timingSafeVerifyPassword(password, storedHash);
 }
 
 export function hashEmail(email: string): string {
@@ -110,7 +97,7 @@ export async function signup(email: string, password: string) {
   }
 
   const stripeCustomerId = `cus_${hashEmail(normalizedEmail).slice(0, 24)}`;
-  const passwordHash = hashPassword(password);
+  const passwordHash = await hashPassword(password);
 
   const operator = await prisma.operator.create({
     data: {
@@ -133,7 +120,7 @@ export async function login(email: string, password: string) {
     return { error: "Invalid email or password" };
   }
 
-  if (!verifyPassword(password, operator.passwordHash)) {
+  if (!await verifyPassword(password, operator.passwordHash)) {
     return { error: "Invalid email or password" };
   }
 

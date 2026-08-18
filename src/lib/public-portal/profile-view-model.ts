@@ -52,6 +52,9 @@ export type ProfileViewModel = {
   totals: ProfileTotals;
   sourceBreakdown: ProfileViewSourceBreakdown[];
   projectSummary: ProfileViewProjectSummary[];
+  attributes: Array<{ name: string; score: number; description: string }>;
+  archetype: string;
+  activitySummary: string;
   trendWindows: {
     "7d": ProfileTrendWindow;
     "30d": ProfileTrendWindow;
@@ -120,6 +123,9 @@ export function mapAgentProfileToViewModel(
       evidenceCount: p.evidence_count,
       lastSeen: new Date(p.last_seen).toLocaleDateString(),
     })),
+    attributes: profile.attributes,
+    archetype: profile.archetype,
+    activitySummary: profile.activity_summary,
     trendWindows: {
       "7d": {
         successRate: profile.trend_windows["7d"]?.success_rate ?? null,

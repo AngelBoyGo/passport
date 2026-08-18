@@ -36,9 +36,12 @@ export function ProfileCard({ view }: ProfileCardProps) {
         <header className="flex flex-col gap-6 sm:flex-row sm:items-start">
           <div className="shrink-0">
             {view.showPhotoPlaceholder ? (
-              <div data-testid="profile-photo-placeholder" className="flex h-32 w-32 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-xs text-slate-500">
-                No signed photo
-              </div>
+              <img
+                data-testid="profile-photo-placeholder"
+                src={`/api/v1/avatar/${view.fullCommitmentHash}`}
+                alt="Agent avatar"
+                className="h-32 w-32 rounded-lg border"
+              />
             ) : (
               <figure>
                 <img src={view.photoUrl!} alt="Agent profile photo" className="h-32 w-32 rounded-lg border object-cover" />
@@ -75,6 +78,38 @@ export function ProfileCard({ view }: ProfileCardProps) {
             <Stat label="Artifacts produced" value={view.totals.artifactCount} sub="commits, traces, reports" />
             <Stat label="Corrections" value={view.totals.correctionCount} sub="human overrides" />
             <Stat label="Failures" value={view.totals.failureCount} sub="execution errors" />
+          </section>
+
+          {/* ── Archetype & attributes ── */}
+          <section className="rounded-lg border bg-white p-5 shadow-sm">
+            <div className="flex items-center gap-3">
+              <h2 className="text-sm font-semibold text-slate-900">Archetype</h2>
+              <span className="rounded-full bg-indigo-100 px-3 py-0.5 text-xs font-medium text-indigo-700">
+                {view.archetype}
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-slate-500">{view.activitySummary}</p>
+            {view.attributes.length > 0 && (
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {view.attributes.map((attr) => (
+                  <div key={attr.name} className="flex items-center gap-3">
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-slate-700">{attr.name}</span>
+                        <span className="text-xs font-mono text-slate-400">{attr.score}%</span>
+                      </div>
+                      <div className="mt-1 h-2 w-full rounded-full bg-slate-100">
+                        <div
+                          className="h-2 rounded-full bg-indigo-500"
+                          style={{ width: `${Math.min(attr.score, 100)}%` }}
+                        />
+                      </div>
+                      <p className="mt-0.5 text-xs text-slate-400">{attr.description}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
 
           {/* ── Trend windows ── */}

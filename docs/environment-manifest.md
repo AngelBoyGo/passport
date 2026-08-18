@@ -53,6 +53,7 @@ Names and purpose only. Set values in Railway Variables or your local `.env` —
 | `DATABASE_URL` | PostgreSQL connection string for Prisma |
 | `SIGNING_PRIVATE_KEY` | 32-byte ed25519 seed (64 hex chars) for receipt signing |
 | `INGESTION_COMMITMENT_SALT` | Salt for deterministic subject commitment hashing at ingestion |
+| `SESSION_SECRET` | 64-hex random string for session token signing |
 
 Validated at startup via `validateEnv()` (`src/lib/config/env.ts`). Missing required vars throw in `production` / `staging`.
 

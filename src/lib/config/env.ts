@@ -6,6 +6,7 @@ export const REQUIRED_PROD_ENV = [
   "DATABASE_URL",
   "SIGNING_PRIVATE_KEY",
   "INGESTION_COMMITMENT_SALT",
+  "SESSION_SECRET",
 ] as const;
 
 export const OPTIONAL_ENV = [

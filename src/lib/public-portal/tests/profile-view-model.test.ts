@@ -38,6 +38,9 @@ function baseProfile(
     ],
     source_breakdown: [],
     project_summary: [],
+    attributes: [],
+    archetype: "Generalist",
+    activity_summary: "Active agent",
     trend_windows: {
       "7d": {
         success_rate: 1,

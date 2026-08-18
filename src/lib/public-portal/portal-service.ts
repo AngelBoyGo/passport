@@ -247,7 +247,7 @@ export async function getLeaderboard(opts: {
           }),
         ]);
 
-      const rates30d = computeRates(events30d);
+const rates30d = computeRates(events30d);
 
       return {
         agent_commitment_hash: hash,
@@ -297,6 +297,13 @@ export type AgentProfile = {
     evidence_count: number;
     last_seen: string;
   }>;
+  attributes: Array<{
+    name: string;
+    score: number;
+    description: string;
+  }>;
+  archetype: string;
+  activity_summary: string;
   timeline: Array<{
     source_type: string;
     artifact_type: string;
@@ -352,6 +359,9 @@ export async function getAgentProfile(
       },
       source_breakdown: [],
       project_summary: [],
+      attributes: [],
+      archetype: "Unclassified",
+      activity_summary: "No evidence recorded yet",
       timeline: [],
       trend_windows: {
         "7d": computeRates([]),
@@ -421,6 +431,44 @@ export async function getAgentProfile(
     .sort((a, b) => b.evidence_count - a.evidence_count)
     .slice(0, 10);
 
+  // ── Agent attributes / archetype ──
+  const total = events.length;
+  const artifacts = events.filter((e) => e.normalizedEventType === "AGENT_ARTIFACT_CREATED").length;
+  const corrections = events.filter((e) => e.normalizedEventType === "HUMAN_CORRECTION_OBSERVED").length;
+  const failures = events.filter((e) => e.normalizedEventType === "EXECUTION_FAILURE_OBSERVED").length;
+  const validations = events.filter((e) => e.normalizedEventType === "VALIDATION_OBSERVED").length;
+
+  const artifactRate = total > 0 ? artifacts / total : 0;
+  const correctionRate = total > 0 ? corrections / total : 0;
+  const failureRate = total > 0 ? failures / total : 0;
+  const validationRate = total > 0 ? validations / total : 0;
+
+  const attributes = [
+    { name: "Builder", score: Math.round(artifactRate * 100), description: "Produces artifacts, commits, and deliverables" },
+    { name: "Validator", score: Math.round(validationRate * 100), description: "Validates outputs and checks quality" },
+    { name: "Learner", score: Math.round(correctionRate * 100), description: "Accepts corrections and improves over time" },
+    { name: "Explorer", score: Math.round(failureRate * 100), description: "Pushes boundaries, encounters edge cases" },
+  ].sort((a, b) => b.score - a.score);
+
+  const archetype =
+    artifactRate > 0.5 ? "Builder" :
+    validationRate > 0.3 ? "Validator" :
+    correctionRate > 0.3 ? "Learner" :
+    failureRate > 0.3 ? "Explorer" :
+    "Generalist";
+
+  const activitySummary = (() => {
+    const parts: string[] = [];
+    if (artifacts > 0) parts.push(`${artifacts} artifacts produced`);
+    if (corrections > 0) parts.push(`${corrections} corrections accepted`);
+    if (failures > 0) parts.push(`${failures} edge cases explored`);
+    if (validations > 0) parts.push(`${validations} validations performed`);
+    const sourceTypes = new Set(events.map((e: { sourceType: string }) => e.sourceType));
+    const sources = Array.from(sourceTypes).slice(0, 3).join(", ");
+    if (sources) parts.push(`via ${sources}`);
+    return parts.length > 0 ? parts.join(" · ") : "Active agent";
+  })();
+
   return {
     agent_commitment_hash: agentCommitmentHash,
     enrollment_status,
@@ -445,6 +493,9 @@ export async function getAgentProfile(
     },
     source_breakdown,
     project_summary,
+    attributes,
+    archetype,
+    activity_summary: activitySummary,
     timeline: events.slice(0, 50).map((e) => ({
       source_type: e.sourceType,
       artifact_type: e.artifactType,

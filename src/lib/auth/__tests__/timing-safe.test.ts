@@ -2,33 +2,27 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/db", () => ({ prisma: {} }));
 
-import { verifyPassword, hashPassword, timingSafeVerifyPassword } from "@/lib/auth/auth-service";
+import { verifyPassword, hashPassword } from "@/lib/auth/auth-service";
 
-describe("timing-safe password verification", () => {
-  it("accepts the correct password", () => {
-    const hash = hashPassword("correct-password");
-    expect(verifyPassword("correct-password", hash)).toBe(true);
+describe("argon2 password verification", () => {
+  it("accepts the correct password", async () => {
+    const hash = await hashPassword("correct-password");
+    expect(await verifyPassword("correct-password", hash)).toBe(true);
   });
 
-  it("rejects an incorrect password", () => {
-    const hash = hashPassword("correct-password");
-    expect(verifyPassword("wrong-password", hash)).toBe(false);
+  it("rejects an incorrect password", async () => {
+    const hash = await hashPassword("correct-password");
+    expect(await verifyPassword("wrong-password", hash)).toBe(false);
   });
 
-  it("handles empty password", () => {
-    const hash = hashPassword("");
-    expect(verifyPassword("", hash)).toBe(true);
-    expect(verifyPassword("x", hash)).toBe(false);
+  it("handles empty password", async () => {
+    const hash = await hashPassword("");
+    expect(await verifyPassword("", hash)).toBe(true);
+    expect(await verifyPassword("x", hash)).toBe(false);
   });
 
-  it("handles different-length hashes without throwing", () => {
-    expect(verifyPassword("a", "short")).toBe(false);
-    expect(verifyPassword("a", "")).toBe(false);
-  });
-
-  it("uses timingSafeEqual internally", () => {
-    const hash = hashPassword("test");
-    expect(timingSafeVerifyPassword("test", hash)).toBe(true);
-    expect(timingSafeVerifyPassword("wrong", hash)).toBe(false);
+  it("handles different-length hashes without throwing", async () => {
+    expect(await verifyPassword("a", "short")).toBe(false);
+    expect(await verifyPassword("a", "")).toBe(false);
   });
 });

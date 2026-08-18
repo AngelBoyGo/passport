@@ -12,6 +12,7 @@ const SECRET_VALUES = {
   DATABASE_URL: "postgresql://user:secret@host/db",
   SIGNING_PRIVATE_KEY: "deadbeef".repeat(8),
   INGESTION_COMMITMENT_SALT: "super-secret-salt-value",
+  SESSION_SECRET: "test-session-secret-hex-value",
   STRIPE_SECRET_KEY: "sk_live_super_secret",
   STRIPE_WEBHOOK_SECRET: "whsec_super_secret",
   STRIPE_PRICE_PRO: "price_super_secret",
@@ -62,6 +63,7 @@ describe("validateEnv", () => {
     env().SIGNING_PRIVATE_KEY = SECRET_VALUES.SIGNING_PRIVATE_KEY;
     env().INGESTION_COMMITMENT_SALT =
       SECRET_VALUES.INGESTION_COMMITMENT_SALT;
+    env().SESSION_SECRET = SECRET_VALUES.SESSION_SECRET;
 
     const result = validateEnv({ mode: "production" });
     expect(result.ok).toBe(true);
@@ -74,6 +76,7 @@ describe("validateEnv", () => {
     env().SIGNING_PRIVATE_KEY = SECRET_VALUES.SIGNING_PRIVATE_KEY;
     env().INGESTION_COMMITMENT_SALT =
       SECRET_VALUES.INGESTION_COMMITMENT_SALT;
+    env().SESSION_SECRET = SECRET_VALUES.SESSION_SECRET;
     delete env().EVIDENCE_BRIDGE_OPERATOR_ID;
     delete env().EVIDENCE_ENFORCEMENT_ENABLED;
     delete env().NEXT_PUBLIC_APP_URL;
@@ -135,6 +138,7 @@ describe("validateEnv", () => {
     env().SIGNING_PRIVATE_KEY = SECRET_VALUES.SIGNING_PRIVATE_KEY;
     env().INGESTION_COMMITMENT_SALT =
       SECRET_VALUES.INGESTION_COMMITMENT_SALT;
+    env().SESSION_SECRET = SECRET_VALUES.SESSION_SECRET;
     env().STRIPE_SECRET_KEY = SECRET_VALUES.STRIPE_SECRET_KEY;
     env().STRIPE_WEBHOOK_SECRET = SECRET_VALUES.STRIPE_WEBHOOK_SECRET;
     env().STRIPE_PRICE_PRO = SECRET_VALUES.STRIPE_PRICE_PRO;
