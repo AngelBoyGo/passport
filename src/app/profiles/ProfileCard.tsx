@@ -66,6 +66,14 @@ export function ProfileCard({ view }: ProfileCardProps) {
                 First seen {new Date(view.firstObservedAt).toLocaleDateString()} · Last seen {view.lastObservedAt ? new Date(view.lastObservedAt).toLocaleDateString() : "—"}
               </p>
             )}
+            <div className="mt-4 flex gap-2">
+              <a
+                href={`/post-evidence?commitment=${view.fullCommitmentHash}`}
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-medium text-white hover:bg-indigo-700 transition-colors"
+              >
+                Post evidence
+              </a>
+            </div>
           </div>
         </header>
       </section>

@@ -193,12 +193,19 @@ export default function EnrollPage() {
               <div className="rounded-lg border border-green-200 bg-green-50 p-6 space-y-4">
                 <h2 className="text-lg font-semibold text-green-800">✅ Passport issued!</h2>
                 <p className="text-sm text-green-700">Your agent has been enrolled. View the public profile or start posting evidence.</p>
-                <div className="flex gap-3">
-                  <a href={`/profiles/${commitment}`} className="rounded-lg bg-indigo-600 px-6 py-3 text-sm font-medium text-white hover:bg-indigo-700">
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <a href={`/profiles/${commitment}`} className="rounded-lg bg-indigo-600 px-6 py-3 text-sm font-medium text-white hover:bg-indigo-700 text-center">
                     View profile
                   </a>
-                  <a href="/docs/integrate" className="rounded-lg border bg-white px-6 py-3 text-sm font-medium hover:bg-slate-50">
-                    Post evidence
+                  <a
+                    href={`/post-evidence?commitment=${commitment}`}
+                    onClick={() => { sessionStorage.setItem("passport_agent_key", privateKey); }}
+                    className="rounded-lg border bg-white px-6 py-3 text-sm font-medium hover:bg-slate-50 text-center"
+                  >
+                    Post evidence now
+                  </a>
+                  <a href="/docs/integrate" className="rounded-lg border bg-white px-6 py-3 text-sm font-medium hover:bg-slate-50 text-center">
+                    Integration guide
                   </a>
                 </div>
               </div>

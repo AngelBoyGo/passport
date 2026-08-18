@@ -14,6 +14,7 @@ export function SiteHeader() {
     { href: "/docs/getting-started", label: "Docs" },
     { href: "/docs/api-reference", label: "API" },
     { href: "/leaderboard", label: "Leaderboard" },
+    { href: "/post-evidence", label: "Post Evidence" },
     { href: "/#pricing", label: "Pricing" },
     { href: "/public-key", label: "Public Key" },
   ];
