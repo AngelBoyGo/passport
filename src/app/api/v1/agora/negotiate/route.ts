@@ -29,19 +29,23 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Resolve operator ID for capability ledger foreign key
-  const authenticatedOperator = await authenticateApiKey(request.headers.get("authorization"));
-  const operator = authenticatedOperator ?? (await prisma.operator.findFirst({ select: { id: true } }));
+  try {
+    const authenticatedOperator = await authenticateApiKey(request.headers.get("authorization"));
+    const operator = authenticatedOperator ?? (await prisma.operator.findFirst({ select: { id: true } }));
 
-  if (operator) {
-    await prisma.capabilityLedgerEntry.create({
-      data: {
-        operatorId: operator.id,
-        agentId: body.from_commitment,
-        eventType: `agora:${body.action}`,
-        metadata: JSON.stringify({ proposal_id: body.proposal_id, terms: body.terms }),
-      },
-    });
+    if (operator) {
+      await prisma.capabilityLedgerEntry.create({
+        data: {
+          operatorId: operator.id,
+          agentId: body.from_commitment.slice(0, 64),
+          eventType: `agora:${body.action}`,
+          metadata: JSON.stringify({ proposal_id: body.proposal_id, terms: body.terms }),
+        },
+      });
+    }
+  } catch (err) {
+    // Ledger recording error should not crash the negotiation proposal response
+    console.error("Agora negotiation ledger persistence error:", err);
   }
 
   return NextResponse.json(
