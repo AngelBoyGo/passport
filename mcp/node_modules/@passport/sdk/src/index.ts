@@ -27,3 +27,8 @@ export type {
   MastraWorkflowLike,
   MastraPassportMiddlewareOptions,
 } from "./middleware/mastra.js";
+export {
+  withPassportAudit,
+  classifyExecutionError,
+} from "./middleware/audit.js";
+export type { PassportAuditOptions } from "./middleware/audit.js";

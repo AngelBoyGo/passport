@@ -37,6 +37,8 @@
     "@noble/hashes": "^2.2.0",
     "@node-rs/argon2": "^2.1.0",
     "@prisma/client": "^6.19.0",
+    "@upstash/ratelimit": "^2.0.8",
+    "@upstash/redis": "^1.38.2",
     "next": "16.2.9",
     "playwright": "^1.62.1",
     "react": "19.2.4",

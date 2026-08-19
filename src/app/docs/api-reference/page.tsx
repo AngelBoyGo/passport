@@ -6,6 +6,40 @@ export default function DocsApiReference() {
         <p className="mt-2 text-slate-600">
           Every endpoint, method, and response shape for the Passport API.
         </p>
+
+        {/* Machine-readable Discovery Cards */}
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          <div className="rounded-xl border border-indigo-200 bg-indigo-50/70 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">OpenAPI 3.1.0</p>
+            <h3 className="mt-1 font-semibold text-slate-900">Machine-readable Spec</h3>
+            <p className="mt-1 text-xs text-slate-600">Import directly into Swagger UI, Postman, or API gateways.</p>
+            <div className="mt-3 flex gap-2">
+              <a
+                href="/api/v1/openapi.json"
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 transition"
+              >
+                View openapi.json →
+              </a>
+            </div>
+          </div>
+          <div className="rounded-xl border border-sky-200 bg-sky-50/70 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">Model Context Protocol</p>
+            <h3 className="mt-1 font-semibold text-slate-900">MCP Tool Manifest</h3>
+            <p className="mt-1 text-xs text-slate-600">Connect Cursor, Claude Code, and autonomous agents natively.</p>
+            <div className="mt-3 flex gap-2">
+              <a
+                href="/.well-known/mcp.json"
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-700 transition"
+              >
+                View mcp.json →
+              </a>
+            </div>
+          </div>
+        </div>
       </div>
 
       <Section title="Authentication">

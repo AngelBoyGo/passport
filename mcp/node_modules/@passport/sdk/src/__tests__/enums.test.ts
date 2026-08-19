@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { ErrorTranche, OperationalDomain } from "@prisma/client";
+import { createRequire } from "node:module";
+import { resolve } from "node:path";
 import { ERROR_TRANCHES, OPERATIONAL_DOMAINS } from "../enums.js";
+
+const rootRequire = createRequire(resolve(__dirname, "../../../package.json"));
+const { ErrorTranche, OperationalDomain } = rootRequire("@prisma/client");
 
 describe("enum drift guard", () => {
   it("OPERATIONAL_DOMAINS matches Prisma OperationalDomain enum", () => {

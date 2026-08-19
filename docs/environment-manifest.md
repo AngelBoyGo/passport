@@ -80,6 +80,8 @@ If `STRIPE_SECRET_KEY` is unset, the app runs in dev/mock billing mode.
 | `ENROLLMENT_CHALLENGE_TTL_SECONDS` | TTL for enrollment challenges |
 | `ENROLLMENT_RATE_LIMIT_MAX` | Max enrollment attempts per window |
 | `ENROLLMENT_RATE_LIMIT_WINDOW_MS` | Enrollment rate-limit window (ms) |
+| `UPSTASH_REDIS_REST_URL` | Upstash Redis REST URL for distributed multi-replica rate limiting |
+| `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis REST token for distributed rate limiting |
 
 ### Runtime (set by platform)
 

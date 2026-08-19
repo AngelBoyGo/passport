@@ -1,3 +1,6 @@
+"use client";
+
+import { useState, useCallback } from "react";
 import Link from "next/link";
 import type { ProfileViewModel } from "@/lib/public-portal/profile-view-model";
 
@@ -26,8 +29,46 @@ function Bar({ label, value, max, color }: { label: string; value: number; max: 
   );
 }
 
+function EmbedSnippet({ label, code }: { label: string; code: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = useCallback(() => {
+    if (typeof navigator !== "undefined") {
+      navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }, [code]);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium text-slate-600">{label}</span>
+        <button
+          type="button"
+          onClick={copy}
+          className="text-xs text-indigo-600 hover:text-indigo-800 transition"
+        >
+          {copied ? "✓ Copied!" : "Copy"}
+        </button>
+      </div>
+      <pre className="mt-1 overflow-x-auto rounded bg-slate-50 p-2 font-mono text-[11px] text-slate-700 select-all border border-slate-200">
+        {code}
+      </pre>
+    </div>
+  );
+}
+
 export function ProfileCard({ view }: ProfileCardProps) {
   const maxSrc = Math.max(1, ...view.sourceBreakdown.map((s) => s.count));
+  const [showEmbeds, setShowEmbeds] = useState(false);
+
+  const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://passport.metis.gold";
+  const badgeUrl = `${baseUrl}/api/v1/badge/${view.fullCommitmentHash}`;
+  const profileUrl = `${baseUrl}/profiles/${view.fullCommitmentHash}`;
+  const didUrl = `${baseUrl}/api/v1/anp/agents/${view.fullCommitmentHash}`;
+
+  const mdSnippet = `[![Passport Verified](${badgeUrl})](${profileUrl})`;
+  const htmlSnippet = `<a href="${profileUrl}"><img src="${badgeUrl}" alt="Passport Verified" /></a>`;
 
   return (
     <article className="space-y-6">
@@ -40,7 +81,7 @@ export function ProfileCard({ view }: ProfileCardProps) {
                 data-testid="profile-photo-placeholder"
                 src={`/api/v1/avatar/${view.fullCommitmentHash}`}
                 alt="Agent avatar"
-                className="h-32 w-32 rounded-lg border"
+                className="h-32 w-32 rounded-lg border object-cover"
               />
             ) : (
               <figure>
@@ -66,16 +107,50 @@ export function ProfileCard({ view }: ProfileCardProps) {
                 First seen {new Date(view.firstObservedAt).toLocaleDateString()} · Last seen {view.lastObservedAt ? new Date(view.lastObservedAt).toLocaleDateString() : "—"}
               </p>
             )}
-            <div className="mt-4 flex gap-2">
+            <div className="mt-4 flex flex-wrap gap-2">
               <a
                 href={`/post-evidence?commitment=${view.fullCommitmentHash}`}
                 className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-medium text-white hover:bg-indigo-700 transition-colors"
               >
                 Post evidence
               </a>
+              <button
+                type="button"
+                onClick={() => setShowEmbeds(!showEmbeds)}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                {showEmbeds ? "Hide Badge & Embeds ▲" : "Share & Embed Badge ▼"}
+              </button>
             </div>
           </div>
         </header>
+
+        {/* Expandable Badge & Embed Panel */}
+        {showEmbeds && (
+          <div className="mt-6 border-t pt-5 space-y-4">
+            <div>
+              <p className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Live Badge Preview</p>
+              <div className="mt-2 flex items-center gap-3">
+                <img src={badgeUrl} alt="Passport Live Badge" className="h-5" />
+                <span className="text-xs text-slate-500">Updates dynamically based on verified evidence count</span>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <EmbedSnippet label="Markdown (GitHub README)" code={mdSnippet} />
+              <EmbedSnippet label="HTML" code={htmlSnippet} />
+            </div>
+
+            <div className="pt-2 flex flex-wrap gap-4 text-xs text-slate-500">
+              <a href={didUrl} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline">
+                W3C Agent DID Document (JSON-LD) →
+              </a>
+              <a href="/.well-known/agent.json" target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline">
+                A2A Agent Card →
+              </a>
+            </div>
+          </div>
+        )}
       </section>
 
       {view.totals.evidenceCount > 0 && (

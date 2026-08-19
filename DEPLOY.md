@@ -57,6 +57,8 @@ On the **Passport app service** → **Variables**, set:
 | `SIGNING_PRIVATE_KEY` | 64-hex from Section 1 (handoff) |
 | `INGESTION_COMMITMENT_SALT` | Long random string (same value across all app instances; never commit to git) |
 | `SESSION_SECRET` | 64-hex random string (generate with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`) |
+| `UPSTASH_REDIS_REST_URL` | Optional: Upstash Redis REST URL for multi-replica distributed rate-limiting |
+| `UPSTASH_REDIS_REST_TOKEN` | Optional: Upstash Redis REST token |
 | `NEXT_PUBLIC_APP_URL` | `https://passport.metis.gold` |
 | `STRIPE_SECRET_KEY` | `sk_test_...` (rotate if previously exposed) |
 | `STRIPE_PRICE_PRO` | `price_...` from Section 3 |

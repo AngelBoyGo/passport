@@ -1,0 +1,125 @@
+import { NextRequest, NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
+
+/**
+ * GET /.well-known/mcp.json — Model Context Protocol (MCP) tool manifest.
+ *
+ * Exposes standardized tools for Claude Code, Cursor, Windsurf, LangChain,
+ * and autonomous agents to integrate with Passport trust substrate.
+ */
+export async function GET(request: NextRequest) {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin;
+
+  const manifest = {
+    schema_version: "2024-11-05",
+    name: "passport",
+    display_name: "Passport Trust Substrate",
+    description: "Tamper-evident behavioral receipt verification, gate checks, and evidence anchoring for AI agents.",
+    homepage: baseUrl,
+    documentation: `${baseUrl}/docs/api-reference`,
+    tools: [
+      {
+        name: "passport_gate_verify",
+        description: "Evaluate domain SLA compliance and minimum escrow bond before invoking an external AI agent.",
+        parameters: {
+          type: "object",
+          required: ["operator_id", "domain"],
+          properties: {
+            operator_id: {
+              type: "string",
+              description: "Public operator ID (op_cus_...)",
+            },
+            domain: {
+              type: "string",
+              enum: [
+                "FINANCIAL_CLEARING",
+                "CUSTOMER_SUPPORT",
+                "CODE_GENERATION",
+                "SYSTEM_INTEGRATION",
+              ],
+              description: "Operational domain to verify against.",
+            },
+          },
+        },
+        endpoint: `${baseUrl}/api/v1/gate/verify`,
+        method: "POST",
+      },
+      {
+        name: "passport_post_evidence",
+        description: "Anchor signed behavioral evidence for an enrolled agent on the privacy-preserving Passport ledger.",
+        parameters: {
+          type: "object",
+          required: ["subject_commitment", "source_type", "payload", "signature"],
+          properties: {
+            subject_commitment: {
+              type: "string",
+              description: "64-character hex identity commitment of the enrolled agent.",
+            },
+            source_type: {
+              type: "string",
+              enum: [
+                "github_push_webhook",
+                "github_commit_payload",
+                "github_issue_event",
+                "compliance_report",
+                "otel_genai_trace",
+                "task_deliverable",
+              ],
+            },
+            payload: {
+              type: "object",
+              description: "JSON object matching the selected source_type schema.",
+            },
+            signature: {
+              type: "string",
+              description: "128-hex Ed25519 signature over sha256(canonicalJson(payload)).",
+            },
+          },
+        },
+        endpoint: `${baseUrl}/api/v1/passport/agents/{subject_commitment}/evidence`,
+        method: "POST",
+      },
+      {
+        name: "passport_verify_receipt",
+        description: "Fetch a public receipt manifest and verify its Ed25519 signature and hash inclusion path.",
+        parameters: {
+          type: "object",
+          required: ["receipt_id"],
+          properties: {
+            receipt_id: {
+              type: "string",
+              description: "Receipt ID (rcpt_...)",
+            },
+          },
+        },
+        endpoint: `${baseUrl}/api/v1/receipts/{receipt_id}/public-manifest`,
+        method: "GET",
+      },
+      {
+        name: "passport_get_profile",
+        description: "Retrieve an agent's behavioral archetype, evidence count, and performance trajectory.",
+        parameters: {
+          type: "object",
+          required: ["commitment_hash"],
+          properties: {
+            commitment_hash: {
+              type: "string",
+              description: "64-character hex agent identity commitment.",
+            },
+          },
+        },
+        endpoint: `${baseUrl}/api/v1/profiles/{commitment_hash}`,
+        method: "GET",
+      },
+    ],
+  };
+
+  return NextResponse.json(manifest, {
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "public, max-age=3600",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
+}

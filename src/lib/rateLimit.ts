@@ -1,3 +1,6 @@
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
+
 type RateBucket = { count: number; windowStart: number; lastAccess: number };
 
 const buckets = new Map<string, RateBucket>();
@@ -5,8 +8,12 @@ const buckets = new Map<string, RateBucket>();
 export const GATE_VERIFY_MAX_REQUESTS = 30;
 export const GATE_VERIFY_WINDOW_MS = 60_000;
 export const RATE_LIMIT_MAX_BUCKETS = 10_000;
+export const REDIS_TIMEOUT_MS = 1500;
 
 let rateLimitMaxBucketsOverride: number | null = null;
+let upstashRatelimitInstance: Ratelimit | null = null;
+let upstashRedisInstance: Redis | null = null;
+let upstashDisabled = false;
 
 /**
  * Overrides bucket cap for unit tests; pass null to restore production default.
@@ -53,12 +60,106 @@ export function getEnrollmentRateLimitWindowMs(): number {
 }
 
 /**
- * Named enrollment rate limiter (env-tunable per instance).
+ * Initializes or retrieves the Upstash Ratelimit client if credentials are set.
+ */
+export function getUpstashRatelimit(
+  max: number = GATE_VERIFY_MAX_REQUESTS,
+  windowMs: number = GATE_VERIFY_WINDOW_MS
+): Ratelimit | null {
+  if (upstashDisabled) return null;
+  const url = process.env.UPSTASH_REDIS_REST_URL?.trim();
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
+
+  if (!url || !token) {
+    return null;
+  }
+
+  if (!upstashRedisInstance) {
+    upstashRedisInstance = new Redis({ url, token });
+  }
+
+  const windowSec = Math.max(1, Math.round(windowMs / 1000));
+  return new Ratelimit({
+    redis: upstashRedisInstance,
+    limiter: Ratelimit.slidingWindow(max, `${windowSec} s`),
+    analytics: false,
+    prefix: "passport_rl",
+  });
+}
+
+/**
+ * Forces or disables Upstash for testing.
+ */
+export function setUpstashForTest(ratelimit: Ratelimit | null, disabled = false): void {
+  upstashRatelimitInstance = ratelimit;
+  upstashDisabled = disabled;
+}
+
+/**
+ * Distributed rate limiter with automatic in-memory sliding window fallback.
+ */
+export async function checkRateLimit(
+  key: string,
+  max: number = GATE_VERIFY_MAX_REQUESTS,
+  windowMs: number = GATE_VERIFY_WINDOW_MS
+): Promise<{ allowed: boolean; retryAfterSec?: number; remaining?: number; limit: number }> {
+  const upstash = upstashRatelimitInstance ?? getUpstashRatelimit(max, windowMs);
+
+  if (upstash) {
+    try {
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Upstash rate limit timeout")), REDIS_TIMEOUT_MS)
+      );
+
+      const result = await Promise.race([upstash.limit(key), timeoutPromise]);
+
+      if (!result.success) {
+        const retryAfterSec = Math.max(1, Math.ceil((result.reset - Date.now()) / 1000));
+        return {
+          allowed: false,
+          retryAfterSec,
+          remaining: result.remaining,
+          limit: result.limit,
+        };
+      }
+
+      return {
+        allowed: true,
+        remaining: result.remaining,
+        limit: result.limit,
+      };
+    } catch (err) {
+      console.warn("Upstash rate limiting failed, falling back to in-memory:", err instanceof Error ? err.message : err);
+    }
+  }
+
+  const inMem = checkInMemoryRateLimit(key, max, windowMs);
+  return {
+    ...inMem,
+    limit: max,
+  };
+}
+
+/**
+ * Named enrollment rate limiter (env-tunable per instance, distributed when Redis is configured).
  */
 export function checkEnrollmentRateLimit(
   key: string
 ): { allowed: boolean; retryAfterSec?: number } {
   return checkInMemoryRateLimit(
+    key,
+    getEnrollmentRateLimitMax(),
+    getEnrollmentRateLimitWindowMs()
+  );
+}
+
+/**
+ * Async version of enrollment rate limiter with Redis support.
+ */
+export async function checkEnrollmentRateLimitAsync(
+  key: string
+): Promise<{ allowed: boolean; retryAfterSec?: number; remaining?: number; limit: number }> {
+  return checkRateLimit(
     key,
     getEnrollmentRateLimitMax(),
     getEnrollmentRateLimitWindowMs()
@@ -92,7 +193,7 @@ function pruneRateLimitBuckets(now: number, windowMs: number): void {
 }
 
 /**
- * Simple in-memory rate limiter. Production should use Redis or a CDN edge limiter.
+ * Simple in-memory rate limiter.
  */
 export function checkInMemoryRateLimit(
   key: string,
@@ -126,6 +227,9 @@ export function checkInMemoryRateLimit(
 export function resetInMemoryRateLimits(): void {
   buckets.clear();
   rateLimitMaxBucketsOverride = null;
+  upstashRatelimitInstance = null;
+  upstashRedisInstance = null;
+  upstashDisabled = false;
 }
 
 /**
