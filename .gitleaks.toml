@@ -1,0 +1,30 @@
+# Passport Security — Git Secrets & Dependency Scanning
+
+extends: https://raw.githubusercontent.com/gitleaks/gitleaks/master/.gitleaks.toml
+
+[allowlist]
+description = "Passport-specific allowlist — known safe patterns"
+
+paths = [
+  # Test fixtures and SDK examples
+  "sdk/src/__tests__/",
+  "src/lib/__tests__/",
+  "src/lib/ingestion/tests/",
+  "src/lib/public-portal/tests/",
+  "python/tests/",
+  "audit/",
+  "docs/",
+  "*.md",
+]
+
+[allowlist.regexes]
+description = "Known safe regex patterns"
+
+# Example key hashes used in tests
+- (?i)deadbeef
+- (?i)example\.com
+- (?i)localhost
+- (?i)vitest-
+- (?i)pp_test
+- (?i)sk_test_
+- (?i)whsec_test

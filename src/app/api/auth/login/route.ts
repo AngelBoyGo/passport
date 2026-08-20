@@ -10,24 +10,33 @@ import {
   clientIpFromRequest,
   rateLimitResponse,
 } from "@/lib/rateLimit";
+import { verifyTurnstileToken } from "@/lib/security/turnstile";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
   const ip = clientIpFromRequest(request.headers);
   const rate = checkInMemoryRateLimit(`auth-login:${ip}`, 10, 60_000);
-if (!rate.allowed) {
+  if (!rate.allowed) {
     return NextResponse.json(
       { error: "Too many login attempts. Try again later." },
       rateLimitResponse(rate, 10)
     );
   }
 
-  let body: unknown;
+  let body: { email?: string; password?: string; turnstile_token?: string };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  // Turnstile bot protection check
+  if (process.env.TURNSTILE_SECRET_KEY && body.turnstile_token) {
+    const turnstileResult = await verifyTurnstileToken(body.turnstile_token);
+    if (!turnstileResult.success) {
+      return NextResponse.json({ error: "Bot verification failed. Please try again." }, { status: 403 });
+    }
   }
 
   const parsed = loginBodySchema.safeParse(body);
