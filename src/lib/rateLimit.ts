@@ -10,6 +10,36 @@ export const GATE_VERIFY_WINDOW_MS = 60_000;
 export const RATE_LIMIT_MAX_BUCKETS = 10_000;
 export const REDIS_TIMEOUT_MS = 1500;
 
+export const TIER_RATE_LIMITS = {
+  free: 60,
+  pro: 600,
+  enterprise: 3000,
+} as const;
+
+export type OperatorTier = keyof typeof TIER_RATE_LIMITS;
+
+/**
+ * Returns the request quota per minute for a given operator tier.
+ */
+export function getRateLimitForTier(tier?: string): number {
+  if (tier && tier.toLowerCase() in TIER_RATE_LIMITS) {
+    return TIER_RATE_LIMITS[tier.toLowerCase() as OperatorTier];
+  }
+  return TIER_RATE_LIMITS.free;
+}
+
+/**
+ * Checks rate limits for authenticated operator actions keyed by operator ID.
+ */
+export async function checkOperatorTierRateLimit(
+  operatorId: string,
+  tier?: string,
+  windowMs: number = GATE_VERIFY_WINDOW_MS
+): Promise<{ allowed: boolean; retryAfterSec?: number; remaining?: number; limit: number }> {
+  const quota = getRateLimitForTier(tier);
+  return checkRateLimit(`operator:${operatorId}`, quota, windowMs);
+}
+
 let rateLimitMaxBucketsOverride: number | null = null;
 let upstashRatelimitInstance: Ratelimit | null = null;
 let upstashRedisInstance: Redis | null = null;

@@ -1,5 +1,6 @@
 import { exec as execCallback } from "node:child_process";
 import { promisify } from "node:util";
+import { createCipheriv, randomBytes } from "node:crypto";
 import { redactDatabaseUrl } from "./backup-args";
 
 const execAsync = promisify(execCallback);
@@ -34,6 +35,83 @@ type ParsedPostgresUrl = {
   password: string;
   database: string;
 };
+
+export interface EncryptedBackupPayload {
+  iv: string;
+  authTag: string;
+  ciphertext: string;
+}
+
+export interface R2UploadOptions {
+  sqlDump: string | Buffer;
+  accountId: string;
+  bucket: string;
+  keyName: string;
+  encryptionKeyHex: string;
+}
+
+/**
+ * Encrypts a SQL dump using AES-256-GCM.
+ */
+export function encryptBackupPayload(
+  sqlDump: string | Buffer,
+  keyHex: string
+): EncryptedBackupPayload {
+  const key = Buffer.from(keyHex.slice(0, 64), "hex");
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+
+  const inputBuffer = typeof sqlDump === "string" ? Buffer.from(sqlDump, "utf-8") : sqlDump;
+  const encrypted = Buffer.concat([cipher.update(inputBuffer), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+
+  return {
+    iv: iv.toString("hex"),
+    authTag: authTag.toString("hex"),
+    ciphertext: encrypted.toString("base64"),
+  };
+}
+
+/**
+ * Builds a Cloudflare R2 S3-compatible REST URL.
+ */
+export function buildR2EndpointUrl(
+  accountId: string,
+  bucket: string,
+  keyName: string
+): string {
+  return `https://${accountId}.r2.cloudflarestorage.com/${bucket}/${keyName}`;
+}
+
+/**
+ * Encrypts and uploads a database dump to Cloudflare R2 object storage.
+ */
+export async function uploadBackupToR2(
+  options: R2UploadOptions
+): Promise<{ ok: boolean; url?: string; error?: string }> {
+  try {
+    const encrypted = encryptBackupPayload(options.sqlDump, options.encryptionKeyHex);
+    const targetUrl = buildR2EndpointUrl(options.accountId, options.bucket, options.keyName);
+    const body = JSON.stringify(encrypted);
+
+    const res = await fetch(targetUrl, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "X-Passport-Backup-Encrypted": "aes-256-gcm",
+      },
+      body,
+    });
+
+    if (!res.ok) {
+      return { ok: false, error: `R2 returned HTTP ${res.status}` };
+    }
+
+    return { ok: true, url: targetUrl };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
 
 /**
  * Parses a PostgreSQL connection URL into pg_dump-friendly fields.

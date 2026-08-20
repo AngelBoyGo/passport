@@ -20,22 +20,20 @@ const mockSubs = [
 ];
 
 beforeEach(() => {
-  localStorage.clear();
-  localStorage.setItem("passport_admin_key", "pp_test_key");
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input, opts) => {
     const path = typeof input === "string" ? input : input instanceof URL ? input.pathname : "";
     const method = (opts?.method as string) ?? "GET";
 
-    if (path === "/api/v1/webhooks" && method === "GET") {
+    if (path.includes("/api/admin/webhooks") && method === "GET") {
       return new Response(JSON.stringify(mockSubs), { status: 200 });
     }
-    if (path === "/api/v1/webhooks" && method === "POST") {
+    if (path.includes("/api/admin/webhooks") && method === "POST") {
       return new Response(
         JSON.stringify({ id: "wh-3", url: "https://new.com/hook", events: ["evidence.anchored"], secret: "whsec_test_secret", active: true }),
         { status: 201 }
       );
     }
-    if (typeof path === "string" && path.startsWith("/api/v1/webhooks/") && method === "DELETE") {
+    if (typeof path === "string" && path.includes("/api/admin/webhooks/") && method === "DELETE") {
       return new Response(null, { status: 204 });
     }
     return new Response(JSON.stringify({ error: "not found" }), { status: 404 });
@@ -47,11 +45,9 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("AdminWebhooks", () => {
-  it("loads and displays webhook subscriptions", async () => {
+describe("AdminWebhooks (Session-Authenticated)", () => {
+  it("auto-loads and displays webhook subscriptions on mount", async () => {
     render(<AdminWebhooks />);
-    const loadBtn = screen.getByRole("button", { name: /load/i });
-    fireEvent.click(loadBtn);
 
     await waitFor(() => {
       expect(screen.getByText(/example\.com/)).toBeInTheDocument();
@@ -64,8 +60,6 @@ describe("AdminWebhooks", () => {
       new Response(JSON.stringify([]), { status: 200 })
     );
     render(<AdminWebhooks />);
-    const loadBtn = screen.getByRole("button", { name: /load/i });
-    fireEvent.click(loadBtn);
 
     await waitFor(() => {
       expect(screen.getByText(/no webhooks configured/i)).toBeInTheDocument();
@@ -77,12 +71,12 @@ describe("AdminWebhooks", () => {
     const urlInput = screen.getByPlaceholderText(/https:\/\/example/);
     fireEvent.change(urlInput, { target: { value: "https://new.com/hook" } });
 
-    const createBtn = screen.getByRole("button", { name: /^Create$/ });
+    const createBtn = screen.getByRole("button", { name: /create subscription/i });
     fireEvent.click(createBtn);
 
     await waitFor(() => {
       expect(globalThis.fetch).toHaveBeenCalledWith(
-        "/api/v1/webhooks",
+        "/api/admin/webhooks",
         expect.objectContaining({
           method: "POST",
           body: expect.stringContaining("new.com"),
@@ -95,8 +89,6 @@ describe("AdminWebhooks", () => {
     vi.spyOn(globalThis, "confirm").mockReturnValue(true);
 
     render(<AdminWebhooks />);
-    const loadBtn = screen.getByRole("button", { name: /load/i });
-    fireEvent.click(loadBtn);
 
     await waitFor(() => {
       expect(screen.getByText(/example\.com/)).toBeInTheDocument();
@@ -108,7 +100,7 @@ describe("AdminWebhooks", () => {
 
     await waitFor(() => {
       expect(globalThis.fetch).toHaveBeenCalledWith(
-        "/api/v1/webhooks/wh-1",
+        "/api/admin/webhooks/wh-1",
         expect.objectContaining({ method: "DELETE" })
       );
     });
@@ -117,8 +109,6 @@ describe("AdminWebhooks", () => {
   it("shows error for API failures", async () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Network failure"));
     render(<AdminWebhooks />);
-    const loadBtn = screen.getByRole("button", { name: /load/i });
-    fireEvent.click(loadBtn);
 
     await waitFor(() => {
       expect(screen.getByText(/network failure/i)).toBeInTheDocument();

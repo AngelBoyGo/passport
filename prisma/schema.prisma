@@ -235,6 +235,8 @@ model AgentEvidence {
   evidenceReceiptLinks EvidenceReceiptLink[]
 
   @@index([agentIdentityCommitment, observedAt])
+  @@index([agentIdentityCommitment, observedAt, normalizedEventType])
+  @@index([observedAt, normalizedEventType])
   @@index([externalTaskId])
   @@index([agentIdentityCommitment, externalTaskId])
 }
@@ -356,4 +358,15 @@ model WebhookSubscription {
   operator Operator @relation(fields: [operatorId], references: [id], onDelete: Cascade)
 
   @@index([operatorId])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([token])
 }

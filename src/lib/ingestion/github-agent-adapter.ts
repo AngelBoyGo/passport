@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { sha256Hex, canonicalJson } from "@/lib/receipt/canonical";
 import { prisma } from "@/lib/db";
+import { invalidateLeaderboardCache } from "@/lib/public-portal/portal-service";
 
 // ---------------------------------------------------------------------------
 // Taxonomy (TS unions — not Prisma enums)
@@ -861,4 +862,5 @@ export async function persistEvidence(
       update: {},
     });
   }
+  invalidateLeaderboardCache();
 }

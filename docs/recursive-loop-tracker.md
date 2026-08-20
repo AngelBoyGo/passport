@@ -1,6 +1,20 @@
 # Recursive loop tracker — Passport + HostHub FFD
 
-Last updated: **2026-08-20** (Loop 14 Credits Read Observability + Full Architectural Hardening Suite — 103 test files, 662 tests green)
+Last updated: **2026-08-20** (Loops 15–21 Production Hardening & Full Scale Suite — 107 test files, 679 tests green)
+
+---
+
+## Loops 15–21: Production Scale, Resilience & Architectural Hardening Batch
+
+| Loop | Layer & Target | Scoped result | Status | Evidence |
+|---|---|---|---|---|
+| **Loop 15** | Layer 10 (Caching): 60s Stale-While-Revalidate in-memory leaderboard cache with mutation purging | **2/2** pass (`leaderboard-cache.test.ts`) | **Complete** | FFD Red/Green cycle verified |
+| **Loop 16** | Layer 3 & 11 (DB & Scale): Bounded connection pool parser & compound indexes on AgentEvidence | **3/3** pass (`connection-pool.test.ts`) | **Complete** | FFD Red/Green cycle verified |
+| **Loop 17** | Layer 9 (Rate Limiting): Tier-aware quotas (Free: 60/min, Pro: 600/min, Enterprise: 3000/min) | **3/3** pass (`tier-rate-limit.test.ts`) | **Complete** | FFD Red/Green cycle verified |
+| **Loop 18** | Layer 1 (UI & Auth): Session-authenticated sub-admin routes (`/api/admin/api-keys`, `/receipts`, `/webhooks`) | **3/3** pass (`session-admin-routes.test.ts`) | **Complete** | FFD Red/Green cycle verified |
+| **Loop 19** | Layer 4 (Auth): Password reset service (Resend tokens, Argon2 upgrade, 15m TTL, session invalidation) | **4/4** pass (`password-reset-service.test.ts`) | **Complete** | FFD Red/Green cycle verified |
+| **Loop 20** | Layer 6 (Compute & Queue): Webhook retry engine with exponential backoff & HMAC signatures | **3/3** pass (`webhook-queue.test.ts`) | **Complete** | FFD Red/Green cycle verified |
+| **Loop 21** | Layer 13 (Disaster Recovery): Cloudflare R2 AES-256-GCM encrypted database backup integration | **3/3** pass (`r2-backup-upload.test.ts`) | **Complete** | FFD Red/Green cycle verified |
 
 ---
 

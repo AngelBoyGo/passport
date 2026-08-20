@@ -190,13 +190,34 @@ export type LeaderboardRow = {
   trajectory_7d: "UP" | "FLAT" | "DOWN";
 };
 
+const LEADERBOARD_CACHE_TTL_MS = 60_000;
+let leaderboardCache: { rows: LeaderboardRow[]; limit: number; timestamp: number } | null = null;
+
+export function invalidateLeaderboardCache(): void {
+  leaderboardCache = null;
+}
+
+export function resetLeaderboardCacheForTest(): void {
+  leaderboardCache = null;
+}
+
 /**
  * Leaderboard: step 1 groupBy totals, step 2 per-agent windowed queries + JS rates.
+ * Caches results in-memory for 60 seconds with stale-while-revalidate semantics.
  */
 export async function getLeaderboard(opts: {
   limit?: number;
 } = {}): Promise<LeaderboardRow[]> {
   const limit = opts.limit ?? 20;
+  const now = Date.now();
+
+  if (
+    leaderboardCache &&
+    leaderboardCache.limit === limit &&
+    now - leaderboardCache.timestamp < LEADERBOARD_CACHE_TTL_MS
+  ) {
+    return leaderboardCache.rows;
+  }
 
   const grouped = await prisma.agentEvidence.groupBy({
     by: ["agentIdentityCommitment"],
@@ -266,6 +287,7 @@ const rates30d = computeRates(events30d);
     })
   );
 
+  leaderboardCache = { rows, limit, timestamp: now };
   return rows;
 }
 

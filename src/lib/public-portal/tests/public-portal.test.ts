@@ -74,6 +74,7 @@ import {
   getAgentProfile,
   getReceiptPublicManifest,
   parseLeaderboardLimit,
+  resetLeaderboardCacheForTest,
 } from "@/lib/public-portal/portal-service";
 import { REFERENCE_AGENTS } from "@/lib/reference-agents/registry";
 import {
@@ -134,6 +135,7 @@ function assertNoRawLeakage(value: unknown) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  resetLeaderboardCacheForTest();
   findManyMock.mockResolvedValue([]);
   countMock.mockResolvedValue(0);
   findBridgeMock.mockResolvedValue(null);
