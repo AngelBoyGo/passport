@@ -6,13 +6,14 @@ import {
 import { isValidAgentCommitmentHash } from "@/lib/public-portal/portal-service";
 import { getAccountBalances } from "@/lib/angelcoin/ledger-service";
 import { angelcoinErrorResponse } from "@/lib/angelcoin/route-errors";
+import { withRouteObservability } from "@/lib/observability/route-wrapper";
 
 export const dynamic = "force-dynamic";
 
 /**
  * GET /api/v1/passport/agents/:id/credits — public AngelCoin balances.
  */
-export async function GET(
+async function handleGetCredits(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -53,3 +54,5 @@ export async function GET(
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+export const GET = withRouteObservability(handleGetCredits, "credits_read");

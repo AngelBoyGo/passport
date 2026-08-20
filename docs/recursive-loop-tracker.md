@@ -1,6 +1,16 @@
 # Recursive loop tracker — Passport + HostHub FFD
 
-Last updated: **2026-07-04** (Loop 5 key-management runbook — full suite green)
+Last updated: **2026-08-20** (Loop 14 Credits Read Observability + Full Architectural Hardening Suite — 103 test files, 662 tests green)
+
+---
+
+## Loop 14 — Credits Read Observability & Complete Edge Architecture (Layer 12)
+
+**Goal:** Close deferred Loop 12 item — wire `GET /api/v1/passport/agents/:id/credits` with `withRouteObservability("credits_read")`, ensuring UUID `request_id`, latency, and outcome logging.
+
+| Loop | Scope | Scoped result | Status | Evidence |
+|------|-------|---------------|--------|----------|
+| **Loop 14** | `credits/route.ts` wired to `withRouteObservability` | **1/1** pass (`credits-observability.test.ts`) | **Complete** | FFD red/green cycle verified |
 
 ---
 
