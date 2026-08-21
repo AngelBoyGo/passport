@@ -112,6 +112,62 @@ export async function GET(request: NextRequest) {
         endpoint: `${baseUrl}/api/v1/profiles/{commitment_hash}`,
         method: "GET",
       },
+      {
+        name: "passport_get_verifiable_credential",
+        description: "Fetch a signed W3C Verifiable Credential representing an agent's portable reputation.",
+        parameters: {
+          type: "object",
+          required: ["commitment_hash"],
+          properties: {
+            commitment_hash: {
+              type: "string",
+              description: "64-character hex agent identity commitment.",
+            },
+          },
+        },
+        endpoint: `${baseUrl}/api/v1/credentials/{commitment_hash}`,
+        method: "GET",
+      },
+      {
+        name: "passport_verify_credential",
+        description: "Verify any external W3C AgentReputationCredential offline against the issuer's Ed25519 signature.",
+        parameters: {
+          type: "object",
+          required: ["credential"],
+          properties: {
+            credential: {
+              type: "object",
+              description: "Full JSON-LD Verifiable Credential object.",
+            },
+          },
+        },
+        endpoint: `${baseUrl}/api/v1/credentials/verify`,
+        method: "POST",
+      },
+      {
+        name: "passport_get_compliance_package",
+        description: "Generate an audit-grade compliance evidence package mapped to NIST AI RMF, EU AI Act, or SOC2.",
+        parameters: {
+          type: "object",
+          required: ["commitment_hash"],
+          properties: {
+            commitment_hash: { type: "string", description: "64-character hex agent identity commitment." },
+            framework: { type: "string", enum: ["NIST_AI_RMF", "EU_AI_ACT", "SOC2_TYPE2", "ISO_42001"] },
+          },
+        },
+        endpoint: `${baseUrl}/api/v1/compliance/packages/{commitment_hash}`,
+        method: "GET",
+      },
+      {
+        name: "passport_get_merkle_checkpoint",
+        description: "Retrieve the latest signed Merkle checkpoint root over finalized receipts.",
+        parameters: {
+          type: "object",
+          properties: {},
+        },
+        endpoint: `${baseUrl}/api/v1/receipts/checkpoints/latest`,
+        method: "GET",
+      },
     ],
   };
 

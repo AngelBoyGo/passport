@@ -217,6 +217,47 @@ export async function GET(request: NextRequest) {
           responses: { "201": { description: "Proposal recorded on capability ledger" } },
         },
       },
+      "/api/v1/credentials/{commitment}": {
+        get: {
+          summary: "Issue Signed W3C Verifiable Credential for Agent Reputation",
+          parameters: [{ name: "commitment", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "W3C AgentReputationCredential (JSON-LD)" } },
+        },
+      },
+      "/api/v1/credentials/verify": {
+        post: {
+          summary: "Verify any W3C AgentReputationCredential Offline / Self-Contained",
+          responses: { "200": { description: "Verification success" }, "422": { description: "Tampered or invalid signature" } },
+        },
+      },
+      "/api/v1/transparency/keys": {
+        get: {
+          summary: "Public Append-Only Key Transparency Log",
+          responses: { "200": { description: "Log of all verifier signing keys with validity windows" } },
+        },
+      },
+      "/api/v1/receipts/checkpoints/latest": {
+        get: {
+          summary: "Get Latest Ed25519-Signed Merkle Checkpoint Root over Finalized Receipts",
+          responses: { "200": { description: "Signed Merkle checkpoint anchor" } },
+        },
+      },
+      "/api/v1/compliance/packages/{commitment}": {
+        get: {
+          summary: "Generate Audit-Grade Compliance Package (NIST AI RMF / EU AI Act / SOC2)",
+          parameters: [
+            { name: "commitment", in: "path", required: true, schema: { type: "string" } },
+            { name: "framework", in: "query", required: false, schema: { type: "string", enum: ["NIST_AI_RMF", "EU_AI_ACT", "SOC2_TYPE2", "ISO_42001"] } },
+          ],
+          responses: { "200": { description: "Signed compliance evidence package" } },
+        },
+      },
+      "/api/v1/compliance/frameworks": {
+        get: {
+          summary: "List Supported Compliance Frameworks & Control Mappings",
+          responses: { "200": { description: "List of frameworks" } },
+        },
+      },
     },
   };
 

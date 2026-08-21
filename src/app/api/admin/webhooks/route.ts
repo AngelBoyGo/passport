@@ -38,6 +38,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "url and events are required" }, { status: 400 });
   }
 
+  const validEvents = [
+    "evidence.anchored",
+    "enrollment.completed",
+    "reputation.degraded",
+    "reputation.restored",
+    "reputation.milestone",
+  ];
+  const invalidEvents = body.events.filter((e) => !validEvents.includes(e));
+  if (invalidEvents.length > 0) {
+    return NextResponse.json(
+      { error: `Invalid events: ${invalidEvents.join(", ")}. Valid: ${validEvents.join(", ")}` },
+      { status: 400 }
+    );
+  }
+
   const secret = generateWebhookSecret();
   const sub = await prisma.webhookSubscription.create({
     data: {

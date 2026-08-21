@@ -1,6 +1,19 @@
 # Recursive loop tracker — Passport + HostHub FFD
 
-Last updated: **2026-08-20** (Loops 15–21 Production Hardening & Full Scale Suite — 107 test files, 679 tests green)
+Last updated: **2026-08-20** (Loop 22 Strategic Moat Expansion & Standards Suite — 114 test files, 694 tests green)
+
+---
+
+## Loop 22: Strategic Moat Expansion & Standards Suite
+
+| Loop | Scope & Recommendation | Scoped result | Status | Evidence |
+|---|---|---|---|---|
+| **Loop 22.1** | W3C Verifiable Credentials: Portable Agent Reputation (`/api/v1/credentials/:commitment`) | **3/3** pass (`portable-reputation.test.ts`) | **Complete** | FFD Red/Green cycle verified |
+| **Loop 22.2** | Key Transparency Log & Zero-Dependency Offline Verifier Kit (`/api/v1/transparency/keys`) | **3/3** pass (`key-transparency.test.ts`) | **Complete** | FFD Red/Green cycle verified |
+| **Loop 22.3** | Tamper-Proof Merkle Chain Checkpointing (`/api/v1/receipts/checkpoints/latest`) | **4/4** pass (`merkle-checkpoint.test.ts`) | **Complete** | FFD Red/Green cycle verified |
+| **Loop 22.4** | Audit-Grade Compliance Packages (NIST AI RMF, EU AI Act, SOC2) (`/api/v1/compliance/packages/:id`) | **1/1** pass (`compliance-package.test.ts`) | **Complete** | FFD Red/Green cycle verified |
+| **Loop 22.5** | Real-Time Reputation Webhook Signals (`reputation.degraded`, `reputation.restored`, `reputation.milestone`) | **2/2** pass (`reputation-signals.test.ts`) | **Complete** | FFD Red/Green cycle verified |
+| **Loop 22.6** | Machine-Readable Discovery: OpenAPI 3.1.0 (17 paths) & MCP Manifest (8 tools) | **2/2** pass (`openapi.test.ts`, `mcp-manifest.test.ts`) | **Complete** | FFD Red/Green cycle verified |
 
 ---
 

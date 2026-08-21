@@ -2,7 +2,12 @@ import { prisma } from "@/lib/db";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 
-export type WebhookEvent = "evidence.anchored" | "enrollment.completed";
+export type WebhookEvent =
+  | "evidence.anchored"
+  | "enrollment.completed"
+  | "reputation.degraded"
+  | "reputation.restored"
+  | "reputation.milestone";
 
 export interface WebhookDeliveryOptions {
   url: string;
@@ -120,6 +125,31 @@ export async function dispatchWebhook(
   } catch (err) {
     console.warn("Failed to query webhook subscriptions for dispatch:", err);
   }
+}
+
+/**
+ * Evaluates real-time reputation status changes (e.g., failure threshold breach or milestone)
+ * and dispatches webhook events to registered gateway subscribers.
+ */
+export async function evaluateAndDispatchReputationSignals(
+  operatorId: string,
+  agentCommitment: string,
+  signal: {
+    event: "reputation.degraded" | "reputation.restored" | "reputation.milestone";
+    reason?: string;
+    failure_rate?: number;
+    previous_failure_rate?: number;
+    milestone?: number;
+    evidence_count?: number;
+  }
+) {
+  const payload = {
+    agent_commitment: agentCommitment,
+    ...signal,
+    timestamp: new Date().toISOString(),
+  };
+
+  await dispatchWebhook(operatorId, signal.event, payload);
 }
 
 export function generateWebhookSecret(): string {

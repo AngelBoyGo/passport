@@ -14,11 +14,17 @@ type Subscription = {
 const EVENT_LABELS: Record<string, string> = {
   evidence_anchored: "Evidence Anchored",
   enrollment_completed: "Enrollment Completed",
+  reputation_degraded: "Reputation Degraded (SLA Breach)",
+  reputation_restored: "Reputation Restored",
+  reputation_milestone: "Reputation Milestone",
 };
 
 const EVENT_RAW: Record<string, string> = {
   evidence_anchored: "evidence.anchored",
   enrollment_completed: "enrollment.completed",
+  reputation_degraded: "reputation.degraded",
+  reputation_restored: "reputation.restored",
+  reputation_milestone: "reputation.milestone",
 };
 
 export default function AdminWebhooks() {

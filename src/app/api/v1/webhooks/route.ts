@@ -43,7 +43,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const validEvents = ["evidence.anchored", "enrollment.completed"];
+  const validEvents = [
+    "evidence.anchored",
+    "enrollment.completed",
+    "reputation.degraded",
+    "reputation.restored",
+    "reputation.milestone",
+  ];
   const invalidEvents = body.events.filter((e) => !validEvents.includes(e));
   if (invalidEvents.length > 0) {
     return NextResponse.json(
