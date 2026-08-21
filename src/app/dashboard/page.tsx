@@ -516,6 +516,32 @@ export default function UserDashboard() {
                   <p className="mt-1 text-slate-400">Cryptographically proves all agent actions were authorized via Ed25519 possession proofs.</p>
                 </div>
               </div>
+
+              <div className="rounded-xl border border-emerald-800/40 bg-emerald-950/20 p-5 space-y-3">
+                <div>
+                  <h3 className="text-sm font-bold text-emerald-300">Metered Reputation-as-a-Service (RaaS)</h3>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Premium attestation products billed against your credit ledger — verified reputation lookups, portable
+                    credential issuance, audit packages, and neutrality/residency attestations.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <a
+                    href={`/api/v1/metered/credentials/${data?.agents[0]?.agentId || "agent_default"}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-lg bg-emerald-600 px-3 py-1.5 font-bold text-white hover:bg-emerald-500 transition"
+                  >
+                    POST Metered Portable Credential (0.5 credit) ↗
+                  </a>
+                  <a
+                    href="/docs/verification"
+                    className="rounded-lg border border-emerald-600/40 bg-slate-900 px-3 py-1.5 font-medium text-emerald-300 hover:bg-slate-800 transition"
+                  >
+                    RaaS Product Catalog →
+                  </a>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -568,6 +594,22 @@ export default function UserDashboard() {
                     className="rounded-lg border border-amber-600/40 bg-slate-900 px-3 py-1.5 font-medium text-amber-300 hover:bg-slate-800 transition"
                   >
                     Latest Merkle Checkpoint Root ↗
+                  </a>
+                  <a
+                    href="/api/v1/receipts/checkpoints/latest"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-lg border border-emerald-600/40 bg-slate-900 px-3 py-1.5 font-medium text-emerald-300 hover:bg-slate-800 transition"
+                  >
+                    External Notary Anchor (Merkle Head) ↗
+                  </a>
+                  <a
+                    href={`/api/v1/compliance/audit-package/${data?.agents[0]?.agentId || "agent_default"}?framework=SOC2_TYPE2`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-lg border border-sky-600/40 bg-slate-900 px-3 py-1.5 font-medium text-sky-300 hover:bg-slate-800 transition"
+                  >
+                    Audit-Grade SOC 2 Evidence Package ↗
                   </a>
                 </div>
               </div>
