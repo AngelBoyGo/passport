@@ -41,6 +41,12 @@ export async function GET(request: NextRequest) {
       evidence_count: evidenceCount,
       profile_url: `${baseUrl}/profiles/${sampleAgent.subjectCommitment}`,
       badge_url: `${baseUrl}/api/v1/badge/${sampleAgent.subjectCommitment}`,
+      portable_reputation: {
+        type: "W3C Verifiable Credential — AgentReputationCredential",
+        credential_url: `${baseUrl}/api/v1/credentials/${sampleAgent.subjectCommitment}`,
+        verification_endpoint: `${baseUrl}/api/v1/credentials/verify`,
+        discovery_url: `${baseUrl}/api/v1/anp/agents/${sampleAgent.subjectCommitment}`,
+      },
     };
   }
 

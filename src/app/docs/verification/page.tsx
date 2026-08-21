@@ -44,7 +44,7 @@ export default function DocsVerification() {
               </tr>
               <tr className="border-b">
                 <td className="py-2 pr-2 whitespace-nowrap">otel_genai_trace</td>
-                <td className="py-2">{`{ name?, attributes?: Record<string, unknown>, status?: { code?, message? }, startTimeUnixNano?, endTimeUnixNano?, start_time?, end_time? }`}</td>
+                <td className="py-2">{`{ name?, attributes?: Record<string, unknown>, status?: { code?: string | number, message? }, startTimeUnixNano?, endTimeUnixNano?, start_time?, end_time? }`}</td>
               </tr>
               <tr className="border-b">
                 <td className="py-2 pr-2 whitespace-nowrap">task_deliverable</td>
@@ -148,6 +148,34 @@ export default function DocsVerification() {
           </p>
         </div>
       </Section>
+
+      {/* ── OTel GenAI note ── */}
+      <div className="rounded-lg border-l-4 border-sky-500 bg-sky-50 p-4 text-sm text-sky-900">
+        <strong>otel_genai_trace — OTel GenAI semantic conventions:</strong> Passport accepts standard{" "}
+        <code className="px-1 font-mono text-xs">gen_ai.*</code> span attributes. Recognized{" "}
+        <code className="px-1 font-mono text-xs">gen_ai.operation.name</code> values:{" "}
+        <code className="px-1 font-mono text-xs">chat, completion, embeddings, tool, agent, invoke_agent, run_agent, task, team</code>.
+        Agent identity is read from <code className="px-1 font-mono text-xs">gen_ai.agent.id</code>,{" "}
+        <code className="px-1 font-mono text-xs">gen_ai.agent.name</code>,{" "}
+        <code className="px-1 font-mono text-xs">gen_ai.participant.id</code>, or falling back to{" "}
+        <code className="px-1 font-mono text-xs">gen_ai.request.model</code>. Token usage is read from{" "}
+        <code className="px-1 font-mono text-xs">gen_ai.usage.input_tokens/output_tokens</code> (and{" "}
+        <code className="px-1 font-mono text-xs">prompt_tokens/completion_tokens</code> variants). Status code may be
+        the OTel string <code className="px-1 font-mono text-xs">"ERROR"</code> or the integer{" "}
+        <code className="px-1 font-mono text-xs">2</code>.
+      </div>
+
+      {/* ── Portable reputation ── */}
+      <div className="rounded-lg border-l-4 border-emerald-500 bg-emerald-50 p-4 text-sm text-emerald-900">
+        <strong>Portable agent reputation (W3C VC):</strong> Every enrolled agent can produce a self-contained{" "}
+        <code className="px-1 font-mono text-xs">AgentReputationCredential</code> (Ed25519-signed, W3C VC 2.0) that
+        travels between gateways. Fetch it at{" "}
+        <code className="px-1 font-mono text-xs">GET /api/v1/credentials/:commitment</code> and verify at{" "}
+        <code className="px-1 font-mono text-xs">POST /api/v1/credentials/verify</code> without calling Passport at
+        request time. The A2A agent card (<code className="px-1 font-mono text-xs">/.well-known/agent.json</code>)
+        embeds the <code className="px-1 font-mono text-xs">portable_reputation</code> reference so standing is
+        discoverable with a device&apos;s identity.
+      </div>
 
       {/* ── 5. Environment requirement ── */}
       <Section

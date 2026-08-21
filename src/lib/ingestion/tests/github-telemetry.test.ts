@@ -275,13 +275,50 @@ describe("normalizeGenAiTrace", () => {
     expect(records[0].tool_call_count).toBeNull();
   });
 
-  it("ignores non-invoke_agent operations (out of scope)", () => {
+  it("accepts standard OTel GenAI operations (chat, embeddings, tool) per semconv", () => {
+    for (const op of ["chat", "embeddings", "tool", "completion"]) {
+      const trace = {
+        attributes: {
+          "gen_ai.operation.name": op,
+          "gen_ai.agent.id": `agent-${op}`,
+        },
+        status: { code: "OK" },
+      };
+      const records = normalizeGenAiTrace(trace);
+      expect(records).toHaveLength(1);
+      expect(records[0].source_type).toBe("otel_genai_trace");
+    }
+  });
+
+  it("rejects unknown/out-of-scope operations (untrusted vocabulary)", () => {
     const trace = {
-      attributes: { "gen_ai.operation.name": "embeddings" },
+      attributes: { "gen_ai.operation.name": "some_custom_thing" },
       status: { code: "OK" },
     };
 
     expect(normalizeGenAiTrace(trace)).toEqual([]);
+  });
+
+  it("reads semantic-convention key variants and numeric EROR status code 2", () => {
+    const trace = {
+      name: "chat span",
+      attributes: {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.participant.id": "runner-7",
+        "gen_ai.usage.input_tokens": 200,
+        "gen_ai.tool.call.count": 3,
+      },
+      // OTel ERROR is integer status code 2
+      status: { code: 2, message: "upstream 429 quota exhausted" },
+      startTimeUnixNano: "1718452800000000000",
+    };
+
+    const records = normalizeGenAiTrace(trace);
+    expect(records).toHaveLength(1);
+    expect(records[0].agent_identity_raw).toBe("runner-7");
+    expect(records[0].tool_call_count).toBe(3);
+    expect(records[0].normalized_event_type).toBe("EXECUTION_FAILURE_OBSERVED");
+    expect(records[0].raw_error_classification).toBe("COMPUTE_TIMEOUT");
   });
 });
 

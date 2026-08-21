@@ -144,7 +144,8 @@ export const GenAiTraceSchema = z
     attributes: z.record(z.unknown()).optional(),
     status: z
       .object({
-        code: z.string().optional(),
+        // OTel GenAI emits status.code as string ("ERROR") or integer (2 = ERROR)
+        code: z.union([z.string(), z.number()]).optional(),
         message: z.string().optional(),
       })
       .passthrough()
@@ -541,14 +542,39 @@ export function normalizeGenAiTrace(payload: unknown): NormalizedEvidence[] {
 
   const span = parsed.data;
   const attrs = span.attributes ?? {};
-  const operation =
-    readStringAttr(attrs, "gen_ai.operation.name") ??
-    (span.name === "invoke_agent" ? "invoke_agent" : null);
 
-  if (operation !== "invoke_agent") return [];
+  const operation = readStringAttr(
+    attrs,
+    "gen_ai.operation.name",
+    "gen_ai_operation_name",
+    "gen_ai.operation"
+  );
+
+  const knownOps = new Set([
+    // OTel GenAI semantic conventions (stable names)
+    "chat",
+    "completion",
+    "embeddings",
+    "tool",
+    "team",
+    "agent",
+    "invoke_agent",
+    "run_agent",
+    "task",
+  ]);
+  if (!operation || !knownOps.has(operation)) return [];
 
   const agentIdentity =
-    readStringAttr(attrs, "gen_ai.agent.id", "gen_ai.agent.name", "agent.id") ??
+    readStringAttr(
+      attrs,
+      "gen_ai.agent.id",
+      "gen_ai.agent.name",
+      "agent.id",
+      "gen_ai.participant.id",
+      "gen_ai.agent.group.id"
+    ) ??
+    readStringAttr(attrs, "gen_ai.request.model") ??
+    span.name ??
     null;
 
   const statusCode = (span.status?.code ?? "UNSET").toString().toUpperCase();
@@ -566,7 +592,8 @@ export function normalizeGenAiTrace(payload: unknown): NormalizedEvidence[] {
     attrs,
     "tool.call.count",
     "gen_ai.tool.call.count",
-    "tool_call_count"
+    "tool_call_count",
+    "gen_ai.usage.tools.total"
   );
 
   const startedAt =
@@ -579,11 +606,19 @@ export function normalizeGenAiTrace(payload: unknown): NormalizedEvidence[] {
   const explicitValidation =
     readStringAttr(attrs, "validation.status", "check.status") !== null;
 
+  // OTel GenAI ERROR status code is the integer 2 (NAME_LOOKUP not involved);
+  // accept both string "ERROR" and numeric 2 from real vendors.
+  const numericCode = typeof span.status?.code === "number" ? span.status.code : null;
+  const isError =
+    statusCode === "ERROR" ||
+    statusCode === "2" ||
+    numericCode === 2;
+
   let normalized_event_type: NormalizedEventType = "AGENT_RUN_OBSERVED";
   let raw_error_classification: RawErrorClassification | null = "UNKNOWN";
   let validation_signal_present = explicitValidation;
 
-  if (statusCode === "ERROR") {
+  if (isError) {
     normalized_event_type = "EXECUTION_FAILURE_OBSERVED";
     raw_error_classification = classifyTraceError(span.status?.message);
   } else if (explicitValidation) {

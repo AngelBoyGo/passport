@@ -1,6 +1,16 @@
 # Recursive loop tracker — Passport + HostHub FFD
 
-Last updated: **2026-08-21** (Loop 26 Trust & Independent Verification Foundation — 124 test files, 727 tests green)
+Last updated: **2026-08-21** (Loop 27 Moat Expansion: OTel GenAI Alignment + Portable Reputation VC — 124 test files, 729 tests green)
+
+---
+
+## Loop 27: Moat Expansion — Standards Alignment & Portable Reputation
+
+| Loop | Recommendation Addressed | Scoped result | Status | Evidence |
+|---|---|---|---|---|
+| **Loop 27.1** | 2.2 — OTel GenAI semantic convention alignment for `otel_genai_trace` | Accepts chat/completion/embeddings/tool/agent ops; numeric status code 2; participant/model identity fallbacks | **Complete** | `github-agent-adapter.ts` + 3 new tests |
+| **Loop 27.2** | 2.1 + 2.2 — Portable reputation VC embedded in A2A agent card identity | `/.well-known/agent.json` now exposes `portable_reputation` credential_url + verify endpoint | **Complete** | `agent.json/route.ts` |
+| **Loop 27.3** | Docs: OTel GenAI span conventions + portable reputation discoverability | `/docs/verification` expanded | **Complete** | Docs live |
 
 ---
 
