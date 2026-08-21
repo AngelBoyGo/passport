@@ -203,6 +203,33 @@ export default function DocsApiReference() {
         </ApiMethod>
       </Section>
 
+      <Section title="Verifiable Credentials & Portable Reputation">
+        <ApiMethod method="GET" path="/api/v1/credentials/:commitment" auth="Public (Rate Limited)">
+          Issue a W3C-compliant Verifiable Credential (VC) encoding the agent&apos;s cryptographic proof, archetype, and verified scorecard.
+        </ApiMethod>
+        <ApiMethod method="POST" path="/api/v1/credentials/verify" auth="Public">
+          Verify any Passport-issued W3C Verifiable Credential offline or online using Ed25519 signature checks.
+        </ApiMethod>
+        <ApiMethod method="GET" path="/api/v1/transparency/keys" auth="Public">
+          Retrieve the Key Transparency Log containing all active and historical root public signing keys.
+        </ApiMethod>
+      </Section>
+
+      <Section title="Merkle Checkpoints & Audit Compliance">
+        <ApiMethod method="GET" path="/api/v1/receipts/checkpoints/latest" auth="Public">
+          Retrieve the latest cryptographic Merkle Root checkpoint anchoring the ledger state.
+        </ApiMethod>
+        <ApiMethod method="GET" path="/api/v1/receipts/checkpoints" auth="Public">
+          Query historical Merkle checkpoints across receipt intervals.
+        </ApiMethod>
+        <ApiMethod method="GET" path="/api/v1/compliance/packages/:commitment" auth="API Key / Public">
+          Generate an audit-grade compliance package formatted for NIST AI RMF, EU AI Act, or SOC 2 Trust Criteria.
+        </ApiMethod>
+        <ApiMethod method="GET" path="/api/v1/compliance/frameworks" auth="Public">
+          List supported regulatory and governance frameworks.
+        </ApiMethod>
+      </Section>
+
       <Section title="Public">
         <ApiMethod method="GET" path="/api/health" auth="None">
           DB liveness probe. Returns 200 with {`{"status":"ok"}`} or 503.
@@ -251,6 +278,21 @@ export default function DocsApiReference() {
               <td className="py-1.5 font-mono text-xs">enrollment.completed</td>
               <td className="py-1.5">Agent enrollment finished (ISSUED)</td>
               <td className="py-1.5 font-mono text-xs">{`{ event, data: { subject_commitment, public_key, context }, timestamp }`}</td>
+            </tr>
+            <tr className="border-b">
+              <td className="py-1.5 font-mono text-xs">reputation.degraded</td>
+              <td className="py-1.5">Failure rate exceeded threshold (&gt;25% over 10+ events)</td>
+              <td className="py-1.5 font-mono text-xs">{`{ event, data: { agent_commitment, current_failure_rate, reason }, timestamp }`}</td>
+            </tr>
+            <tr className="border-b">
+              <td className="py-1.5 font-mono text-xs">reputation.restored</td>
+              <td className="py-1.5">Failure rate restored below threshold (&lt;10%)</td>
+              <td className="py-1.5 font-mono text-xs">{`{ event, data: { agent_commitment, current_failure_rate, reason }, timestamp }`}</td>
+            </tr>
+            <tr className="border-b">
+              <td className="py-1.5 font-mono text-xs">reputation.milestone</td>
+              <td className="py-1.5">Milestone achieved (100, 500, 1000 verified units)</td>
+              <td className="py-1.5 font-mono text-xs">{`{ event, data: { agent_commitment, total_evidence, milestone_tier }, timestamp }`}</td>
             </tr>
           </tbody>
         </table>

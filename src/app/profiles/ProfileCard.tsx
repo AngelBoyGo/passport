@@ -145,6 +145,12 @@ export function ProfileCard({ view }: ProfileCardProps) {
               <a href={didUrl} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline">
                 W3C Agent DID Document (JSON-LD) →
               </a>
+              <a href={`/api/v1/credentials/${view.fullCommitmentHash}`} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline">
+                W3C Verifiable Credential →
+              </a>
+              <a href={`/api/v1/compliance/packages/${view.fullCommitmentHash}`} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline">
+                Audit Compliance Package (NIST/EU AI) →
+              </a>
               <a href="/.well-known/agent.json" target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline">
                 A2A Agent Card →
               </a>

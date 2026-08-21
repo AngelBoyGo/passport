@@ -40,6 +40,37 @@ export default function AdminReceipts() {
 
   return (
     <div className="space-y-6">
+      {/* ── Checkpoint & Transparency Banner ── */}
+      <div className="rounded-lg border bg-gradient-to-r from-slate-900 to-indigo-950 p-4 text-white shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+            <h3 className="text-sm font-semibold text-slate-100">Cryptographic Ledger Integrity</h3>
+          </div>
+          <p className="mt-1 text-xs text-slate-300">
+            Receipts are anchored in tamper-evident Merkle trees and verifiable via Public Key Transparency logs.
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <a
+            href="/api/v1/receipts/checkpoints/latest"
+            target="_blank"
+            rel="noreferrer"
+            className="rounded bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 transition"
+          >
+            Latest Merkle Root →
+          </a>
+          <a
+            href="/api/v1/transparency/keys"
+            target="_blank"
+            rel="noreferrer"
+            className="rounded border border-slate-600 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-800 transition"
+          >
+            Key Transparency Log →
+          </a>
+        </div>
+      </div>
+
       <div className="rounded-lg border p-4 bg-white">
         <h2 className="mb-4 text-lg font-semibold">Filter receipts</h2>
         <div className="grid gap-3 sm:grid-cols-4">
