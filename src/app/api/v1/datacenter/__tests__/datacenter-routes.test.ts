@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
+const authenticateApiKeyMock = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/operator", () => ({
+  authenticateApiKey: (...args: unknown[]) => authenticateApiKeyMock(...args),
+}));
+
 const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
     agentEnrollment: { findUnique: vi.fn(), upsert: vi.fn() },
@@ -17,6 +23,8 @@ vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 
 describe("DataCenter API Routes", () => {
   const clusterId = "facility-cluster-01";
+  const issuerOp = { id: "op_issuer_1", email: "ops@datacenter.example", apiKeyRole: "ISSUER" };
+  const holderOp = { id: "op_holder_1", email: "holder@agent.example", apiKeyRole: "HOLDER" };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -25,7 +33,55 @@ describe("DataCenter API Routes", () => {
     process.env.NEXT_PUBLIC_APP_URL = "https://passport.metis.gold";
   });
 
-  it("POST /api/v1/datacenter/evidence — ingests telemetry and returns signed receipt", async () => {
+  it("POST /api/v1/datacenter/evidence — rejects UNAUTHENTICATED writes with 401", async () => {
+    authenticateApiKeyMock.mockResolvedValue(null);
+    const { POST } = await import("@/app/api/v1/datacenter/evidence/route");
+    const payload = {
+      cluster_id: clusterId,
+      instance_id: "gpu-node-01",
+      event_type: "HARDWARE_POWER_VALIDATION",
+      timestamp_utc: "2026-08-21T05:00:00Z",
+      origin: "live-instrument",
+      sku: "NVIDIA_H100_SXM5",
+      telemetry_source: "nvml_v12.2",
+    };
+    const req = new NextRequest("https://passport.metis.gold/api/v1/datacenter/evidence", {
+      method: "POST",
+      body: JSON.stringify(payload),
+      headers: { "Content-Type": "application/json" },
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(401);
+  });
+
+  it("POST /api/v1/datacenter/evidence — rejects HOLDER-tier keys with 403", async () => {
+    authenticateApiKeyMock.mockResolvedValue(holderOp);
+    const { POST } = await import("@/app/api/v1/datacenter/evidence/route");
+    const payload = {
+      cluster_id: clusterId,
+      instance_id: "gpu-node-01",
+      event_type: "HARDWARE_POWER_VALIDATION",
+      timestamp_utc: "2026-08-21T05:00:00Z",
+      origin: "live-instrument",
+      sku: "NVIDIA_H100_SXM5",
+      telemetry_source: "nvml_v12.2",
+    };
+    const req = new NextRequest("https://passport.metis.gold/api/v1/datacenter/evidence", {
+      method: "POST",
+      body: JSON.stringify(payload),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer pp_usr_deadbeef",
+      },
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(403);
+  });
+
+  it("POST /api/v1/datacenter/evidence — allows authenticated ISSUER write and returns signed receipt", async () => {
+    authenticateApiKeyMock.mockResolvedValue(issuerOp);
     prismaMock.operator.findFirst.mockResolvedValue({ id: "op_default" });
     prismaMock.agent.findFirst.mockResolvedValue({ id: "agent_rec_01" });
     prismaMock.agentEvidence.create.mockResolvedValue({
@@ -61,7 +117,10 @@ describe("DataCenter API Routes", () => {
     const req = new NextRequest("https://passport.metis.gold/api/v1/datacenter/evidence", {
       method: "POST",
       body: JSON.stringify(payload),
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer pp_ent_deadbeef",
+      },
     });
 
     const res = await POST(req);

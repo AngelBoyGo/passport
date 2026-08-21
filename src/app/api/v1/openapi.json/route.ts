@@ -260,9 +260,13 @@ export async function GET(request: NextRequest) {
       },
       "/api/v1/datacenter/evidence": {
         post: {
-          summary: "Ingest Data Center Power, Thermal, and Carbon Telemetry",
+          summary: "Ingest Data Center Power, Thermal, and Carbon Telemetry (Issuer-key authenticated)",
           security: [{ ApiKeyAuth: [] }],
-          responses: { "201": { description: "Evidence ingested and signed receipt generated" } },
+          responses: {
+            "201": { description: "Evidence ingested and signed receipt generated" },
+            "401": { description: "Unauthorized: valid Bearer API key required" },
+            "403": { description: "Forbidden: Holder keys cannot anchor fleet telemetry" },
+          },
         },
       },
       "/api/v1/datacenter/clusters/{id}/scorecard": {
