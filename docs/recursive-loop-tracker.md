@@ -1,6 +1,16 @@
 # Recursive loop tracker — Passport + HostHub FFD
 
-Last updated: **2026-08-21** (Loop 27 Moat Expansion: OTel GenAI Alignment + Portable Reputation VC — 124 test files, 729 tests green)
+Last updated: **2026-08-21** (Loop 28 Notary Anchoring + Reputation-as-a-Service Metering — 127 test files, 740 tests green)
+
+---
+
+## Loop 28: External Notary Anchoring (2.4) & Reputation Metering (2.7)
+
+| Loop | Recommendation Addressed | Scoped result | Status | Evidence |
+|---|---|---|---|---|
+| **Loop 28.1** | 2.4 — Publish Merkle chain head to independent external notary | `src/lib/notary/notary-anchor.ts` + wired into `/checkpoints/latest` (4/4 tests) | **Complete** | `notary-anchor.test.ts` |
+| **Loop 28.2** | 2.7 — Reputation-as-a-service metered product catalog on credit ledger | `src/lib/metering/attestation-meter.ts` + `POST /api/v1/metered/credentials/:commitment` (7/7 tests) | **Complete** | `attestation-meter.test.ts`, `metered-credential.test.ts` |
+| **Loop 28.3** | OpenAPI + MCP manifest extensions (`passport_metered_credential`, `passport_get_notary_anchor`), `NOTARY_ANCHOR_URL` in DEPLOY.md | 13 MCP tools active | **Complete** | `mcp-manifest.test.ts`, `openapi.test.ts` |
 
 ---
 

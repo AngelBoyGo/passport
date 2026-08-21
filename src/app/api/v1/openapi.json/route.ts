@@ -308,6 +308,18 @@ export async function GET(request: NextRequest) {
           responses: { "201": { description: "Autonomous Holder API key and Passport issued" } },
         },
       },
+      "/api/v1/metered/credentials/{commitment}": {
+        post: {
+          summary: "Premium credit-metered portable reputation credential issuance (Reputation-as-a-Service)",
+          security: [{ ApiKeyAuth: [] }],
+          parameters: [{ name: "commitment", in: "path", required: true, schema: { type: "string" } }],
+          responses: {
+            "201": { description: "Metered credential issued with meter receipt" },
+            "401": { description: "Unauthorized" },
+            "402": { description: "Insufficient credits" },
+          },
+        },
+      },
     },
   };
 

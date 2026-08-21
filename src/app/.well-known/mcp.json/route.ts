@@ -229,6 +229,29 @@ export async function GET(request: NextRequest) {
         endpoint: `${baseUrl}/api/v1/passport/agents/autonomous/provision`,
         method: "POST",
       },
+      {
+        name: "passport_metered_credential",
+        description: "Premium, credit-metered issuance of a portable W3C reputation credential (Reputation-as-a-Service). Bills the operator's credit ledger.",
+        parameters: {
+          type: "object",
+          required: ["commitment"],
+          properties: {
+            commitment: { type: "string", description: "64-hex agent identity commitment" },
+          },
+        },
+        endpoint: `${baseUrl}/api/v1/metered/credentials/{commitment}`,
+        method: "POST",
+      },
+      {
+        name: "passport_get_notary_anchor",
+        description: "Retrieve the latest signed Merkle checkpoint anchored to an independent external notary for tamper-evident history (sovereignty/air-gap claims).",
+        parameters: {
+          type: "object",
+          properties: {},
+        },
+        endpoint: `${baseUrl}/api/v1/receipts/checkpoints/latest`,
+        method: "GET",
+      },
     ],
   };
 
