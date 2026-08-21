@@ -230,7 +230,7 @@ export default function DocsApiReference() {
         </ApiMethod>
       </Section>
 
-      <Section title="Data Center Infrastructure & Energy (DataCet Integration)">
+      <Section title="Data Center Infrastructure, Energy & Carbon Governance">
         <ApiMethod method="POST" path="/api/v1/datacenter/evidence" auth="API Key / Public">
           Ingest live hardware-measured power, thermal safety, setpoint transitions, and Scope 2 carbon telemetry from GPU data centers.
         </ApiMethod>

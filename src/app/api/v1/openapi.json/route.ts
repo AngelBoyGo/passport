@@ -260,7 +260,7 @@ export async function GET(request: NextRequest) {
       },
       "/api/v1/datacenter/evidence": {
         post: {
-          summary: "Ingest Data Center Power, Thermal, and Carbon Telemetry (for DataCet)",
+          summary: "Ingest Data Center Power, Thermal, and Carbon Telemetry",
           security: [{ ApiKeyAuth: [] }],
           responses: { "201": { description: "Evidence ingested and signed receipt generated" } },
         },

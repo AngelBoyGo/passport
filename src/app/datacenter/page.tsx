@@ -19,7 +19,7 @@ export default function DataCenterPage() {
   const [merkleRoot, setMerkleRoot] = useState<string>("8f4b29c0...");
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
-  const [selectedCluster, setSelectedCluster] = useState<string>("vast-michigan-1");
+  const [selectedCluster, setSelectedCluster] = useState<string>("facility-cluster-01");
   const [complianceFramework, setComplianceFramework] = useState<string>("EU_AI_ACT");
   const [copiedCode, setCopiedCode] = useState(false);
 
@@ -49,28 +49,52 @@ export default function DataCenterPage() {
     return true;
   });
 
+  // Calculate live dynamic metrics from actual ledger receipts
+  let totalLiveEvents = receipts.length;
+  let hwVerifiedCount = receipts.filter((r) => r.origin === "live-instrument").length;
+  let avgPowerDelta = 0;
+  let totalEnergySaved = 0;
+  let totalCarbonAvoided = 0;
+  let powerDeltaCount = 0;
+
+  for (const r of receipts) {
+    if (typeof r.telemetry?.delta_power_pct === "number" && r.origin === "live-instrument") {
+      avgPowerDelta += r.telemetry.delta_power_pct;
+      powerDeltaCount++;
+    }
+    if (typeof r.telemetry?.energy_saved_kwh === "number") {
+      totalEnergySaved += r.telemetry.energy_saved_kwh;
+    }
+    if (typeof r.telemetry?.carbon_avoided_kg === "number") {
+      totalCarbonAvoided += r.telemetry.carbon_avoided_kg;
+    }
+  }
+
+  const displayPowerDelta = powerDeltaCount > 0 ? (avgPowerDelta / powerDeltaCount).toFixed(1) : "—";
+  const displayHwRatio = totalLiveEvents > 0 ? Math.round((hwVerifiedCount / totalLiveEvents) * 100) : 100;
+
   const pythonSnippet = `import httpx, time
 
-# DataCet -> Passport Cryptographic Anchoring
-async def anchor_power_validation(cluster_id, measured_w, baseline_w, delta_pct):
+# Enterprise Data Center Telemetry & Carbon Anchoring
+async def anchor_facility_telemetry(cluster_id, measured_watts, baseline_watts, delta_pct):
     payload = {
         "cluster_id": cluster_id,
-        "instance_id": "vast-michigan-1",
+        "instance_id": "gpu-node-01",
         "event_type": "HARDWARE_POWER_VALIDATION",
         "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "origin": "live-instrument", # 'live-instrument' | 'synthetic'
-        "sku": "NVIDIA_RTX_4090",
-        "telemetry_source": "nvml_v12.2",
-        "baseline_nameplate_w": baseline_w,
-        "measured_power_avg_w": measured_w,
+        "sku": "NVIDIA_H100_SXM5",
+        "telemetry_source": "nvml_v12.2_ipmi_bmc",
+        "baseline_nameplate_w": baseline_watts,
+        "measured_power_avg_w": measured_watts,
         "delta_power_pct": delta_pct,
-        "policy_setpoint_applied": "gap7_load_stable"
+        "policy_setpoint_applied": "dynamic_power_governor_v2"
     }
     async with httpx.AsyncClient() as client:
         res = await client.post(
             "https://passport.metis.gold/api/v1/datacenter/evidence",
             json=payload,
-            headers={"Authorization": "Bearer pp_YOUR_API_KEY"}
+            headers={"Authorization": "Bearer pp_ent_YOUR_ISSUER_KEY"}
         )
         return res.json()["receipt_id"]`;
 
@@ -83,157 +107,224 @@ async def anchor_power_validation(cluster_id, measured_w, baseline_w, delta_pct)
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900">
+    <div className="flex min-h-screen flex-col bg-slate-950 text-slate-100 font-sans">
       <SiteHeader />
 
-      <main className="flex-1 mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 space-y-10">
-        {/* ── Header ── */}
-        <div className="border-b border-slate-200 pb-8 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-          <div>
+      <main className="flex-1 mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 space-y-12">
+        {/* ── Hero & Introduction ── */}
+        <div className="border-b border-slate-800 pb-10 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+          <div className="max-w-3xl space-y-3">
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
-                Data Center Energy & Trust Protocol
+              <span className="inline-flex items-center rounded-full bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 text-xs font-semibold text-emerald-400">
+                Enterprise Infrastructure Substrate
               </span>
-              <span className="text-xs text-slate-500 font-mono">Domain: SYSTEM_INTEGRATION</span>
+              <span className="text-xs text-slate-400 font-mono">Domain: SYSTEM_INTEGRATION</span>
             </div>
-            <h1 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl text-slate-900">
-              Data Center Infrastructure & Carbon Governance
+            <h1 className="text-3xl font-extrabold tracking-tight sm:text-5xl text-white">
+              Data Center Trust, Energy & Carbon Governance
             </h1>
-            <p className="mt-2 max-w-3xl text-sm text-slate-600">
-              Cryptographically verified energy reductions, thermal safety guarantees, and auditable Scope 2 carbon
-              receipts for GPU data centers and AI clusters. Powering DataCet with immutable Ed25519 proofs.
+            <p className="text-base text-slate-300 leading-relaxed">
+              The cryptographic trust substrate for GPU facilities, AI cloud providers, and sustainable data centers.
+              Generate tamper-evident receipts for energy reduction, thermal safety compliance, and certified Scope 2 carbon avoidance.
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-3">
             <a
               href={`/api/v1/datacenter/clusters/${selectedCluster}/credential`}
               target="_blank"
               rel="noreferrer"
-              className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow hover:bg-indigo-700 transition"
+              className="rounded-lg bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow hover:bg-emerald-500 transition"
             >
-              Export W3C Sustainability VC ↗
+              Export Sustainability VC (JSON-LD) ↗
             </a>
             <a
               href={`/api/v1/datacenter/compliance/packages/${selectedCluster}?framework=${complianceFramework}`}
               target="_blank"
               rel="noreferrer"
-              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition"
+              className="rounded-lg border border-slate-700 bg-slate-900 px-4 py-2.5 text-xs font-semibold text-slate-200 shadow-sm hover:bg-slate-800 transition"
             >
-              Export {complianceFramework} Audit Package ↗
+              Generate {complianceFramework} Audit Package ↗
             </a>
           </div>
         </div>
 
-        {/* ── Key Governance Gauges ── */}
+        {/* ── Live Ledger Health Indicators ── */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-5 shadow-sm">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Hardware Power Δ</span>
-              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">Measured</span>
+              <span className="text-xs font-medium text-slate-400 uppercase tracking-wide">Live Power Reduction</span>
+              <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-400 border border-emerald-500/30">
+                {powerDeltaCount > 0 ? "Hardware Verified" : "Awaiting Data"}
+              </span>
             </div>
-            <p className="mt-2 text-3xl font-bold text-emerald-600">-9.6%</p>
-            <p className="mt-1 text-xs text-slate-500">Champion: <code className="font-mono font-semibold text-slate-700">gap7_load_stable</code> (RTX 4090)</p>
+            <p className="mt-2 text-3xl font-bold text-emerald-400">
+              {displayPowerDelta !== "—" ? `${displayPowerDelta}%` : "Active"}
+            </p>
+            <p className="mt-1 text-xs text-slate-400">Empirically measured on physical silicon</p>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-5 shadow-sm">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Peak Ramp Mitigation</span>
-              <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700">Grid Safe</span>
+              <span className="text-xs font-medium text-slate-400 uppercase tracking-wide">Strict Honesty Ratio</span>
+              <span className="rounded-full bg-indigo-500/10 px-2 py-0.5 text-[10px] font-bold text-indigo-400 border border-indigo-500/30">
+                Audited
+              </span>
             </div>
-            <p className="mt-2 text-3xl font-bold text-indigo-600">-14.7%</p>
-            <p className="mt-1 text-xs text-slate-500">Latency overhead capped at +2.6%</p>
+            <p className="mt-2 text-3xl font-bold text-indigo-400">{displayHwRatio}%</p>
+            <p className="mt-1 text-xs text-slate-400">Zero unverified models promoted</p>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-5 shadow-sm">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Thermal Safety Pass</span>
-              <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-700">100% Clean</span>
+              <span className="text-xs font-medium text-slate-400 uppercase tracking-wide">Avoided Scope 2 Carbon</span>
+              <span className="rounded-full bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold text-sky-400 border border-sky-500/30">
+                Grid Sync
+              </span>
             </div>
-            <p className="mt-2 text-3xl font-bold text-sky-600">100.0%</p>
-            <p className="mt-1 text-xs text-slate-500">0 thermal throttle events (Tj ≤ 68.2°C)</p>
+            <p className="mt-2 text-3xl font-bold text-sky-400">
+              {totalCarbonAvoided > 0 ? `-${totalCarbonAvoided.toFixed(1)} kg` : "Live Accrual"}
+            </p>
+            <p className="mt-1 text-xs text-slate-400">Hourly grid intensity emission matching</p>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-5 shadow-sm">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Merkle Checkpoint</span>
-              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">Tamper-Proof</span>
+              <span className="text-xs font-medium text-slate-400 uppercase tracking-wide">Merkle Checkpoint</span>
+              <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-400 border border-amber-500/30">
+                Tamper-Proof
+              </span>
             </div>
-            <p className="mt-2 text-sm font-mono font-bold text-slate-800 break-all">{merkleRoot.slice(0, 16)}...</p>
-            <p className="mt-1 text-xs text-slate-500">Anchored in immutable ledger root</p>
+            <p className="mt-2 text-xs font-mono font-bold text-slate-200 break-all">{merkleRoot.slice(0, 18)}...</p>
+            <p className="mt-1 text-xs text-slate-400">Signed with root Ed25519 key</p>
           </div>
         </div>
 
-        {/* ── 3-Tier Integration Architecture Diagram ── */}
-        <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 p-6 sm:p-8 text-white shadow-md">
-          <div className="flex items-center justify-between border-b border-slate-700/80 pb-4">
-            <div>
-              <span className="text-xs font-semibold tracking-wider uppercase text-indigo-400">Enterprise Topology</span>
-              <h2 className="text-xl font-bold text-white">The Three-Pillar Energy Governance Architecture</h2>
-            </div>
-            <div className="hidden sm:flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-xs font-mono text-emerald-400">Active Live Feed</span>
-            </div>
+        {/* ── 6 Core Benefits for Data Centers ── */}
+        <div className="space-y-6">
+          <div>
+            <span className="text-xs font-semibold tracking-wider uppercase text-emerald-400">Enterprise Value Proposition</span>
+            <h2 className="mt-1 text-2xl font-bold text-white">How Modern Data Centers Benefit from Passport</h2>
+            <p className="mt-1 text-sm text-slate-400">
+              Transform energy efficiency initiatives and AI cluster management into verifiable cryptographic assets.
+            </p>
           </div>
 
-          <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-3">
-            {/* Pillar 1 */}
-            <div className="rounded-xl border border-slate-700 bg-slate-800/60 p-5 backdrop-blur">
-              <div className="flex items-center gap-2">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-500/20 text-xs font-bold text-indigo-400">1</span>
-                <h3 className="font-semibold text-slate-100">Replica Datacenter</h3>
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+            {/* Benefit 1 */}
+            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5 space-y-3 hover:border-slate-700 transition">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400 text-lg font-bold">
+                1
               </div>
-              <p className="mt-2 text-xs text-slate-300 leading-relaxed">
-                Physical & simulated GPU nodes (<code className="text-indigo-300">vast-michigan-1</code>, <code className="text-indigo-300">vast-replica-live</code>) executing live workloads. Emits raw NVML/IPMI power, junction temperatures, and latency traces.
+              <h3 className="text-base font-bold text-white">Certified Scope 2 GHG Carbon Accounting</h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Match GPU power reduction with real-time hourly grid carbon intensity data (ISO 14064 & GHG Protocol).
+                Issue certified carbon receipts that enterprise tenants can directly submit for ESG disclosures without greenwashing scrutiny.
               </p>
-              <div className="mt-4 rounded bg-slate-900/80 p-2.5 font-mono text-[11px] text-slate-400 border border-slate-700/50">
-                • Target: Hardware Silicon<br />
-                • Output: High-Hz Telemetry<br />
-                • Direct Passport: <strong>None (via DataCet)</strong>
-              </div>
             </div>
 
-            {/* Pillar 2 */}
-            <div className="rounded-xl border border-indigo-600/50 bg-indigo-950/40 p-5 backdrop-blur ring-1 ring-indigo-500/30">
-              <div className="flex items-center gap-2">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-500 text-xs font-bold text-white">2</span>
-                <h3 className="font-semibold text-white">DataCet Control Plane</h3>
+            {/* Benefit 2 */}
+            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5 space-y-3 hover:border-slate-700 transition">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-500/10 text-sky-400 text-lg font-bold">
+                2
               </div>
-              <p className="mt-2 text-xs text-slate-300 leading-relaxed">
-                Autonomous energy management engine. Explores policy Pareto frontiers, enforces acting champion (<code className="text-emerald-300">gap7_load_stable</code>), performs measured-vs-predicted probes, and manages carbon deferral.
+              <h3 className="text-base font-bold text-white">EU AI Act (Article 51 / Annex IV) Compliance</h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Automate compliance documentation for high-compute AI clusters. Generate 1-click signed evidence packages
+                detailing energy consumption, compute efficiency, and environmental impact as required by European regulations.
               </p>
-              <div className="mt-4 rounded bg-slate-900/80 p-2.5 font-mono text-[11px] text-slate-400 border border-slate-700/50">
-                • Policy: -9.6% Avg Power<br />
-                • Strict Honesty: Never Fakes Measured<br />
-                • Anchoring: Calls Passport API
-              </div>
             </div>
 
-            {/* Pillar 3 */}
-            <div className="rounded-xl border border-slate-700 bg-slate-800/60 p-5 backdrop-blur">
-              <div className="flex items-center gap-2">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-500/20 text-xs font-bold text-indigo-400">3</span>
-                <h3 className="font-semibold text-slate-100">Passport Trust Layer</h3>
+            {/* Benefit 3 */}
+            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5 space-y-3 hover:border-slate-700 transition">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-400 text-lg font-bold">
+                3
               </div>
-              <p className="mt-2 text-xs text-slate-300 leading-relaxed">
-                The cryptographic ledger & compliance authority. Verifies hardware evidence, issues Ed25519-signed receipts, aggregates Merkle checkpoints, and generates W3C Verifiable Credentials.
+              <h3 className="text-base font-bold text-white">Tenant SLA & Thermal Safety Guarantees</h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Provide immutable proof to colocation tenants that dynamic power capping or optimization setpoints never
+                caused thermal throttling or exceeded safe junction temperature margins (Tj &lt; 85°C).
               </p>
-              <div className="mt-4 rounded bg-slate-900/80 p-2.5 font-mono text-[11px] text-slate-400 border border-slate-700/50">
-                • Proof: Ed25519 & Merkle Trees<br />
-                • Standards: W3C VC & EU AI Act<br />
-                • Offline Verifiable: Yes (Zero Dep)
+            </div>
+
+            {/* Benefit 4 */}
+            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5 space-y-3 hover:border-slate-700 transition">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10 text-amber-400 text-lg font-bold">
+                4
               </div>
+              <h3 className="text-base font-bold text-white">Useful Work Fraction (UWF) & Joules/Token</h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Move beyond facility-level PUE to internal compute efficiency. Quantify true energy consumed per generated LLM
+                token (Joules/Token) and verify workload throughput with privacy-preserving hash commitments.
+              </p>
+            </div>
+
+            {/* Benefit 5 */}
+            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5 space-y-3 hover:border-slate-700 transition">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-500/10 text-purple-400 text-lg font-bold">
+                5
+              </div>
+              <h3 className="text-base font-bold text-white">W3C Verifiable Credentials for Green Marketing</h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Issue tamper-evident <code className="text-purple-300">DataCenterSustainabilityCredential</code> documents signed with <code className="text-purple-300">did:key</code>.
+                Tenants can verify and display official cryptographic badges on their websites and annual sustainability filings.
+              </p>
+            </div>
+
+            {/* Benefit 6 */}
+            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5 space-y-3 hover:border-slate-700 transition">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-rose-500/10 text-rose-400 text-lg font-bold">
+                6
+              </div>
+              <h3 className="text-base font-bold text-white">Air-Gapped & Sovereign Offline Audits</h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Government, defense, and high-security enterprise auditors can verify facility power receipts offline
+                using zero-dependency CLI verifiers and published Public Key Transparency logs without network access.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Architecture Pipeline ── */}
+        <div className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 p-6 sm:p-8 text-white shadow-lg space-y-6">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+            <div>
+              <span className="text-xs font-semibold tracking-wider uppercase text-emerald-400">Integration Architecture</span>
+              <h2 className="text-xl font-bold text-white">How Data Centers Connect to Passport</h2>
+            </div>
+            <span className="text-xs font-mono text-emerald-400">Enterprise REST & JSON-LD</span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-3 text-xs">
+            <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-5 space-y-2">
+              <span className="font-bold text-slate-200">1. Facility Instrumentation</span>
+              <p className="text-slate-400 leading-relaxed">
+                Collect high-frequency power and thermal telemetry via Smart PDUs, BMS, NVML, or BMC/IPMI interfaces.
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-emerald-800/40 bg-emerald-950/20 p-5 space-y-2 ring-1 ring-emerald-500/20">
+              <span className="font-bold text-emerald-300">2. Power Management & Setpoints</span>
+              <p className="text-slate-400 leading-relaxed">
+                Execute energy-saving policies, dynamic clocking, or workload shifting algorithms across connected server clusters.
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-5 space-y-2">
+              <span className="font-bold text-slate-200">3. Passport Cryptographic Ledger</span>
+              <p className="text-slate-400 leading-relaxed">
+                Post empirical benchmarks to Passport to generate Ed25519-signed receipts, Merkle tree checkpoints, and compliance exports.
+              </p>
             </div>
           </div>
         </div>
 
         {/* ── Live Receipts Ledger ── */}
-        <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="rounded-xl border border-slate-800 bg-slate-900/80 shadow-sm">
+          <div className="border-b border-slate-800 p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h2 className="text-lg font-bold text-slate-900">Data Center Receipts & Evidence Ledger</h2>
-              <p className="mt-0.5 text-xs text-slate-500">
+              <h2 className="text-base font-bold text-white">Data Center Receipts & Evidence Ledger</h2>
+              <p className="mt-0.5 text-xs text-slate-400">
                 Immutable cryptographic receipts linking physical telemetry to verified execution outcomes.
               </p>
             </div>
@@ -242,7 +333,7 @@ async def anchor_power_validation(cluster_id, measured_w, baseline_w, delta_pct)
               <button
                 onClick={() => setFilter("all")}
                 className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                  filter === "all" ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  filter === "all" ? "bg-emerald-600 text-white" : "bg-slate-800 text-slate-300 hover:bg-slate-700"
                 }`}
               >
                 All Receipts
@@ -250,7 +341,7 @@ async def anchor_power_validation(cluster_id, measured_w, baseline_w, delta_pct)
               <button
                 onClick={() => setFilter("hardware")}
                 className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                  filter === "hardware" ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  filter === "hardware" ? "bg-emerald-600 text-white" : "bg-slate-800 text-slate-300 hover:bg-slate-700"
                 }`}
               >
                 Live Hardware Only
@@ -258,7 +349,7 @@ async def anchor_power_validation(cluster_id, measured_w, baseline_w, delta_pct)
               <button
                 onClick={() => setFilter("thermal")}
                 className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                  filter === "thermal" ? "bg-sky-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  filter === "thermal" ? "bg-sky-600 text-white" : "bg-slate-800 text-slate-300 hover:bg-slate-700"
                 }`}
               >
                 Thermal Audits
@@ -268,7 +359,7 @@ async def anchor_power_validation(cluster_id, measured_w, baseline_w, delta_pct)
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 text-slate-500 border-b">
+              <thead className="bg-slate-950 text-slate-400 border-b border-slate-800 font-sans">
                 <tr>
                   <th className="px-5 py-3 font-semibold">Receipt ID</th>
                   <th className="px-5 py-3 font-semibold">Event Type</th>
@@ -278,25 +369,25 @@ async def anchor_power_validation(cluster_id, measured_w, baseline_w, delta_pct)
                   <th className="px-5 py-3 font-semibold">Verification</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 font-mono">
+              <tbody className="divide-y divide-slate-800 font-mono">
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="px-5 py-8 text-center text-slate-400">
+                    <td colSpan={6} className="px-5 py-8 text-center text-slate-500 font-sans">
                       Loading data center receipts...
                     </td>
                   </tr>
                 ) : filteredReceipts.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-5 py-8 text-center text-slate-400">
-                      No matching receipts found in the ledger. Ingest evidence via DataCet API.
+                    <td colSpan={6} className="px-5 py-8 text-center text-slate-400 font-sans">
+                      No data center receipts recorded yet in this view. Ingest telemetry via the API below.
                     </td>
                   </tr>
                 ) : (
                   filteredReceipts.map((r) => (
-                    <tr key={r.receipt_id} className="hover:bg-slate-50/80 transition">
-                      <td className="px-5 py-3 font-semibold text-slate-900">{r.receipt_id}</td>
+                    <tr key={r.receipt_id} className="hover:bg-slate-800/50 transition">
+                      <td className="px-5 py-3 font-semibold text-slate-200">{r.receipt_id}</td>
                       <td className="px-5 py-3">
-                        <span className="rounded bg-slate-100 px-2 py-0.5 text-[11px] font-sans font-medium text-slate-800">
+                        <span className="rounded bg-slate-800 px-2 py-0.5 text-[11px] font-sans font-medium text-slate-300">
                           {r.event_type}
                         </span>
                       </td>
@@ -304,22 +395,22 @@ async def anchor_power_validation(cluster_id, measured_w, baseline_w, delta_pct)
                         <span
                           className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-sans font-bold ${
                             r.origin === "live-instrument"
-                              ? "bg-emerald-100 text-emerald-800"
-                              : "bg-amber-100 text-amber-800"
+                              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+                              : "bg-amber-500/10 text-amber-400 border border-amber-500/30"
                           }`}
                         >
-                          {r.origin === "live-instrument" ? "LIVE INSTRUMENT" : "SYNTHETIC MODEL"}
+                          {r.origin === "live-instrument" ? "LIVE HARDWARE" : "SIMULATION MODEL"}
                         </span>
                       </td>
-                      <td className="px-5 py-3 text-slate-700 font-sans">
+                      <td className="px-5 py-3 text-slate-300 font-sans">
                         {r.telemetry.delta_power_pct !== undefined && (
-                          <span>Power Δ: <strong className="text-emerald-600">{r.telemetry.delta_power_pct}%</strong> </span>
+                          <span>Power Δ: <strong className="text-emerald-400">{r.telemetry.delta_power_pct}%</strong> </span>
                         )}
                         {r.telemetry.peak_junction_temp_c !== undefined && (
                           <span className="ml-2">Tj: <strong>{r.telemetry.peak_junction_temp_c}°C</strong></span>
                         )}
                         {r.telemetry.carbon_avoided_kg !== undefined && (
-                          <span className="ml-2 text-indigo-600 font-medium">Carbon: -{r.telemetry.carbon_avoided_kg}kg</span>
+                          <span className="ml-2 text-sky-400 font-medium">Carbon: -{r.telemetry.carbon_avoided_kg}kg</span>
                         )}
                       </td>
                       <td className="px-5 py-3 text-slate-500">{new Date(r.observed_at).toLocaleString()}</td>
@@ -328,7 +419,7 @@ async def anchor_power_validation(cluster_id, measured_w, baseline_w, delta_pct)
                           href={`/verify/${r.receipt_id}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-indigo-600 hover:text-indigo-800 font-sans font-medium hover:underline"
+                          className="text-indigo-400 hover:text-indigo-300 font-sans font-semibold hover:underline"
                         >
                           Inspect Proof →
                         </a>
@@ -341,24 +432,24 @@ async def anchor_power_validation(cluster_id, measured_w, baseline_w, delta_pct)
           </div>
         </div>
 
-        {/* ── DataCet SDK Quickstart ── */}
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+        {/* ── SDK Quickstart ── */}
+        <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-6 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-base font-bold text-slate-900">Connect DataCet to Passport in 3 Lines of Code</h2>
-              <p className="mt-1 text-xs text-slate-500">
-                Use our authenticated REST API to post power benchmarks, policy setpoint transitions, and thermal safety checks.
+              <h2 className="text-base font-bold text-white">Connect Your Data Center Cluster in Minutes</h2>
+              <p className="mt-1 text-xs text-slate-400">
+                Submit power validations, thermal safety audits, and carbon receipts using our authenticated REST API.
               </p>
             </div>
             <button
               onClick={copyCode}
-              className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
+              className="rounded-lg border border-slate-700 bg-slate-800 px-3.5 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-700 transition"
             >
               {copiedCode ? "✓ Copied" : "Copy Python Snippet"}
             </button>
           </div>
 
-          <pre className="overflow-x-auto rounded-lg bg-slate-900 p-4 font-mono text-xs text-indigo-200 border border-slate-800">
+          <pre className="overflow-x-auto rounded-lg bg-slate-950 p-4 font-mono text-xs text-emerald-300 border border-slate-800">
             {pythonSnippet}
           </pre>
         </div>

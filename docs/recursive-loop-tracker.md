@@ -29,7 +29,7 @@ Last updated: **2026-08-21** (Loop 25 Dual-Tier Keys, Autonomous Agent Self-Prov
 
 ---
 
-## Loop 23: DataCenter Infrastructure & Energy Governance Suite (DataCet Integration)
+## Loop 23: DataCenter Infrastructure & GPU Energy Governance Suite
 
 | Loop | Scope & Capability | Scoped result | Status | Evidence |
 |---|---|---|---|---|

@@ -16,7 +16,7 @@ const { prismaMock } = vi.hoisted(() => ({
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 
 describe("DataCenter API Routes", () => {
-  const clusterId = "vast-michigan-1";
+  const clusterId = "facility-cluster-01";
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -42,20 +42,20 @@ describe("DataCenter API Routes", () => {
     const { POST } = await import("@/app/api/v1/datacenter/evidence/route");
     const payload = {
       cluster_id: clusterId,
-      instance_id: "vast-michigan-1",
+      instance_id: "gpu-node-01",
       event_type: "HARDWARE_POWER_VALIDATION",
       timestamp_utc: "2026-08-21T05:00:00Z",
       origin: "live-instrument",
-      sku: "NVIDIA_RTX_4090",
+      sku: "NVIDIA_H100_SXM5",
       telemetry_source: "nvml_v12.2",
-      baseline_nameplate_w: 450,
-      measured_power_avg_w: 406.8,
-      delta_power_pct: -9.6,
-      ramp_delta_pct: -14.7,
-      latency_overhead_pct: 2.6,
+      baseline_nameplate_w: 700,
+      measured_power_avg_w: 630.0,
+      delta_power_pct: -10.0,
+      ramp_delta_pct: -15.0,
+      latency_overhead_pct: 1.5,
       replicate_count: 5,
-      policy_setpoint_applied: "gap7_load_stable",
-      peak_junction_temp_c: 68.2,
+      policy_setpoint_applied: "power_governor_v2",
+      peak_junction_temp_c: 65.0,
     };
 
     const req = new NextRequest("https://passport.metis.gold/api/v1/datacenter/evidence", {
@@ -76,14 +76,14 @@ describe("DataCenter API Routes", () => {
     prismaMock.agentEvidence.findMany.mockResolvedValue([
       {
         id: "ev_1",
-        sourceType: "datacet_control_plane",
+        sourceType: "datacenter_telemetry",
         normalizedEventType: "HARDWARE_POWER_VALIDATION",
         validationSignalPresent: true,
         observedAt: new Date("2026-08-21T04:00:00Z"),
         sourceDigest: JSON.stringify({
           origin: "live-instrument",
-          delta_power_pct: -9.6,
-          policy_setpoint_applied: "gap7_load_stable",
+          delta_power_pct: -10.0,
+          policy_setpoint_applied: "power_governor_v2",
           energy_saved_kwh: 50.0,
           carbon_avoided_kg: 18.2,
         }),
@@ -100,22 +100,22 @@ describe("DataCenter API Routes", () => {
 
     expect(res.status).toBe(200);
     const scorecard = await res.json();
-    expect(scorecard.acting_champion_policy).toBe("gap7_load_stable");
-    expect(scorecard.avg_power_reduction_pct).toBe(-9.6);
+    expect(scorecard.acting_champion_policy).toBe("power_governor_v2");
+    expect(scorecard.avg_power_reduction_pct).toBe(-10.0);
   });
 
   it("GET /api/v1/datacenter/clusters/:id/credential — returns signed W3C sustainability credential", async () => {
     prismaMock.agentEvidence.findMany.mockResolvedValue([
       {
         id: "ev_1",
-        sourceType: "datacet_control_plane",
+        sourceType: "datacenter_telemetry",
         normalizedEventType: "HARDWARE_POWER_VALIDATION",
         validationSignalPresent: true,
         observedAt: new Date("2026-08-21T04:00:00Z"),
         sourceDigest: JSON.stringify({
           origin: "live-instrument",
-          delta_power_pct: -9.6,
-          policy_setpoint_applied: "gap7_load_stable",
+          delta_power_pct: -10.0,
+          policy_setpoint_applied: "power_governor_v2",
         }),
       },
     ]);

@@ -209,7 +209,7 @@ export async function ingestDataCenterTelemetry(
   // Persist immutable AgentEvidence
   const evidence = await prisma.agentEvidence.create({
     data: {
-      sourceType: "datacet_control_plane",
+      sourceType: "datacenter_telemetry",
       artifactType: "datacenter_telemetry",
       normalizedEventType: payload.event_type,
       observedAt: new Date(payload.timestamp_utc || Date.now()),
@@ -309,7 +309,7 @@ export async function getDataCenterScorecard(
   const events = await prisma.agentEvidence.findMany({
     where: {
       agentIdentityCommitment: commitment,
-      sourceType: "datacet_control_plane",
+      sourceType: { in: ["datacenter_telemetry", "datacet_control_plane", "hardware_telemetry"] },
     },
     orderBy: { observedAt: "desc" },
   });
@@ -325,7 +325,7 @@ export async function getDataCenterScorecard(
   let carbonAvoidedKg = 0;
   let thermalEvents = 0;
   let thermalPasses = 0;
-  let champion = "gap7_load_stable";
+  let champion = "active_setpoint";
   let latestEventAt: string | null = null;
 
   for (const ev of events) {
@@ -371,8 +371,8 @@ export async function getDataCenterScorecard(
   }
 
   const hwRatio = totalEvents > 0 ? hwVerified / totalEvents : 0;
-  const avgPower = powerDeltaCount > 0 ? powerDeltaSum / powerDeltaCount : -9.6;
-  const avgRamp = rampDeltaCount > 0 ? rampDeltaSum / rampDeltaCount : -14.7;
+  const avgPower = powerDeltaCount > 0 ? powerDeltaSum / powerDeltaCount : 0;
+  const avgRamp = rampDeltaCount > 0 ? rampDeltaSum / rampDeltaCount : 0;
   const thermalPassRate = thermalEvents > 0 ? (thermalPasses / thermalEvents) * 100 : 100;
 
   return {

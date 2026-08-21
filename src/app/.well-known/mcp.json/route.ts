@@ -170,7 +170,7 @@ export async function GET(request: NextRequest) {
       },
       {
         name: "passport_ingest_datacenter_telemetry",
-        description: "Ingest live hardware-measured power, thermal safety, and carbon avoidance telemetry for GPU clusters (DataCet integration).",
+        description: "Ingest live hardware-measured power, thermal safety, and carbon avoidance telemetry for GPU data centers and AI clusters.",
         parameters: {
           type: "object",
           required: ["cluster_id", "instance_id", "event_type", "origin", "sku"],

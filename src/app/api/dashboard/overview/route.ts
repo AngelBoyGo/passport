@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
     prisma.webhookSubscription.count({ where: { operatorId } }),
     createReceiptCheckpoint(),
     prisma.agentEvidence.findMany({
-      where: { sourceType: "datacet_control_plane" },
+      where: { sourceType: { in: ["datacenter_telemetry", "datacet_control_plane", "hardware_telemetry"] } },
       take: 50,
       orderBy: { observedAt: "desc" },
     }),
@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
   let powerDeltaCount = 0;
   let energySavedKwh = 0;
   let carbonAvoidedKg = 0;
-  let champion = "gap7_load_stable";
+  let champion = "active_setpoint";
 
   for (const ev of dataCenterEvidence) {
     if (ev.validationSignalPresent) hwVerified++;
@@ -104,9 +104,9 @@ export async function GET(request: NextRequest) {
   const dcScorecard = {
     total_events: dcEvents,
     hardware_verified_events: hwVerified,
-    hardware_verification_ratio: dcEvents > 0 ? Number((hwVerified / dcEvents).toFixed(2)) : 1.0,
-    acting_champion_policy: champion,
-    avg_power_reduction_pct: powerDeltaCount > 0 ? Number((powerDeltaSum / powerDeltaCount).toFixed(2)) : -9.6,
+    hardware_verification_ratio: dcEvents > 0 ? Number((hwVerified / dcEvents).toFixed(2)) : 0,
+    acting_champion_policy: dcEvents > 0 ? champion : "None",
+    avg_power_reduction_pct: powerDeltaCount > 0 ? Number((powerDeltaSum / powerDeltaCount).toFixed(2)) : 0,
     cumulative_energy_saved_kwh: Number(energySavedKwh.toFixed(2)),
     cumulative_carbon_avoided_kg: Number(carbonAvoidedKg.toFixed(2)),
   };

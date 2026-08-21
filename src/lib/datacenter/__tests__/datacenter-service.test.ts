@@ -24,7 +24,7 @@ import {
 } from "@/lib/datacenter/datacenter-service";
 
 describe("DataCenter Energy & Infrastructure Governance Domain", () => {
-  const clusterId = "vast-cluster-01";
+  const clusterId = "facility-cluster-01";
   const clusterCommitment = "c".repeat(64);
 
   beforeEach(() => {
@@ -38,19 +38,19 @@ describe("DataCenter Energy & Infrastructure Governance Domain", () => {
     it("accepts valid hardware telemetry within physical bounds", () => {
       const validPayload: DataCenterTelemetryPayload = {
         cluster_id: clusterId,
-        instance_id: "vast-michigan-1",
+        instance_id: "gpu-node-01",
         event_type: "HARDWARE_POWER_VALIDATION",
         timestamp_utc: "2026-08-21T05:00:00Z",
         origin: "live-instrument",
-        sku: "NVIDIA_RTX_4090",
-        telemetry_source: "nvml_v12.2",
-        baseline_nameplate_w: 450,
-        measured_power_avg_w: 406.8,
-        delta_power_pct: -9.6,
-        ramp_delta_pct: -14.7,
-        latency_overhead_pct: 2.6,
+        sku: "NVIDIA_H100_SXM5",
+        telemetry_source: "nvml_v12.2_ipmi",
+        baseline_nameplate_w: 700,
+        measured_power_avg_w: 630.0,
+        delta_power_pct: -10.0,
+        ramp_delta_pct: -15.0,
+        latency_overhead_pct: 1.5,
         replicate_count: 5,
-        peak_junction_temp_c: 68.2,
+        peak_junction_temp_c: 65.0,
       };
 
       expect(() => validatePhysicalPlausibility(validPayload)).not.toThrow();
@@ -59,15 +59,15 @@ describe("DataCenter Energy & Infrastructure Governance Domain", () => {
     it("rejects absurd power readings outside physical hardware TDP limits", () => {
       const absurdPowerPayload: DataCenterTelemetryPayload = {
         cluster_id: clusterId,
-        instance_id: "vast-replica-live",
+        instance_id: "gpu-node-01",
         event_type: "HARDWARE_POWER_VALIDATION",
         timestamp_utc: "2026-08-21T05:00:00Z",
         origin: "live-instrument",
-        sku: "NVIDIA_RTX_4090",
+        sku: "NVIDIA_H100_SXM5",
         telemetry_source: "nvml_v12.2",
-        baseline_nameplate_w: 450,
+        baseline_nameplate_w: 700,
         measured_power_avg_w: 99999, // Impossible > 1.5x TDP
-        delta_power_pct: -9.6,
+        delta_power_pct: -10.0,
       };
 
       expect(() => validatePhysicalPlausibility(absurdPowerPayload)).toThrow(
@@ -78,13 +78,13 @@ describe("DataCenter Energy & Infrastructure Governance Domain", () => {
     it("rejects invalid thermal junction readings", () => {
       const absurdTempPayload: DataCenterTelemetryPayload = {
         cluster_id: clusterId,
-        instance_id: "vast-replica-live",
+        instance_id: "gpu-node-01",
         event_type: "THERMAL_SAFETY_AUDIT",
         timestamp_utc: "2026-08-21T05:00:00Z",
         origin: "live-instrument",
-        sku: "NVIDIA_RTX_4090",
+        sku: "NVIDIA_H100_SXM5",
         telemetry_source: "nvml_v12.2",
-        peak_junction_temp_c: 150, // Silicon melts / triggers shutdown at ~105C
+        peak_junction_temp_c: 150, // Out of physical bounds
       };
 
       expect(() => validatePhysicalPlausibility(absurdTempPayload)).toThrow(
@@ -110,20 +110,20 @@ describe("DataCenter Energy & Infrastructure Governance Domain", () => {
 
       const payload: DataCenterTelemetryPayload = {
         cluster_id: clusterId,
-        instance_id: "vast-michigan-1",
+        instance_id: "gpu-node-01",
         event_type: "HARDWARE_POWER_VALIDATION",
         timestamp_utc: "2026-08-21T05:00:00Z",
         origin: "live-instrument",
-        sku: "NVIDIA_RTX_4090",
+        sku: "NVIDIA_H100_SXM5",
         telemetry_source: "nvml_v12.2",
-        baseline_nameplate_w: 450,
-        measured_power_avg_w: 406.8,
-        delta_power_pct: -9.6,
-        ramp_delta_pct: -14.7,
-        latency_overhead_pct: 2.6,
+        baseline_nameplate_w: 700,
+        measured_power_avg_w: 630.0,
+        delta_power_pct: -10.0,
+        ramp_delta_pct: -15.0,
+        latency_overhead_pct: 1.5,
         replicate_count: 5,
-        policy_setpoint_applied: "gap7_load_stable",
-        peak_junction_temp_c: 68.2,
+        policy_setpoint_applied: "power_governor_v2",
+        peak_junction_temp_c: 65.0,
       };
 
       const result = await ingestDataCenterTelemetry(payload);
@@ -136,7 +136,7 @@ describe("DataCenter Energy & Infrastructure Governance Domain", () => {
       expect(prismaMock.agentEvidence.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            sourceType: "datacet_control_plane",
+            sourceType: "datacenter_telemetry",
             validationSignalPresent: true,
           }),
         })
@@ -149,22 +149,22 @@ describe("DataCenter Energy & Infrastructure Governance Domain", () => {
       prismaMock.agentEvidence.findMany.mockResolvedValue([
         {
           id: "ev_1",
-          sourceType: "datacet_control_plane",
+          sourceType: "datacenter_telemetry",
           normalizedEventType: "HARDWARE_POWER_VALIDATION",
           validationSignalPresent: true,
           observedAt: new Date("2026-08-21T04:00:00Z"),
           sourceDigest: JSON.stringify({
             origin: "live-instrument",
-            delta_power_pct: -9.6,
-            ramp_delta_pct: -14.7,
-            policy_setpoint_applied: "gap7_load_stable",
-            peak_junction_temp_c: 68.2,
+            delta_power_pct: -10.0,
+            ramp_delta_pct: -15.0,
+            policy_setpoint_applied: "power_governor_v2",
+            peak_junction_temp_c: 65.0,
             thermal_throttle_observed: false,
           }),
         },
         {
           id: "ev_2",
-          sourceType: "datacet_control_plane",
+          sourceType: "datacenter_telemetry",
           normalizedEventType: "CARBON_AVOIDED_ACCRUAL",
           validationSignalPresent: true,
           observedAt: new Date("2026-08-21T04:30:00Z"),
@@ -176,14 +176,14 @@ describe("DataCenter Energy & Infrastructure Governance Domain", () => {
         },
         {
           id: "ev_3",
-          sourceType: "datacet_control_plane",
+          sourceType: "datacenter_telemetry",
           normalizedEventType: "HARDWARE_POWER_VALIDATION",
           validationSignalPresent: false,
           observedAt: new Date("2026-08-21T04:45:00Z"),
           sourceDigest: JSON.stringify({
             origin: "synthetic",
             delta_power_pct: -12.18,
-            policy_setpoint_applied: "junction_setpoint_60c",
+            policy_setpoint_applied: "sim_model_01",
           }),
         },
       ]);
@@ -194,8 +194,8 @@ describe("DataCenter Energy & Infrastructure Governance Domain", () => {
       expect(scorecard.hardware_verified_events).toBe(2);
       expect(scorecard.modeled_events).toBe(1);
       expect(scorecard.hardware_verification_ratio).toBeCloseTo(0.67, 1);
-      expect(scorecard.acting_champion_policy).toBe("gap7_load_stable");
-      expect(scorecard.avg_power_reduction_pct).toBe(-9.6);
+      expect(scorecard.acting_champion_policy).toBe("power_governor_v2");
+      expect(scorecard.avg_power_reduction_pct).toBe(-10.0);
       expect(scorecard.cumulative_energy_saved_kwh).toBe(12.5);
       expect(scorecard.cumulative_carbon_avoided_kg).toBe(4.8);
       expect(scorecard.thermal_safety_pass_rate_pct).toBe(100);
@@ -208,14 +208,14 @@ describe("DataCenter Energy & Infrastructure Governance Domain", () => {
       prismaMock.agentEvidence.findMany.mockResolvedValue([
         {
           id: "ev_1",
-          sourceType: "datacet_control_plane",
+          sourceType: "datacenter_telemetry",
           normalizedEventType: "HARDWARE_POWER_VALIDATION",
           validationSignalPresent: true,
           observedAt: new Date("2026-08-21T04:00:00Z"),
           sourceDigest: JSON.stringify({
             origin: "live-instrument",
-            delta_power_pct: -9.6,
-            policy_setpoint_applied: "gap7_load_stable",
+            delta_power_pct: -10.0,
+            policy_setpoint_applied: "power_governor_v2",
             energy_saved_kwh: 50.0,
             carbon_avoided_kg: 18.2,
             thermal_throttle_observed: false,
@@ -228,7 +228,7 @@ describe("DataCenter Energy & Infrastructure Governance Domain", () => {
       expect(vc).not.toBeNull();
       expect(vc!["@context"]).toContain("https://www.w3.org/ns/credentials/v2");
       expect(vc!.type).toContain("DataCenterSustainabilityCredential");
-      expect(vc!.credentialSubject.acting_champion_policy).toBe("gap7_load_stable");
+      expect(vc!.credentialSubject.acting_champion_policy).toBe("power_governor_v2");
       expect(vc!.proof.type).toBe("Ed25519Signature2020");
       expect(vc!.proof.proofValue).toMatch(/^[0-9a-f]{128}$/i);
 
@@ -243,14 +243,14 @@ describe("DataCenter Energy & Infrastructure Governance Domain", () => {
       prismaMock.agentEvidence.findMany.mockResolvedValue([
         {
           id: "ev_1",
-          sourceType: "datacet_control_plane",
+          sourceType: "datacenter_telemetry",
           normalizedEventType: "HARDWARE_POWER_VALIDATION",
           validationSignalPresent: true,
           observedAt: new Date("2026-08-21T04:00:00Z"),
           sourceDigest: JSON.stringify({
             origin: "live-instrument",
-            delta_power_pct: -9.6,
-            policy_setpoint_applied: "gap7_load_stable",
+            delta_power_pct: -10.0,
+            policy_setpoint_applied: "power_governor_v2",
             energy_saved_kwh: 50.0,
             carbon_avoided_kg: 18.2,
           }),

@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
   const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "50", 10)));
 
   const whereClause: any = {
-    sourceType: "datacet_control_plane",
+    sourceType: { in: ["datacenter_telemetry", "datacet_control_plane", "hardware_telemetry"] },
   };
 
   if (eventType) {
