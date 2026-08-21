@@ -211,6 +211,24 @@ export async function GET(request: NextRequest) {
         endpoint: `${baseUrl}/api/v1/datacenter/clusters/{cluster_id}/scorecard`,
         method: "GET",
       },
+      {
+        name: "passport_autonomous_provision",
+        description: "Self-provision an autonomous Passport identity and Holder API key (pp_usr_...) via Proof-of-Work and Ed25519 proof of possession without human verification.",
+        parameters: {
+          type: "object",
+          required: ["public_key", "challenge_nonce", "pow_nonce", "signature"],
+          properties: {
+            public_key: { type: "string", description: "64-hex Ed25519 public key" },
+            challenge_nonce: { type: "string", description: "Challenge nonce from /challenge" },
+            pow_nonce: { type: "string", description: "Solved Proof-of-Work nonce" },
+            signature: { type: "string", description: "128-hex signature over sha256(challenge_nonce:pow_nonce:public_key)" },
+            display_name: { type: "string", description: "Optional agent display name" },
+            domain: { type: "string", description: "Operational domain" },
+          },
+        },
+        endpoint: `${baseUrl}/api/v1/passport/agents/autonomous/provision`,
+        method: "POST",
+      },
     ],
   };
 

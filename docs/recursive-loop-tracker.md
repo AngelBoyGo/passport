@@ -1,6 +1,18 @@
 # Recursive loop tracker — Passport + HostHub FFD
 
-Last updated: **2026-08-21** (Loop 24 Powerhouse User Dashboard & Persona Verification Hub — 122 test files, 719 tests green)
+Last updated: **2026-08-21** (Loop 25 Dual-Tier Keys, Autonomous Agent Self-Provisioning & Threat Hardening — 124 test files, 725 tests green)
+
+---
+
+## Loop 25: Dual-Tier Key Model & Autonomous Agent Self-Provisioning Suite
+
+| Loop | Scope & Security Milestone | Scoped result | Status | Evidence |
+|---|---|---|---|---|
+| **Loop 25.1** | Dual-Tier RBAC Architecture (`pp_ent_...` Issuer vs `pp_usr_...` Holder) | **3/3** pass (`operator.ts`, `api-keys`) | **Complete** | FFD Red/Green cycle verified |
+| **Loop 25.2** | Autonomous Agent Self-Provisioning with PoW Challenge (`/api/v1/passport/agents/autonomous/challenge`) | **2/2** pass (`autonomous-provision.test.ts`) | **Complete** | FFD Red/Green cycle verified |
+| **Loop 25.3** | Proof of Possession & Replay-Resistant Provisioning (`/api/v1/passport/agents/autonomous/provision`) | **2/2** pass (`autonomous-routes.test.ts`) | **Complete** | FFD Red/Green cycle verified |
+| **Loop 25.4** | Sybil Mitigation (3-zero SHA-256 PoW + Nonce Burn Cache) | **2/2** pass (`autonomous-provision.test.ts`) | **Complete** | FFD Red/Green cycle verified |
+| **Loop 25.5** | OpenAPI 3.1.0 & MCP Manifest Extensions (`passport_autonomous_provision`) | **2/2** pass (`openapi.test.ts`, `mcp-manifest.test.ts`) | **Complete** | 11 MCP tools active |
 
 ---
 

@@ -75,7 +75,7 @@ export async function ensureAgent(
 }
 
 /**
- * Authenticates a Bearer API key and returns the operator.
+ * Authenticates a Bearer API key and returns the operator with role information.
  */
 export async function authenticateApiKey(authHeader: string | null) {
   if (!authHeader?.startsWith("Bearer ")) {
@@ -90,18 +90,37 @@ export async function authenticateApiKey(authHeader: string | null) {
     include: { operator: true },
   });
 
-  return apiKey?.operator ?? null;
+  if (!apiKey?.operator) return null;
+
+  const role: "ISSUER" | "HOLDER" = key.startsWith("pp_usr_") ? "HOLDER" : "ISSUER";
+  return {
+    ...apiKey.operator,
+    apiKeyRole: role,
+  };
 }
 
 /**
- * Creates a new API key for an operator; returns the raw key once.
+ * Creates a new API key for an operator (Enterprise Issuer or Subject Holder); returns the raw key once.
+ * Gracefully supports (operatorId, name, role, client) or (operatorId, name, client).
  */
 export async function createApiKey(
   operatorId: string,
   name?: string,
-  client: PrismaTx | typeof prisma = prisma
+  roleOrClient?: "ISSUER" | "HOLDER" | PrismaTx | typeof prisma,
+  clientArg?: PrismaTx | typeof prisma
 ) {
-  const rawKey = `pp_${bytesToHex(crypto.getRandomValues(new Uint8Array(32)))}`;
+  let role: "ISSUER" | "HOLDER" = "ISSUER";
+  let client: PrismaTx | typeof prisma = prisma;
+
+  if (typeof roleOrClient === "string") {
+    role = roleOrClient;
+    if (clientArg) client = clientArg;
+  } else if (roleOrClient) {
+    client = roleOrClient;
+  }
+
+  const prefix = role === "HOLDER" ? "pp_usr_" : "pp_ent_";
+  const rawKey = `${prefix}${bytesToHex(crypto.getRandomValues(new Uint8Array(32)))}`;
   await client.apiKey.create({
     data: {
       operatorId,

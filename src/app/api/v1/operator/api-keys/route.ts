@@ -29,17 +29,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { name?: string };
+  let body: { name?: string; role?: "ISSUER" | "HOLDER" };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const rawKey = await createApiKey(operator.id, body.name);
+  const rawKey = body.role
+    ? await createApiKey(operator.id, body.name, body.role)
+    : await createApiKey(operator.id, body.name);
 
   return NextResponse.json(
-    { rawKey, name: body.name ?? null },
+    { rawKey, name: body.name ?? null, ...(body.role ? { role: body.role } : {}) },
     { status: 201 }
   );
 }

@@ -58,6 +58,7 @@ export default function UserDashboard() {
   const [selectedReceipt, setSelectedReceipt] = useState<any | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [newKeyName, setNewKeyName] = useState("");
+  const [newKeyRole, setNewKeyRole] = useState<"ISSUER" | "HOLDER">("ISSUER");
   const [createdKeyRaw, setCreatedKeyRaw] = useState<string | null>(null);
   const [creatingKey, setCreatingKey] = useState(false);
   const [complianceFramework, setComplianceFramework] = useState("EU_AI_ACT");
@@ -108,7 +109,10 @@ export default function UserDashboard() {
       const res = await fetch("/api/admin/api-keys", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newKeyName || "Standard API Key" }),
+        body: JSON.stringify({
+          name: newKeyName || (newKeyRole === "ISSUER" ? "Enterprise Platform Key" : "Agent Holder Key"),
+          role: newKeyRole,
+        }),
       });
       if (res.ok) {
         const json = await res.json();
@@ -282,10 +286,18 @@ export default function UserDashboard() {
                   <p className="text-xs text-slate-400">Use your Bearer API key to issue receipts and post evidence from Python, TS, or cURL.</p>
                 </div>
 
-                <form onSubmit={handleCreateKey} className="flex gap-2">
+                <form onSubmit={handleCreateKey} className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={newKeyRole}
+                    onChange={(e) => setNewKeyRole(e.target.value as "ISSUER" | "HOLDER")}
+                    className="rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  >
+                    <option value="ISSUER">Enterprise Issuer (pp_ent_...)</option>
+                    <option value="HOLDER">Agent Holder (pp_usr_...)</option>
+                  </select>
                   <input
                     type="text"
-                    placeholder="Key name (e.g., Cursor Agent)"
+                    placeholder="Key name (e.g., DataCet / Agent)"
                     value={newKeyName}
                     onChange={(e) => setNewKeyName(e.target.value)}
                     className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"

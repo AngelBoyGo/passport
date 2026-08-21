@@ -28,17 +28,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: NO_STORE });
   }
 
-  let body: { name?: string };
+  let body: { name?: string; role?: "ISSUER" | "HOLDER" };
   try {
     body = await request.json();
   } catch {
     body = {};
   }
 
-  const rawKey = await createApiKey(session.operator.id, body.name);
+  const role = body.role === "HOLDER" ? "HOLDER" : "ISSUER";
+  const rawKey = await createApiKey(session.operator.id, body.name, role);
 
   return NextResponse.json(
-    { rawKey, name: body.name ?? null },
+    { rawKey, name: body.name ?? null, role },
     { status: 201, headers: NO_STORE }
   );
 }

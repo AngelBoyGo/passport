@@ -292,6 +292,18 @@ export async function GET(request: NextRequest) {
           responses: { "200": { description: "Signed compliance evidence package" } },
         },
       },
+      "/api/v1/passport/agents/autonomous/challenge": {
+        post: {
+          summary: "Request Ephemeral Nonce with Proof-of-Work Challenge for Autonomous Provisioning",
+          responses: { "200": { description: "Challenge nonce and difficulty" } },
+        },
+      },
+      "/api/v1/passport/agents/autonomous/provision": {
+        post: {
+          summary: "Complete Autonomous Agent Self-Provisioning with PoW and Proof of Possession",
+          responses: { "201": { description: "Autonomous Holder API key and Passport issued" } },
+        },
+      },
     },
   };
 

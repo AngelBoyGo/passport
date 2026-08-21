@@ -15,13 +15,49 @@ export default function DocsGettingStarted() {
         or use the dev provision endpoint in development.
       </div>
 
-      <Section title="1. Get an API key">
+      <Section title="1. Get an API key (Dual-Tier Access)">
+        <p className="text-sm text-slate-600">
+          Passport provides two distinct API key tiers:
+        </p>
+        <ul className="list-disc pl-5 text-sm text-slate-600 space-y-1">
+          <li><strong>Enterprise Platform Issuer (<code className="font-mono text-xs text-indigo-600">pp_ent_...</code>):</strong> For platforms like DataCet or multi-agent orchestrators that manage fleets, mint child passports, and anchor bulk evidence.</li>
+          <li><strong>Agent Holder (<code className="font-mono text-xs text-indigo-600">pp_usr_...</code>):</strong> For individual autonomous agents, indie builders, or single cluster nodes that hold their own reputation and export receipts.</li>
+        </ul>
         <CodeBlock>
-          {`# Production: subscribe via Stripe checkout, key is auto-provisioned
-# Dev: use the dev provision endpoint
-curl -X POST https://passport.metis.gold/api/dev/provision
+          {`# Generate via /dashboard or call the API:
+curl -X POST https://passport.metis.gold/api/v1/operator/api-keys \\
+  -H "Authorization: Bearer pp_ent_<admin_key>" \\
+  -H "Content-Type: application/json" \\
+  -d '{"name": "Fleet Key", "role": "ISSUER"}'
 
-# Store the returned api_key — it's shown once.`}
+# Store the returned rawKey — it is shown once.`}
+        </CodeBlock>
+      </Section>
+
+      <Section title="Autonomous Agent Self-Provisioning (Zero-Human Flow)">
+        <p className="text-sm text-slate-600">
+          Autonomous AI agents can self-provision a Passport identity and Holder API key without human email verification using our Proof-of-Work (PoW) and Proof-of-Possession challenge:
+        </p>
+        <CodeBlock>
+          {`# Step 1: Request an ephemeral challenge nonce
+curl -X POST https://passport.metis.gold/api/v1/passport/agents/autonomous/challenge \\
+  -H "Content-Type: application/json" \\
+  -d '{"public_key": "<64-hex-ed25519-public-key>"}'
+
+# Step 2: Solve lightweight PoW & sign digest sha256(nonce + ":" + pow_nonce + ":" + pubkey)
+# Step 3: Complete self-provisioning
+curl -X POST https://passport.metis.gold/api/v1/passport/agents/autonomous/provision \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "public_key": "<64-hex-ed25519-public-key>",
+    "challenge_nonce": "<nonce-from-step-1>",
+    "pow_nonce": "<solved-pow-nonce>",
+    "signature": "<128-hex-ed25519-signature>",
+    "display_name": "AutonomousReviewer",
+    "domain": "CODE_GENERATION"
+  }'
+
+# Returns: { "api_key": "pp_usr_...", "role": "HOLDER", "did": "did:key:z...", "subject_commitment": "..." }`}
         </CodeBlock>
       </Section>
 
