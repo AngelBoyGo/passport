@@ -1,6 +1,17 @@
 # Recursive loop tracker — Passport + HostHub FFD
 
-Last updated: **2026-08-21** (Loop 25 Dual-Tier Keys, Autonomous Agent Self-Provisioning & Threat Hardening — 124 test files, 725 tests green)
+Last updated: **2026-08-21** (Loop 26 Trust & Independent Verification Foundation — 124 test files, 727 tests green)
+
+---
+
+## Loop 26: Trust Foundation & Independent Verification Docs
+
+| Loop | Recommendation Addressed | Scoped result | Status | Evidence |
+|---|---|---|---|---|
+| **Loop 26.1** | 1.5 — Confirm key rotation / drop misleading `immutable` header | Already fixed; no `immutable` on `/api/v1/public-key`, `key-history` present | **Verified** | `public-key/route.ts` |
+| **Loop 26.2** | 1.2 + 1.3 — Publish six source_type payload schemas, evidence digest & receipt `content_hash` canonicalization | **New** `src/app/docs/verification/page.tsx` | **Complete** | Docs page live |
+| **Loop 26.3** | 1.6 — Publish signed webhook contract (headers, signing scheme, retry semantics) | Documented in verification docs | **Complete** | Docs page live |
+| **Loop 26.4** | 1.1 — `INGESTION_COMMITMENT_SALT` production requirement | Confirmed required outside test (no agent can anchor without it); surfaced in admin health | **Verified** | `github-agent-adapter.ts` |
 
 ---
 

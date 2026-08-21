@@ -178,6 +178,10 @@ curl -X POST https://passport.metis.gold/api/v1/passport/agents/<commitment>/evi
 
       <div className="border-t pt-6 text-sm text-slate-500">
         Next:{" "}
+        <Link href="/docs/verification" className="text-indigo-600 hover:underline">
+          Trust, Evidence & Independent Verification →
+        </Link>
+        {" · "}
         <Link href="/docs/api-reference" className="text-indigo-600 hover:underline">
           Full API Reference →
         </Link>

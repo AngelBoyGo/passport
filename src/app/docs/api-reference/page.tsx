@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function DocsApiReference() {
   return (
     <div className="space-y-8">
@@ -127,6 +129,14 @@ export default function DocsApiReference() {
           Get masked receipt manifest with verification status, chain info, and enforcement state.
         </ApiMethod>
       </Section>
+
+      <p className="rounded-lg border-l-4 border-emerald-500 bg-emerald-50 p-3 text-sm text-emerald-900">
+        For the exact canonicalization rules (evidence digest + receipt content_hash) and the signed webhook
+        contract that enable fully <strong>independent, offline verification</strong>, see{" "}
+        <Link href="/docs/verification" className="font-semibold text-emerald-700 underline">
+          Trust, Evidence & Independent Verification →
+        </Link>
+      </p>
 
       <Section title="Evidence">
         <ApiMethod method="POST" path="/api/v1/passport/agents/:id/evidence" auth="Service Token (task) / API Key">
