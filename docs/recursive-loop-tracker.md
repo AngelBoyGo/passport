@@ -1,6 +1,19 @@
 # Recursive loop tracker — Passport + HostHub FFD
 
-Last updated: **2026-08-21** (Loop 23 DataCenter Energy & Carbon Governance Suite — 121 test files, 717 tests green)
+Last updated: **2026-08-21** (Loop 24 Powerhouse User Dashboard & Persona Verification Hub — 122 test files, 719 tests green)
+
+---
+
+## Loop 24: Powerhouse User Dashboard & Persona Verification Hub
+
+| Loop | Scope & Capability | Scoped result | Status | Evidence |
+|---|---|---|---|---|
+| **Loop 24.1** | User Dashboard Overview Data Aggregator API (`/api/dashboard/overview`) | **2/2** pass (`overview.test.ts`) | **Complete** | FFD Red/Green cycle verified |
+| **Loop 24.2** | Multi-Persona Adaptive Dashboard Hub (`/dashboard` with 4 Lenses: Builder, DataCenter, Enterprise, Auditor) | **1/1** pass (JSDOM/Node rendering) | **Complete** | Full interactive dashboard live |
+| **Loop 24.3** | Instant API Key Generator, Copy Launcher & README Badge Embedder | **1/1** pass (verified in dashboard flow) | **Complete** | Live key creation & snippet generation |
+| **Loop 24.4** | 1-Click W3C Verifiable Credential & Regulatory Compliance Exporter | **1/1** pass (verified against VC generator) | **Complete** | JSON-LD & EU AI Act packages |
+| **Loop 24.5** | Real-Time Receipts Stream & Cryptographic Proof Inspector Modal | **1/1** pass (canonical digest & Ed25519) | **Complete** | Interactive inspection modal |
+| **Loop 24.6** | Site-Wide Onboarding & Post-Auth Routing Upgrades (Login/Signup $\rightarrow$ `/dashboard`) | **1/1** pass (Session cookie routing) | **Complete** | Seamless user journey |
 
 ---
 

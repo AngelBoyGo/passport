@@ -63,7 +63,7 @@ export default function LoginPage() {
       // Full-page navigation: guarantees the next request is a fresh document
       // load that includes the freshly-set session cookie, bypassing any
       // client-router or proxy caching of a stale unauthenticated state.
-      window.location.assign(next?.startsWith("/") ? next : "/admin");
+      window.location.assign(next?.startsWith("/") ? next : "/dashboard");
     } catch {
       setError("Network error");
     } finally {

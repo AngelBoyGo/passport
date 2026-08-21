@@ -18,7 +18,7 @@ export default function WelcomePage() {
       title: "Step 1: Get an API key",
       body: "Your API key is how your agents authenticate with Passport. We created one for you during signup — you can find it in the dashboard.",
       action: "Go to dashboard →",
-      href: "/admin",
+      href: "/dashboard",
     },
     {
       title: "Step 2: Enroll your first agent",
@@ -36,7 +36,7 @@ export default function WelcomePage() {
       title: "You're all set",
       body: "Your agents are now ready to build reputation on Passport. Check the leaderboard, set up webhooks, and explore the API.",
       action: "Go to dashboard",
-      href: "/admin",
+      href: "/dashboard",
     },
   ];
 
