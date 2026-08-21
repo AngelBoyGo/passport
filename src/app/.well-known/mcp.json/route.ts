@@ -252,6 +252,20 @@ export async function GET(request: NextRequest) {
         endpoint: `${baseUrl}/api/v1/receipts/checkpoints/latest`,
         method: "GET",
       },
+      {
+        name: "passport_get_audit_package",
+        description: "Assemble a commitment's compliance_report receipts into a signed, audit-grade evidence package mapped to SOC 2, ISO 27001, or ISO 42001.",
+        parameters: {
+          type: "object",
+          required: ["commitment"],
+          properties: {
+            commitment: { type: "string", description: "64-hex agent identity commitment" },
+            framework: { type: "string", enum: ["SOC2_TYPE2", "ISO_27001", "ISO_42001"] },
+          },
+        },
+        endpoint: `${baseUrl}/api/v1/compliance/audit-package/{commitment}`,
+        method: "GET",
+      },
     ],
   };
 

@@ -1,6 +1,16 @@
 # Recursive loop tracker — Passport + HostHub FFD
 
-Last updated: **2026-08-21** (Loop 28 Notary Anchoring + Reputation-as-a-Service Metering — 127 test files, 740 tests green)
+Last updated: **2026-08-21** (Loop 29 Audit-Grade Compliance Evidence Aggregation — 129 test files, 746 tests green)
+
+---
+
+## Loop 29: Audit-Grade Compliance Evidence Receipts (2.5)
+
+| Loop | Recommendation Addressed | Scoped result | Status | Evidence |
+|---|---|---|---|---|
+| **Loop 29.1** | 2.5 — Assemble compliance_report receipts into signed audit-grade package mapped to real frameworks | `src/lib/compliance/audit-evidence-package.ts` (SOC2/ISO27001/ISO42001 controls, per-control evidence refs) | **Complete** | `audit-evidence-package.test.ts` (3/3) |
+| **Loop 29.2** | 2.5 — Expose `GET /api/v1/compliance/audit-package/:commitment` | 3/3 pass route tests | **Complete** | `audit-package-route.test.ts` |
+| **Loop 29.3** | OpenAPI + MCP manifest extension (`passport_get_audit_package`), api-reference doc | 14 MCP tools active | **Complete** | `mcp-manifest.test.ts` |
 
 ---
 

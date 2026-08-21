@@ -320,6 +320,19 @@ export async function GET(request: NextRequest) {
           },
         },
       },
+      "/api/v1/compliance/audit-package/{commitment}": {
+        get: {
+          summary: "Assemble compliance_report receipts into a signed audit-grade evidence package (SOC2 / ISO 27001 / ISO 42001)",
+          parameters: [
+            { name: "commitment", in: "path", required: true, schema: { type: "string" } },
+            { name: "framework", in: "query", required: false, schema: { type: "string", enum: ["SOC2_TYPE2", "ISO_27001", "ISO_42001"] } },
+          ],
+          responses: {
+            "200": { description: "Signed audit evidence package" },
+            "404": { description: "No compliance_report evidence" },
+          },
+        },
+      },
     },
   };
 

@@ -238,6 +238,9 @@ export default function DocsApiReference() {
         <ApiMethod method="GET" path="/api/v1/compliance/frameworks" auth="Public">
           List supported regulatory and governance frameworks.
         </ApiMethod>
+        <ApiMethod method="GET" path="/api/v1/compliance/audit-package/:commitment" auth="Public">
+          Assemble a stream of compliance_report receipts into a signed, audit-grade evidence package mapped to SOC 2, ISO 27001, or ISO 42001 controls.
+        </ApiMethod>
       </Section>
 
       <Section title="Data Center Infrastructure, Energy & Carbon Governance">
