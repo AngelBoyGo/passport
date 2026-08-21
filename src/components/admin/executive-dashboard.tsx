@@ -132,6 +132,16 @@ export function ExecutiveDashboard() {
                 <Link href="/" className="text-slate-400 hover:text-white transition">
                   View public site →
                 </Link>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await fetch("/api/auth/logout", { method: "POST" });
+                    window.location.assign("/login");
+                  }}
+                  className="mt-1 text-left text-red-400 hover:text-red-300 transition"
+                >
+                  Sign out ⎋
+                </button>
               </div>
             </div>
           </div>
@@ -143,13 +153,25 @@ export function ExecutiveDashboard() {
               <h2 className="mt-2 text-3xl font-semibold tracking-tight">{currentTab?.label}</h2>
               <p className="mt-1 text-sm text-slate-400">Live snapshot · {new Date(data.generatedAt).toLocaleTimeString()}</p>
             </div>
-            <button
-              type="button"
-              onClick={() => load().catch((reason) => setError(String(reason)))}
-              className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300 hover:bg-white/10 transition"
-            >
-              Refresh data
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => load().catch((reason) => setError(String(reason)))}
+                className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300 hover:bg-white/10 transition"
+              >
+                Refresh data
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  await fetch("/api/auth/logout", { method: "POST" });
+                  window.location.assign("/login");
+                }}
+                className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm font-medium text-red-300 hover:bg-red-500/20 transition"
+              >
+                Sign out
+              </button>
+            </div>
           </header>
           <div className="mt-4 flex gap-2 overflow-x-auto pb-1 lg:hidden" role="tablist">
             {ADMIN_TABS.map((item) => (

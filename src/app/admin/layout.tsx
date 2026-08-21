@@ -110,11 +110,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <button
             onClick={async () => {
               await fetch("/api/auth/logout", { method: "POST" });
-              router.push("/login");
+              window.location.assign("/login");
             }}
             className="text-red-600 hover:underline"
           >
-            Logout
+            Sign out
           </button>
         </nav>
       </header>
