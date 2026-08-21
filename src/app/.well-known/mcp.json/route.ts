@@ -168,6 +168,49 @@ export async function GET(request: NextRequest) {
         endpoint: `${baseUrl}/api/v1/receipts/checkpoints/latest`,
         method: "GET",
       },
+      {
+        name: "passport_ingest_datacenter_telemetry",
+        description: "Ingest live hardware-measured power, thermal safety, and carbon avoidance telemetry for GPU clusters (DataCet integration).",
+        parameters: {
+          type: "object",
+          required: ["cluster_id", "instance_id", "event_type", "origin", "sku"],
+          properties: {
+            cluster_id: { type: "string" },
+            instance_id: { type: "string" },
+            event_type: {
+              type: "string",
+              enum: [
+                "HARDWARE_POWER_VALIDATION",
+                "POLICY_SETPOINT_TRANSITION",
+                "THERMAL_SAFETY_AUDIT",
+                "CARBON_AVOIDED_ACCRUAL",
+                "WORKLOAD_ENERGY_EFFICIENCY",
+              ],
+            },
+            origin: { type: "string", enum: ["live-instrument", "synthetic"] },
+            sku: { type: "string" },
+            baseline_nameplate_w: { type: "number" },
+            measured_power_avg_w: { type: "number" },
+            delta_power_pct: { type: "number" },
+            policy_setpoint_applied: { type: "string" },
+          },
+        },
+        endpoint: `${baseUrl}/api/v1/datacenter/evidence`,
+        method: "POST",
+      },
+      {
+        name: "passport_get_datacenter_scorecard",
+        description: "Retrieve verified data center cluster scorecard including hardware vs modeled breakdown, energy saved, and thermal pass rate.",
+        parameters: {
+          type: "object",
+          required: ["cluster_id"],
+          properties: {
+            cluster_id: { type: "string" },
+          },
+        },
+        endpoint: `${baseUrl}/api/v1/datacenter/clusters/{cluster_id}/scorecard`,
+        method: "GET",
+      },
     ],
   };
 

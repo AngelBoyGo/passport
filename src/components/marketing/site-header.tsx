@@ -11,6 +11,7 @@ export function SiteHeader() {
   }, []);
 
   const links = [
+    { href: "/datacenter", label: "Data Center" },
     { href: "/docs/getting-started", label: "Docs" },
     { href: "/docs/api-reference", label: "API" },
     { href: "/leaderboard", label: "Leaderboard" },

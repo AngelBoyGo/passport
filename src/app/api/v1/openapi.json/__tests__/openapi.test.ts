@@ -35,5 +35,7 @@ describe("GET /api/v1/openapi.json (OpenAPI 3.1.0)", () => {
     expect(spec.paths["/api/v1/credentials/{commitment}"]).toBeDefined();
     expect(spec.paths["/api/v1/transparency/keys"]).toBeDefined();
     expect(spec.paths["/api/v1/compliance/packages/{commitment}"]).toBeDefined();
+    expect(spec.paths["/api/v1/datacenter/evidence"]).toBeDefined();
+    expect(spec.paths["/api/v1/datacenter/clusters/{id}/scorecard"]).toBeDefined();
   });
 });

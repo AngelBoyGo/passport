@@ -230,6 +230,24 @@ export default function DocsApiReference() {
         </ApiMethod>
       </Section>
 
+      <Section title="Data Center Infrastructure & Energy (DataCet Integration)">
+        <ApiMethod method="POST" path="/api/v1/datacenter/evidence" auth="API Key / Public">
+          Ingest live hardware-measured power, thermal safety, setpoint transitions, and Scope 2 carbon telemetry from GPU data centers.
+        </ApiMethod>
+        <ApiMethod method="GET" path="/api/v1/datacenter/clusters/:id/scorecard" auth="Public">
+          Retrieve verified cluster efficiency scorecard separating hardware-measured runs from simulation models.
+        </ApiMethod>
+        <ApiMethod method="GET" path="/api/v1/datacenter/clusters/:id/credential" auth="Public">
+          Issue an Ed25519-signed W3C DataCenterSustainabilityCredential for tenant ESG audits.
+        </ApiMethod>
+        <ApiMethod method="GET" path="/api/v1/datacenter/receipts" auth="Public">
+          List tamper-evident data center energy receipts anchored to the latest Merkle checkpoint root.
+        </ApiMethod>
+        <ApiMethod method="GET" path="/api/v1/datacenter/compliance/packages/:id" auth="Public">
+          Generate an audit-grade regulatory compliance package formatted for EU AI Act (Art 51), ISO 14064, or NIST AI RMF.
+        </ApiMethod>
+      </Section>
+
       <Section title="Public">
         <ApiMethod method="GET" path="/api/health" auth="None">
           DB liveness probe. Returns 200 with {`{"status":"ok"}`} or 503.

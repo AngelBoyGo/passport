@@ -1,6 +1,19 @@
 # Recursive loop tracker — Passport + HostHub FFD
 
-Last updated: **2026-08-20** (Loop 22 Strategic Moat Expansion & Standards Suite — 114 test files, 694 tests green)
+Last updated: **2026-08-21** (Loop 23 DataCenter Energy & Carbon Governance Suite — 121 test files, 717 tests green)
+
+---
+
+## Loop 23: DataCenter Infrastructure & Energy Governance Suite (DataCet Integration)
+
+| Loop | Scope & Capability | Scoped result | Status | Evidence |
+|---|---|---|---|---|
+| **Loop 23.1** | DataCenter Telemetry Ingestion & Plausibility Filter (`/api/v1/datacenter/evidence`) | **3/3** pass (`datacenter-service.test.ts`) | **Complete** | FFD Red/Green cycle verified |
+| **Loop 23.2** | Cluster Efficiency Scorecard & Honesty Radar (`/api/v1/datacenter/clusters/:id/scorecard`) | **2/2** pass (`datacenter-service.test.ts`) | **Complete** | FFD Red/Green cycle verified |
+| **Loop 23.3** | W3C DataCenter Sustainability Verifiable Credential (`/api/v1/datacenter/clusters/:id/credential`) | **2/2** pass (`datacenter-service.test.ts`) | **Complete** | FFD Red/Green cycle verified |
+| **Loop 23.4** | DataCenter ESG / EU AI Act Compliance Generator (`/api/v1/datacenter/compliance/packages/:id`) | **2/2** pass (`datacenter-service.test.ts`) | **Complete** | FFD Red/Green cycle verified |
+| **Loop 23.5** | DataCenter Receipts Ledger with Merkle Root (`/api/v1/datacenter/receipts`) | **3/3** pass (`datacenter-routes.test.ts`) | **Complete** | FFD Red/Green cycle verified |
+| **Loop 23.6** | DataCenter Governance Hub UI & Navigation (`/datacenter`, Site Header) | **1/1** pass (JSDOM/Node rendering) | **Complete** | Full interactive dashboard live |
 
 ---
 

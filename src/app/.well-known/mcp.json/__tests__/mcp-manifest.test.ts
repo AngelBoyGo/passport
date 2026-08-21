@@ -18,7 +18,7 @@ describe("GET /.well-known/mcp.json (Model Context Protocol Manifest)", () => {
     const manifest = await res.json();
     expect(manifest.name).toBe("passport");
     expect(manifest.tools).toBeInstanceOf(Array);
-    expect(manifest.tools.length).toBe(8);
+    expect(manifest.tools.length).toBe(10);
 
     const toolNames = manifest.tools.map((t: { name: string }) => t.name);
     expect(toolNames).toContain("passport_gate_verify");
@@ -29,6 +29,8 @@ describe("GET /.well-known/mcp.json (Model Context Protocol Manifest)", () => {
     expect(toolNames).toContain("passport_verify_credential");
     expect(toolNames).toContain("passport_get_compliance_package");
     expect(toolNames).toContain("passport_get_merkle_checkpoint");
+    expect(toolNames).toContain("passport_ingest_datacenter_telemetry");
+    expect(toolNames).toContain("passport_get_datacenter_scorecard");
 
     const gateTool = manifest.tools.find((t: { name: string }) => t.name === "passport_gate_verify");
     expect(gateTool.parameters.required).toContain("operator_id");

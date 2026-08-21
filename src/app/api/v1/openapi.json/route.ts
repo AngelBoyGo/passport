@@ -258,6 +258,40 @@ export async function GET(request: NextRequest) {
           responses: { "200": { description: "List of frameworks" } },
         },
       },
+      "/api/v1/datacenter/evidence": {
+        post: {
+          summary: "Ingest Data Center Power, Thermal, and Carbon Telemetry (for DataCet)",
+          security: [{ ApiKeyAuth: [] }],
+          responses: { "201": { description: "Evidence ingested and signed receipt generated" } },
+        },
+      },
+      "/api/v1/datacenter/clusters/{id}/scorecard": {
+        get: {
+          summary: "Get Data Center Cluster Efficiency Scorecard",
+          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "Cluster energy scorecard" } },
+        },
+      },
+      "/api/v1/datacenter/clusters/{id}/credential": {
+        get: {
+          summary: "Issue Signed W3C Data Center Sustainability Credential",
+          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "W3C DataCenterSustainabilityCredential" } },
+        },
+      },
+      "/api/v1/datacenter/receipts": {
+        get: {
+          summary: "List Data Center Cryptographic Receipts with Merkle Root Anchor",
+          responses: { "200": { description: "List of data center receipts" } },
+        },
+      },
+      "/api/v1/datacenter/compliance/packages/{id}": {
+        get: {
+          summary: "Generate Data Center Regulatory Compliance Package (EU AI Act, ISO 14064, NIST)",
+          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "Signed compliance evidence package" } },
+        },
+      },
     },
   };
 
