@@ -252,7 +252,7 @@ export async function GET(request: NextRequest) {
         endpoint: `${baseUrl}/api/v1/receipts/checkpoints/latest`,
         method: "GET",
       },
-      {
+{
         name: "passport_get_audit_package",
         description: "Assemble a commitment's compliance_report receipts into a signed, audit-grade evidence package mapped to SOC 2, ISO 27001, or ISO 42001.",
         parameters: {
@@ -264,6 +264,39 @@ export async function GET(request: NextRequest) {
           },
         },
         endpoint: `${baseUrl}/api/v1/compliance/audit-package/{commitment}`,
+        method: "GET",
+      },
+      {
+        name: "passport_agent_pay_spend",
+        description: "Authorize a scoped agent payment from the agent's Passport wallet for an attestation product (agentic payments with spend ceiling and merchant binding).",
+        parameters: {
+          type: "object",
+          required: ["product", "max_credits"],
+          properties: {
+            product: { type: "string", enum: ["reputation_lookup_verified", "portable_credential_issuance", "audit_package_generation", "neutrality_residency_attestation"] },
+            max_credits: { type: "number", description: "Spend ceiling in credits" },
+          },
+        },
+        endpoint: `${baseUrl}/api/v1/agent-pay/spend`,
+        method: "POST",
+      },
+      {
+        name: "passport_agent_wallet",
+        description: "Read the authenticated agent/operator wallet credit balance funding Passport attestation products.",
+        parameters: { type: "object", properties: {} },
+        endpoint: `${baseUrl}/api/v1/agent-pay/wallet`,
+        method: "GET",
+      },
+      {
+        name: "passport_get_datacenter_documentation",
+        description: "Retrieve the facility documentation manifest — what Passport documents for a data center (artifacts, compliance readiness, sustainability, audit anchors).",
+        parameters: {
+          type: "object",
+          properties: {
+            facility: { type: "string", description: "Facility/cluster id" },
+          },
+        },
+        endpoint: `${baseUrl}/api/v1/datacenter/documentation`,
         method: "GET",
       },
     ],

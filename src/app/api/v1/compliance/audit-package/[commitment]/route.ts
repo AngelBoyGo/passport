@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildAuditEvidencePackage } from "@/lib/compliance/audit-evidence-package";
 import { isValidAgentCommitmentHash } from "@/lib/public-portal/portal-service";
+import { checkInMemoryRateLimit, clientIpFromRequest, rateLimitResponse } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 const CORS = { "Access-Control-Allow-Origin": "*" };
@@ -14,6 +15,12 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ commitment: string }> }
 ) {
+  const ip = clientIpFromRequest(request.headers);
+  const rate = checkInMemoryRateLimit(`audit-package:${ip}`, 30, 60_000);
+  if (!rate.allowed) {
+    return NextResponse.json({ error: "Rate limit exceeded" }, rateLimitResponse(rate, 30));
+  }
+
   const { commitment } = await params;
   if (!isValidAgentCommitmentHash(commitment)) {
     return NextResponse.json(

@@ -333,6 +333,33 @@ export async function GET(request: NextRequest) {
           },
         },
       },
+      "/api/v1/agent-pay/wallet": {
+        get: {
+          summary: "Read the agent/operator wallet credit balance (agentic payments)",
+          security: [{ ApiKeyAuth: [] }],
+          responses: { "200": { description: "Wallet balance" } },
+        },
+      },
+      "/api/v1/agent-pay/spend": {
+        post: {
+          summary: "Authorize a scoped agent payment for an attestation product (agentic payments)",
+          security: [{ ApiKeyAuth: [] }],
+          responses: { "201": { description: "Spend authorized with payment digest" }, "402": { description: "Insufficient credits / scope violation" } },
+        },
+      },
+      "/api/v1/agent-pay/settlement": {
+        post: {
+          summary: "Inbound settlement from external agentic rail (Stripe agent, Visa, x402, Mastercard) — HMAC-authenticated, idempotent",
+          security: [{ ApiKeyAuth: [] }],
+          responses: { "201": { description: "Settlement credited to wallet" } },
+        },
+      },
+      "/api/v1/datacenter/documentation": {
+        get: {
+          summary: "Facility documentation manifest — what Passport documents for a data center",
+          responses: { "200": { description: "Documentation manifest" } },
+        },
+      },
     },
   };
 

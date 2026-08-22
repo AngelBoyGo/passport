@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createReceiptCheckpoint } from "@/lib/receipt/merkle-checkpoint";
 import { deliverToExternalNotary } from "@/lib/notary/notary-anchor";
+import { checkInMemoryRateLimit, clientIpFromRequest, rateLimitResponse } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +12,13 @@ export const dynamic = "force-dynamic";
  * Also attempts to publish the signed chain head to the configured independent
  * notary (NOTARY_ANCHOR_URL) so the ledger is externally pinned on each refresh.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const ip = clientIpFromRequest(request.headers);
+  const rate = checkInMemoryRateLimit(`checkpoint-latest:${ip}`, 30, 60_000);
+  if (!rate.allowed) {
+    return NextResponse.json({ error: "Rate limit exceeded" }, rateLimitResponse(rate, 30));
+  }
+
   const checkpoint = await createReceiptCheckpoint();
 
   // Fire-and-forget external anchoring (never blocks or fails the response).

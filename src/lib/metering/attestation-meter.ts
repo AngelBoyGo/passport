@@ -84,7 +84,9 @@ export async function meterAttestation(
   meter_ref?: string;
 }> {
   const price = ATTESTATION_CATALOG[product];
-  const creditsNeeded = microsToCredits(price.price_micros);
+  // Operator.credits is an integer column: round fractional micro-based prices
+  // UP to at least 1 whole credit so DB integrity is never violated.
+  const creditsNeeded = Math.max(1, Math.ceil(microsToCredits(price.price_micros)));
 
   let result: { allowed: boolean; reason?: string } = { allowed: false };
 

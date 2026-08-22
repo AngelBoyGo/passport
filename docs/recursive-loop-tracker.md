@@ -1,6 +1,21 @@
 # Recursive loop tracker — Passport + HostHub FFD
 
-Last updated: **2026-08-21** (Loop 29 Audit-Grade Compliance Evidence Aggregation — 129 test files, 746 tests green)
+Last updated: **2026-08-21** (Loop 30 Agentic Payments + Zero-Manual Auto-Onboard, DC Documentation & Security Hardening Sweep — 131 test files, 763 tests green)
+
+---
+
+## Loop 30: Agentic Payments, Autonomous DC Documentation & Attack Hardening
+
+| Loop | Scope & Security Milestone | Scoped result | Status | Evidence |
+|---|---|---|---|---|
+| **Loop 30.1** | Agentic payments (research-aligned: Stripe/OpenAI-Visa/Mastercard/x402): agent wallets, scoped spend with merchant+ceiling+TTL, Ed25519 proof-of-possession, HMAC-authenticated external-rail settlement | `src/lib/agent-pay/agent-payment-service.ts` + wallet/spend/settlement routes | **Complete** | `agent-payment-service.test.ts` (11/11) |
+| **Loop 30.2** | SSRF hardening: block loopback/private/metadata webhook targets at registration AND delivery | `src/lib/security/ssrf.ts` applied to v1+admin webhooks + delivery | **Complete** | `ssrf.test.ts` (6/6) |
+| **Loop 30.3** | Dev-provision backdoor hardening (`ALLOW_DEV_PROVISION` opt-in) + autonomous-provision commitment salt hard-fail (no known-default fallback) | routes patched | **Complete** | tsc clean |
+| **Loop 30.4** | Rate-limit gaps closed on audit-package + checkpoint-latest | routes patched | **Complete** | tests pass |
+| **Loop 30.5** | Zero manual on-ramp: platforms self-serve pp_ent key on /dashboard; agents self-provision pp_usr (no operator provisioning for any new user) | Already-live flow documented | **Complete** | dashboard role toggle |
+| **Loop 30.6** | DataCenter documentation upgrade: `AUTONOMOUS_MICROACTION` evidence + facility documentation manifest (`GET /api/v1/datacenter/documentation`) + autonomous audit-layer vision on /datacenter | `datacenter-service.ts` + new route + page section | **Complete** | new endpoint |
+| **Loop 30.7** | OpenAPI + MCP manifest extension (agent-pay wallet/spend/settlement, dc documentation) | 17 MCP tools active | **Complete** | `mcp-manifest.test.ts` |
+| **Loop 30.8** | Fractional-credit integrity: Operator.credits is Int — meter charges rounded UP to whole credits | `attestation-meter.ts` | **Complete** | tests updated |
 
 ---
 

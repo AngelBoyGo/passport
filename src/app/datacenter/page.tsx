@@ -149,6 +149,78 @@ async def anchor_facility_telemetry(cluster_id, measured_watts, baseline_watts, 
           </div>
         </div>
 
+        {/* ── The Autonomous Data Center Audit Layer (vision) ── */}
+        <div className="rounded-2xl border border-indigo-800/50 bg-gradient-to-br from-indigo-950 via-slate-900 to-emerald-950 p-6 sm:p-10 text-white shadow-xl space-y-6">
+          <div>
+            <span className="text-xs font-semibold tracking-wider uppercase text-indigo-300">
+              The Verified-Autonomous Future
+            </span>
+            <h2 className="mt-2 text-2xl font-bold sm:text-3xl">
+              When AI runs the data center, no human can review it. Passport can.
+            </h2>
+            <p className="mt-3 max-w-4xl text-sm text-slate-300 leading-relaxed">
+              The trajectory of the modern data center is unmistakable: energy governors, thermal controllers,
+              workload schedulers, and capacity planners are becoming autonomous AI systems performing{" "}
+              <strong className="text-white">millions of micro-decisions per day</strong> — a power setpoint change here,
+              a thermal governor nudge there, a carbon-deferral scheduling choice, a hardware lifecycle action.
+              No human team can review even a fraction of that volume, and manual audit simply does not scale.
+              That is exactly the gap Passport fills.
+            </p>
+          </div>
+
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4 text-xs">
+            <div className="rounded-xl border border-slate-700 bg-slate-950/60 p-4 space-y-2">
+              <span className="font-bold text-indigo-300">1. Each microaction is notarized</span>
+              <p className="text-slate-400 leading-relaxed">
+                Every autonomous decision emits a signed evidence event (
+                <code>AUTONOMOUS_MICROACTION</code>) anchored with an Ed25519 signature and hashed into the receipt
+                chain. Tampering with any single action breaks the Merkle root.
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 space-y-2">
+              <span className="font-bold text-indigo-300">2. Batched, check-pointed, notarized</span>
+              <p className="text-slate-400 leading-relaxed">
+                Millions of receipts collapse into signed Merkle roots, published on a cadence, and pinned to an
+                independent external notary — so no one (including Passport) can rewrite the record.
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 space-y-2">
+              <span className="font-bold text-indigo-300">3. Aggregated into audit-grade documentation</span>
+              <p className="text-slate-400 leading-relaxed">
+                The receipt stream is automatically assembled into compliance evidence packages (SOC 2, ISO 27001,
+                ISO 42001, NIST AI RMF, EU AI Act) and W3C sustainability credentials — documentation that
+                materializes without a single human reviewer.
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 space-y-2">
+              <span className="font-bold text-indigo-300">4. Verifiable by anyone, offline</span>
+              <p className="text-slate-400 leading-relaxed">
+                Regulators, tenants, insurers, and buyers independently re-verify any artifact offline with the
+                public key-transparency log and the zero-dependency verifier. Trust is mechanical, not asserted.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2 pt-1 text-xs">
+            <a
+              href="/api/v1/datacenter/documentation"
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-lg bg-indigo-600 px-3.5 py-1.5 font-bold text-white hover:bg-indigo-500 transition"
+            >
+              View Facility Documentation Manifest ↗
+            </a>
+            <a
+              href="/docs/verification"
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-lg border border-slate-700 bg-slate-900 px-3.5 py-1.5 font-medium text-slate-200 hover:bg-slate-800 transition"
+            >
+              How independent verification works →
+            </a>
+          </div>
+        </div>
+
         {/* ── Live Ledger Health Indicators ── */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-5 shadow-sm">

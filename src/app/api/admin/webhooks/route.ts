@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sessionFromRequest } from "@/lib/auth/cookies";
 import { prisma } from "@/lib/db";
 import { generateWebhookSecret } from "@/lib/webhooks/webhook-service";
+import { validateWebhookUrl } from "@/lib/security/ssrf";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,11 @@ export async function POST(request: NextRequest) {
 
   if (!body.url || !body.events || body.events.length === 0) {
     return NextResponse.json({ error: "url and events are required" }, { status: 400 });
+  }
+
+  const urlError = validateWebhookUrl(body.url);
+  if (urlError) {
+    return NextResponse.json({ error: urlError }, { status: 400, headers: NO_STORE });
   }
 
   const validEvents = [

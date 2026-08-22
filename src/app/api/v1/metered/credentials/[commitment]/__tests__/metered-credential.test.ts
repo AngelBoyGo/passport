@@ -73,7 +73,7 @@ describe("POST /api/v1/metered/credentials/:commitment — Reputation-as-a-Servi
       allowed: true,
       product: "portable_credential_issuance",
       price_micros: 500_000,
-      credits_charged: 0.5,
+      credits_charged: 1,
       remaining_credits: 9.5,
       meter_ref: "meter_abc123",
     });
@@ -96,6 +96,6 @@ describe("POST /api/v1/metered/credentials/:commitment — Reputation-as-a-Servi
     const body = await res.json();
     expect(body.credential.type).toContain("AgentReputationCredential");
     expect(body.meter.meter_ref).toBe("meter_abc123");
-    expect(body.meter.credits_charged).toBe(0.5);
+    expect(body.meter.credits_charged).toBe(1);
   });
 });

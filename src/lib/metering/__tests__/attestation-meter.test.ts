@@ -60,9 +60,9 @@ describe("Reputation-as-a-Service Metering (2.7)", () => {
 
     expect(result.allowed).toBe(true);
     expect(result.price_micros).toBe(500_000);
-    expect(result.credits_charged).toBe(0.5);
+    expect(result.credits_charged).toBe(1); // fractional prices round UP to 1 whole credit
     expect(prismaMock.operator.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ credits: { decrement: 0.5 } }) })
+      expect.objectContaining({ data: expect.objectContaining({ credits: { decrement: 1 } }) })
     );
     expect(prismaMock.capabilityLedgerEntry.create).toHaveBeenCalled();
   });

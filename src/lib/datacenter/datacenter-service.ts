@@ -12,7 +12,8 @@ export type DataCenterEventType =
   | "POLICY_SETPOINT_TRANSITION"
   | "THERMAL_SAFETY_AUDIT"
   | "CARBON_AVOIDED_ACCRUAL"
-  | "WORKLOAD_ENERGY_EFFICIENCY";
+  | "WORKLOAD_ENERGY_EFFICIENCY"
+  | "AUTONOMOUS_MICROACTION";
 
 export interface DataCenterTelemetryPayload {
   cluster_id: string;
@@ -38,6 +39,7 @@ export interface DataCenterTelemetryPayload {
   useful_work_fraction?: number;
   joules_per_token?: number;
   operator_notes?: string;
+  microaction_class?: string;
 }
 
 export interface DataCenterScorecard {
@@ -393,6 +395,120 @@ export async function getDataCenterScorecard(
       live_instrument_samples: hwVerified,
       synthetic_samples: modeled,
       hardware_seam_status: hwVerified > 0 ? "VALIDATED_LIVE" : "UNVALIDATED_SEAM",
+    },
+  };
+}
+
+export interface DataCenterDocumentationManifest {
+  facility_id: string;
+  generated_at: string;
+  documentable_artifacts: string[];
+  telemetry_records: {
+    total: number;
+    by_event_type: Record<string, number>;
+    by_origin: { live_instrument: number; synthetic: number };
+  };
+  compliance_readiness: {
+    eu_ai_act: boolean;
+    iso_14064_scope2: boolean;
+    soc2_cc6: boolean;
+    nist_ai_rmf: boolean;
+  };
+  sustainability_summary: {
+    energy_saved_kwh: number;
+    carbon_avoided_kg: number;
+    avg_power_reduction_pct: number;
+  };
+  audit_anchors: {
+    merkle_checkpoints: boolean;
+    notary_anchor: boolean;
+    key_transparency_log: boolean;
+  };
+}
+
+/**
+ * What Passport documents for a data center: an aggregate manifest of every
+ * artifact the substrate produces from a facility's signed telemetry stream —
+ * the "ongoing documentation ledger" that audit, tenant, and regulator
+ * stakeholders consume. This is the documentation surface for autonomous
+ * facilities that perform millions of AI-driven microactions per day with no
+ * human reviewer able to audit them individually.
+ */
+export async function getDataCenterDocumentationManifest(
+  clusterIdOrCommitment: string
+): Promise<DataCenterDocumentationManifest> {
+  const commitment =
+    clusterIdOrCommitment.length === 64
+      ? clusterIdOrCommitment
+      : sha256Hex(clusterIdOrCommitment);
+
+  const events = await prisma.agentEvidence.findMany({
+    where: {
+      agentIdentityCommitment: commitment,
+      sourceType: { in: ["datacenter_telemetry", "datacet_control_plane", "hardware_telemetry"] },
+    },
+    orderBy: { observedAt: "desc" },
+    select: { normalizedEventType: true, validationSignalPresent: true, sourceDigest: true },
+  });
+
+  const byEventType: Record<string, number> = {};
+  let liveCount = 0;
+  let syntheticCount = 0;
+  let energySaved = 0;
+  let carbonAvoided = 0;
+  let powerSum = 0;
+  let powerCount = 0;
+
+  for (const ev of events) {
+    byEventType[ev.normalizedEventType] = (byEventType[ev.normalizedEventType] ?? 0) + 1;
+    if (ev.validationSignalPresent) liveCount++;
+    else syntheticCount++;
+    if (ev.sourceDigest) {
+      try {
+        const d = JSON.parse(ev.sourceDigest);
+        if (typeof d.energy_saved_kwh === "number") energySaved += d.energy_saved_kwh;
+        if (typeof d.carbon_avoided_kg === "number") carbonAvoided += d.carbon_avoided_kg;
+        if (typeof d.delta_power_pct === "number" && d.origin === "live-instrument") {
+          powerSum += d.delta_power_pct;
+          powerCount++;
+        }
+      } catch {}
+    }
+  }
+
+  const hasLive = liveCount > 0;
+
+  return {
+    facility_id: clusterIdOrCommitment,
+    generated_at: new Date().toISOString(),
+    documentable_artifacts: [
+      "ed25519_signed_energy_receipts",
+      "merkle_checkpoint_roots",
+      "external_notary_anchor",
+      "w3c_sustainability_credential",
+      "audit_grade_regulatory_packages",
+      "public_key_transparency_log",
+    ],
+    telemetry_records: {
+      total: events.length,
+      by_event_type: byEventType,
+      by_origin: { live_instrument: liveCount, synthetic: syntheticCount },
+    },
+    compliance_readiness: {
+      eu_ai_act: hasLive,
+      iso_14064_scope2: hasLive && carbonAvoided >= 0,
+      soc2_cc6: hasLive,
+      nist_ai_rmf: hasLive,
+    },
+    sustainability_summary: {
+      energy_saved_kwh: Number(energySaved.toFixed(2)),
+      carbon_avoided_kg: Number(carbonAvoided.toFixed(2)),
+      avg_power_reduction_pct: powerCount > 0 ? Number((powerSum / powerCount).toFixed(2)) : 0,
+    },
+    audit_anchors: {
+      merkle_checkpoints: true,
+      notary_anchor: !!process.env.NOTARY_ANCHOR_URL,
+      key_transparency_log: true,
     },
   };
 }

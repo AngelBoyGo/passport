@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
+import { validateWebhookUrl } from "@/lib/security/ssrf";
 
 export type WebhookEvent =
   | "evidence.anchored"
@@ -45,6 +46,19 @@ export async function deliverWebhookWithRetry(
 ): Promise<WebhookDeliveryResult> {
   const maxAttempts = options.maxAttempts ?? 3;
   const baseDelay = options.retryDelayMs ?? 1000;
+
+  // Defense-in-depth SSRF guard: never deliver to private/loopback/metadata hosts
+  // even if a subscription was created before validation was added.
+  const urlError = validateWebhookUrl(options.url);
+  if (urlError) {
+    return {
+      delivered: false,
+      attempts: 0,
+      deadLetter: true,
+      error: `Blocked: ${urlError}`,
+    };
+  }
+
   const body = {
     event: options.event,
     data: options.payload,

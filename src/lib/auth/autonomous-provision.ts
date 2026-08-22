@@ -26,6 +26,28 @@ function cleanupStaleChallenges() {
 }
 
 /**
+ * Commitment salt must match the evidence-ingestion salt and hard-fail outside
+ * test. Using a public fallback would let anyone precompute commitments for a
+ * known salt, defeating identity binding — so we never fall back in production.
+ */
+function resolveProvisionSalt(): string {
+  if (
+    process.env.NODE_ENV === "test" ||
+    process.env.VITEST === "true" ||
+    typeof (globalThis as { __vitest_index__?: unknown }).__vitest_index__ !== "undefined"
+  ) {
+    return process.env.INGESTION_COMMITMENT_SALT ?? "test-salt";
+  }
+  const salt = process.env.INGESTION_COMMITMENT_SALT;
+  if (!salt) {
+    throw new Error(
+      "INGESTION_COMMITMENT_SALT is required outside test environments for autonomous provisioning"
+    );
+  }
+  return salt;
+}
+
+/**
  * Generates an ephemeral cryptographic challenge with a lightweight Proof-of-Work requirement.
  */
 export function generateAutonomousChallenge(publicKeyHex: string): {
@@ -150,7 +172,7 @@ export async function provisionAutonomousAgent(
   }
 
   // 6. Compute Deterministic Subject Commitment Hash
-  const salt = process.env.INGESTION_COMMITMENT_SALT || "passport-default-salt";
+  const salt = resolveProvisionSalt();
   const subjectCommitment = sha256Hex(pubKeyClean + salt);
   const agentName = display_name?.trim() || `Agent-${subjectCommitment.slice(0, 8)}`;
   const operationalDomain = domain || "CODE_GENERATION";
