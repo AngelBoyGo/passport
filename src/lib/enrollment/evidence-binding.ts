@@ -135,7 +135,31 @@ export async function ingestEnrolledEvidence(
     };
   });
 
-  await persistEvidence(maskedRecords);
+  const persistedRecords = await persistEvidence(maskedRecords);
+
+  // Capability: auto-mint a signed custody receipt for each persisted evidence
+  // event when enabled AND the evidence-bridge minter operator is configured.
+  // Opt-in (EVIDENCE_BRIDGE_AUTO_ENABLED=true) so ordinary evidence ingestion
+  // mints receipts only where intended, matching the documented bridge
+  // behavior. The bridge is idempotent on eventCommitmentHash, so replays
+  // never double-mint.
+  if (persistedRecords.length > 0 && process.env.EVIDENCE_BRIDGE_AUTO_ENABLED === "true") {
+    const { bridgeEvidenceToReceipt } = await import("@/lib/evidence-bridge/evidence-receipt-bridge");
+    for (const rec of persistedRecords) {
+      bridgeEvidenceToReceipt({
+        id: rec.id,
+        sourceType: rec.sourceType,
+        agentIdentityCommitment: rec.agentIdentityCommitment,
+        eventCommitmentHash: rec.eventCommitmentHash,
+        normalizedEventType: rec.normalizedEventType,
+        rawErrorClassification: rec.rawErrorClassification ?? null,
+        validationSignalPresent: rec.validationSignalPresent,
+        observedAt: rec.observedAt,
+      }).catch((err) => {
+        console.warn("evidence→receipt bridge failed:", err);
+      });
+    }
+  }
 
   if (input.sourceType === "task_deliverable") {
     const parsed = normalized[0];

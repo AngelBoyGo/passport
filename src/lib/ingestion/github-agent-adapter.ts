@@ -82,6 +82,9 @@ export interface MaskedAgentEvidence {
   externalTaskId?: string | null;
 }
 
+/** Evidence row as persisted, with the DB id available for the receipt bridge. */
+export type PersistedMaskedEvidence = MaskedAgentEvidence & { id: string };
+
 // ---------------------------------------------------------------------------
 // Zod schemas (permissive — unknown vendor fields never throw)
 // ---------------------------------------------------------------------------
@@ -868,7 +871,8 @@ export function normalizeEvidence(input: NormalizeEvidenceInput): NormalizedEvid
  */
 export async function persistEvidence(
   records: MaskedAgentEvidence[]
-): Promise<void> {
+): Promise<PersistedMaskedEvidence[]> {
+  const persisted: PersistedMaskedEvidence[] = [];
   for (const record of records) {
     // L1: salt-rotation-safe semantic dedup. exact eventCommitmentHash the upsert
     // below already catches. This pre-check also blocks near-duplicates whose
@@ -887,11 +891,14 @@ export async function persistEvidence(
         ...(record.sourceUrl ? { sourceUrl: record.sourceUrl } : {}),
         ...(record.commitSha ? { commitSha: record.commitSha } : {}),
       },
-      select: { id: true },
+      select: { id: true, eventCommitmentHash: true },
     });
-    if (skip) continue;
+    if (skip) {
+      persisted.push({ ...record, id: skip.id });
+      continue;
+    }
 
-    await prisma.agentEvidence.upsert({
+    const row = await prisma.agentEvidence.upsert({
       where: { eventCommitmentHash: record.eventCommitmentHash },
       create: {
         sourceType: record.sourceType,
@@ -916,7 +923,10 @@ export async function persistEvidence(
         externalTaskId: record.externalTaskId ?? null,
       },
       update: {},
+      select: { id: true, eventCommitmentHash: true },
     });
+    persisted.push({ ...record, id: row.id });
   }
   invalidateLeaderboardCache();
+  return persisted;
 }

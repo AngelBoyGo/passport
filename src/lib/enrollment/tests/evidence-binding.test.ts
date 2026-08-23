@@ -45,6 +45,12 @@ vi.mock("@/lib/engagement/engagement-service", () => ({
   markEngagementDelivered: markEngagementDeliveredMock,
 }));
 
+const bridgeEvidenceToReceiptMock = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/evidence-bridge/evidence-receipt-bridge", () => ({
+  bridgeEvidenceToReceipt: bridgeEvidenceToReceiptMock,
+  resolveEvidenceBridgeOperatorId: vi.fn(() => "op_bridge"),
+}));
+
 import {
   resolveEnrollmentStatus,
   ingestEnrolledEvidence,
@@ -314,5 +320,41 @@ describe("ingestEnrolledEvidence", () => {
       })
     ).rejects.toThrow(InvalidEnrollmentProofError);
     expect(upsertEvidenceMock).not.toHaveBeenCalled();
+  });
+
+  it("auto-bridges persisted evidence to a receipt when the opt-in flag is on", async () => {
+    bridgeEvidenceToReceiptMock.mockResolvedValue({ id: "link_1" });
+    bridgeEvidenceToReceiptMock.mockClear();
+    process.env.EVIDENCE_BRIDGE_AUTO_ENABLED = "true";
+
+    const payload = complianceReportFixture;
+    const signature = await signDigest(payload);
+    await ingestEnrolledEvidence({
+      subjectCommitment: SUBJECT_COMMITMENT,
+      sourceType: "compliance_report",
+      payload,
+      signature,
+    });
+
+    expect(bridgeEvidenceToReceiptMock).toHaveBeenCalled();
+    const callArg = bridgeEvidenceToReceiptMock.mock.calls[0][0];
+    expect(callArg.agentIdentityCommitment).toBe(SUBJECT_COMMITMENT);
+    expect(callArg.eventCommitmentHash).toMatch(/^[0-9a-f]{64}$/i);
+  });
+
+  it("does NOT bridge when the opt-in flag is off (default)", async () => {
+    process.env.EVIDENCE_BRIDGE_AUTO_ENABLED = "0";
+    bridgeEvidenceToReceiptMock.mockClear();
+
+    const payload = complianceReportFixture;
+    const signature = await signDigest(payload);
+    await ingestEnrolledEvidence({
+      subjectCommitment: SUBJECT_COMMITMENT,
+      sourceType: "compliance_report",
+      payload,
+      signature,
+    });
+
+    expect(bridgeEvidenceToReceiptMock).not.toHaveBeenCalled();
   });
 });

@@ -111,6 +111,16 @@ export default function DocsVerification() {
         </div>
       </Section>
 
+      {/* ── Evidence → Receipt auto-bridge ── */}
+      <div className="rounded-lg border-l-4 border-emerald-500 bg-emerald-50 p-4 text-sm text-emerald-900">
+        <strong>Evidence → Receipt auto-bridge:</strong> When enabled, each accepted evidence event is automatically
+        minted into a signed <code className="px-1 font-mono text-xs">custody</code> receipt via the evidence bridge.
+        Enable with <code className="px-1 font-mono text-xs">EVIDENCE_BRIDGE_AUTO_ENABLED=true</code> and provision a
+        dedicated minter operator via <code className="px-1 font-mono text-xs">EVIDENCE_BRIDGE_OPERATOR_ID</code> (its
+        credit balance funds the minting). The bridge is idempotent on{" "}
+        <code className="px-1 font-mono text-xs">eventCommitmentHash</code>, so replayed events never double-mint.
+      </div>
+
       {/* ── 4. Signed webhook contract ── */}
       <Section
         title="4. Signed webhook contract"
