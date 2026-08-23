@@ -6,14 +6,25 @@ import {
   zodValidationErrorResponse,
 } from "@/lib/validation/angelcoinSchemas";
 import { angelcoinErrorResponse } from "@/lib/angelcoin/route-errors";
+import { isExecutiveAdmin } from "@/lib/admin/admin-auth";
 
 /**
  * POST /api/v1/passport/access/override — set or clear admin override tier.
+ * H5 fix: elevating a subject's access tier is a privileged control. Only
+ * executive admins may override tiers, so any key-holder can no longer
+ * escalate arbitrary agents to FULL.
  */
 export async function POST(request: NextRequest) {
   const operator = await authenticateApiKey(request.headers.get("authorization"));
   if (!operator) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!isExecutiveAdmin(operator)) {
+    return NextResponse.json(
+      { error: "Forbidden: only executive admins may override access tiers" },
+      { status: 403 }
+    );
   }
 
   let body: unknown;

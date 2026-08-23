@@ -11,14 +11,22 @@ export type PasswordResetResult = {
   resetUrl?: string;
 };
 
+function resetSecret(): string {
+  const secret = process.env.SESSION_SECRET;
+  if (secret) return secret;
+  if (process.env.NODE_ENV === "test" || process.env.NODE_ENV === "development") {
+    return "dev-session-secret";
+  }
+  throw new Error("SESSION_SECRET is required outside test/development environments");
+}
+
 /**
  * Generates a signed password reset token.
  */
 function generateResetToken(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   const raw = bytesToHex(sha256(bytes));
-  const secret = process.env.SESSION_SECRET || "dev-session-secret";
-  const signature = bytesToHex(sha256(utf8ToBytes(raw + secret)));
+  const signature = bytesToHex(sha256(utf8ToBytes(raw + resetSecret())));
   return "prt_" + raw + signature;
 }
 

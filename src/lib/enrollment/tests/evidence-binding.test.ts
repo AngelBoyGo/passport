@@ -157,7 +157,7 @@ describe("ingestEnrolledEvidence", () => {
     expect(persisted.normalizedEventType).toBe("AGENT_ARTIFACT_CREATED");
     expect(persisted.sourceUrl).toBe("https://github.com/acme/repo/pull/42");
     expect(persisted.observedAt.toISOString()).toBe("2026-06-20T10:00:00.000Z");
-    expect(persisted.sourceDigest).toBe(computePayloadDigest(payload));
+    expect(persisted.sourceDigest).toBe(JSON.stringify(payload));
     expect(persisted.eventCommitmentHash).toMatch(/^[0-9a-f]{64}$/);
     expect(persisted).not.toHaveProperty("completeness");
     expect(persisted).not.toHaveProperty("gaps");

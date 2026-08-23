@@ -1,6 +1,26 @@
 # Recursive loop tracker — Passport + HostHub FFD
 
-Last updated: **2026-08-21** (Loop 31 Security Patch Batch from 3-way Audit — 121 test files, 739 tests green)
+Last updated: **2026-08-21** (Loop 32 Security Patch Batch 2 — 121 test files, 741 tests green)
+
+---
+
+## Loop 32: Second Patch Batch (from 3-way audit — medium/high findings)
+
+| Finding | Severity | Patch | Status |
+|---|---|---|---|
+| H5 — AngelCoin transfer drain + mint/override privilege escalation | HIGH | `AngelCoinAccount.ownerOperatorId` binding; transfer requires ownership or exec admin; grants + access-override gated to executive admins | Fixed + regression test |
+| H13 — ACP deliver unauthenticated, arbitrary engagement flip | HIGH | ACP deliver requires key + worker/exec-ownership; agora requires key (removed first-operator fallback) + action allowlist | Fixed + tests |
+| Webhooks — `evidence.anchored` never fired | HIGH | Dispatch now fires on successful evidence ingest | Fixed |
+| M2 — Audit packages couldn't map controls | HIGH→MED | `compliance_report` now stores canonical payload JSON in sourceDigest (matching datacenter path) | Fixed + test |
+| Login CSRF / host-injection OAuth | HIGH | OAuth `state` nonce (github+google) set as httpOnly cookie, verified on callback; base URL allow-listed | Fixed |
+| Turnstile voluntary | MED | When configured, token now REQUIRED (no silent skip) | Fixed |
+| `change-password` didn't invalidate sessions | MED | Invalidates all sessions, re-issues current one | Fixed |
+| SESSION_SECRET dev fallback | MED | Hard-fails outside test/dev in session + reset signing | Fixed |
+| Reset-link host injection | MED | forgot-password always uses allow-listed base URL | Fixed |
+| Body-size DoS | MED | `readJsonBody` 1MB cap applied to datacenter evidence; generic 500 for internal errors | Fixed |
+| H2 — non-deterministic checkpoint | MED | `orderBy [issuedAt asc, contentHash asc]` tie-break | Fixed |
+| H3 — checkpoint chain never chained | MED | Successive checkpoints now thread `previous_checkpoint_hash` | Fixed |
+| Receipt index | LOW→MED | Added `@@index([operatorId, issuedAt])` | Fixed |
 
 ---
 

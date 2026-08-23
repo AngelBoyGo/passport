@@ -79,6 +79,7 @@ function makeAccount(subjectCommitment: string, id?: string) {
     accessTier: AccessTier.FULL,
     adminOverrideTier: null,
     backingMetadata: null,
+    ownerOperatorId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

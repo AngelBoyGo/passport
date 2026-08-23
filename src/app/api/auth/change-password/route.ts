@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { sessionFromRequest } from "@/lib/auth/cookies";
-import { hashPassword, verifyPassword } from "@/lib/auth/auth-service";
+import {
+  hashPassword,
+  verifyPassword,
+  deleteAllSessionsForOperator,
+  createSession,
+} from "@/lib/auth/auth-service";
+import { sessionCookieOptions } from "@/lib/auth/cookies";
 
 export const dynamic = "force-dynamic";
 
@@ -42,5 +48,13 @@ export async function POST(request: NextRequest) {
     data: { passwordHash: newHash },
   });
 
-  return NextResponse.json({ ok: true });
+  // Security: invalidate ALL existing sessions (including other devices) so a
+  // leaked/stale session forces re-auth after a password change, matching the
+  // password-reset behavior. Issue a fresh session for the current request.
+  await deleteAllSessionsForOperator(operator.id);
+  const newSession = await createSession(operator.id);
+
+  const response = NextResponse.json({ ok: true });
+  response.cookies.set("session_token", newSession.token, sessionCookieOptions(request));
+  return response;
 }

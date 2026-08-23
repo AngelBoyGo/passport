@@ -68,7 +68,10 @@ export async function createReceiptCheckpoint(options?: {
       ...(options?.since ? { finalizedAt: { gte: options.since } } : {}),
     },
     select: { contentHash: true },
-    orderBy: { issuedAt: "asc" },
+    // H2: deterministic ordering. issuedAt has ms precision and is not unique,
+    // so tie-break on contentHash to guarantee the same receipt set always
+    // produces the same Merkle root across runs/auditors.
+    orderBy: [{ issuedAt: "asc" }, { contentHash: "asc" }],
   });
 
   const receiptHashes = receipts.map((r) => r.contentHash);
@@ -77,25 +80,39 @@ export async function createReceiptCheckpoint(options?: {
   const timestamp = new Date().toISOString();
   const publicKey = getPublicKeyHex();
 
+  // H3: chain headers on successive checkpoints so the "append-only" claim is
+  // structurally real (previous_checkpoint_hash). Within a process we remember
+  // the last checkpoint; callers may also pass it explicitly.
+  const previousHash = options?.previousCheckpointHash ?? lastCheckpointContentHash ?? null;
+
   const unsigned = {
     checkpoint_id: checkpointId,
     timestamp,
     receipt_count: receipts.length,
     merkle_root: merkleRoot,
-    previous_checkpoint_hash: options?.previousCheckpointHash ?? null,
+    previous_checkpoint_hash: previousHash,
   };
 
   const contentHash = sha256Hex(canonicalJson(unsigned as unknown as Record<string, unknown>));
   const privKey = getPrivateKeyBytes();
   const signatureBytes = await sign(utf8ToBytes(contentHash), privKey);
 
-  return {
+  const checkpoint: SignedCheckpoint = {
     ...unsigned,
     content_hash: contentHash,
     signature: bytesToHex(signatureBytes),
     algorithm: "ed25519",
     public_key: publicKey,
   };
+  lastCheckpointContentHash = contentHash;
+  return checkpoint;
+}
+
+/** In-process memory of the last checkpoint hash so headers chain (H3). */
+let lastCheckpointContentHash: string | null = null;
+
+export function resetCheckpointChain(): void {
+  lastCheckpointContentHash = null;
 }
 
 /**

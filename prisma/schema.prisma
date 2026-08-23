@@ -145,6 +145,7 @@ model Receipt {
 
   @@index([operatorId, domain])
   @@index([operatorId, domainCommitment])
+  @@index([operatorId, issuedAt])
 }
 
 enum ApiKeyRole {
@@ -274,12 +275,16 @@ model AngelCoinAccount {
   accessTier        AccessTier           @default(FULL)
   adminOverrideTier AccessTier?
   backingMetadata   String?
+  /// H5: the operator that first created/claimed this account. Transfers FROM
+  /// this account require ownership by the authenticated operator.
+  ownerOperatorId   String?
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt
 
   journal AngelCoinJournalEntry[]
 
   @@index([subjectCommitment])
+  @@index([ownerOperatorId])
 }
 
 /// Append-only AngelCoin journal entries for a subject account.

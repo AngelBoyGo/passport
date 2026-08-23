@@ -4,6 +4,8 @@ import { AccessTier, AngelCoinEntryType } from "@prisma/client";
 const authenticateApiKeyMock = vi.fn();
 const grantCreditsMock = vi.fn();
 const transferCreditsMock = vi.fn();
+const assertCanTransferFromMock = vi.fn();
+const getOrCreateAccountMock = vi.fn();
 const applyAccessEvaluationMock = vi.fn();
 const setAdminOverrideMock = vi.fn();
 const getAccountBalancesMock = vi.fn();
@@ -18,6 +20,8 @@ vi.mock("@/lib/operator", () => ({
 vi.mock("@/lib/angelcoin/ledger-service", () => ({
   grantCredits: (...args: unknown[]) => grantCreditsMock(...args),
   transferCredits: (...args: unknown[]) => transferCreditsMock(...args),
+  assertCanTransferFrom: (...args: unknown[]) => assertCanTransferFromMock(...args),
+  getOrCreateAccount: (...args: unknown[]) => getOrCreateAccountMock(...args),
   getAccountBalances: (...args: unknown[]) => getAccountBalancesMock(...args),
   listJournalEntries: (...args: unknown[]) => listJournalEntriesMock(...args),
   loadAccountWithJournal: (...args: unknown[]) => loadAccountWithJournalMock(...args),
@@ -57,6 +61,8 @@ beforeEach(() => {
   authenticateApiKeyMock.mockReset();
   grantCreditsMock.mockReset();
   transferCreditsMock.mockReset();
+  assertCanTransferFromMock.mockReset();
+  getOrCreateAccountMock.mockReset();
   applyAccessEvaluationMock.mockReset();
   setAdminOverrideMock.mockReset();
   getAccountBalancesMock.mockReset();
@@ -65,6 +71,8 @@ beforeEach(() => {
   loadAccountWithJournalMock.mockReset();
 
   authenticateApiKeyMock.mockResolvedValue(operator);
+  assertCanTransferFromMock.mockResolvedValue(true);
+  getOrCreateAccountMock.mockResolvedValue({ id: "acct_1", subjectCommitment: VALID_ID });
 });
 
 describe("POST /api/v1/passport/credits/grants", () => {
@@ -147,6 +155,28 @@ describe("POST /api/v1/passport/credits/transfers", () => {
       }) as import("next/server").NextRequest
     );
     expect(response.status).toBe(200);
+  });
+
+  it("returns 403 when the caller does NOT own the source commitment (H5)", async () => {
+    assertCanTransferFromMock.mockResolvedValue(false);
+
+    const { POST } = await import("@/app/api/v1/passport/credits/transfers/route");
+    const response = await POST(
+      new Request("http://localhost/api/v1/passport/credits/transfers", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer pp_key",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from_commitment: VALID_ID,
+          to_commitment: "f".repeat(64),
+          amount: 10,
+        }),
+      }) as import("next/server").NextRequest
+    );
+    expect(response.status).toBe(403);
+    expect(transferCreditsMock).not.toHaveBeenCalled();
   });
 
   it("returns 402 on insufficient funds", async () => {

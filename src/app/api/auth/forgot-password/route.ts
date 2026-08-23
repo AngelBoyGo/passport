@@ -32,8 +32,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(zodValidationErrorResponse(parsed.error), { status: 400 });
   }
 
-  const origin = request.headers.get("origin") ?? "https://passport.metis.gold";
-  const result = await createPasswordResetToken(parsed.data.email, origin);
+  // Always build reset URLs from the allow-listed production base URL, never
+  // from the request Origin header (which is attacker-controllable and could
+  // phish a victim's reset token onto a fake site).
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://passport.metis.gold";
+  const result = await createPasswordResetToken(parsed.data.email, baseUrl);
 
   return NextResponse.json({
     ok: true,

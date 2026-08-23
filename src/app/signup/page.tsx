@@ -31,15 +31,23 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [googleClientId, setGoogleClientId] = useState("");
   const [githubClientId, setGithubClientId] = useState("");
+  const [githubState, setGithubState] = useState("");
+  const [googleState, setGoogleState] = useState("");
 
   useEffect(() => {
     fetch("/api/auth/google/config")
       .then((r) => r.json())
-      .then((data) => setGoogleClientId(data.clientId || ""))
+      .then((data) => {
+        setGoogleClientId(data.clientId || "");
+        setGoogleState(data.state || "");
+      })
       .catch(() => {});
     fetch("/api/auth/github/config")
       .then((r) => r.json())
-      .then((data) => setGithubClientId(data.clientId || ""))
+      .then((data) => {
+        setGithubClientId(data.clientId || "");
+        setGithubState(data.state || "");
+      })
       .catch(() => {});
   }, []);
 
@@ -167,7 +175,7 @@ export default function SignupPage() {
 
           <div className="mt-4 space-y-2.5">
             <a
-              href={`https://accounts.google.com/o/oauth2/v2/auth?client_id=${googleClientId}&redirect_uri=${origin}/api/auth/google&response_type=code&scope=openid%20email%20profile`}
+              href={`https://accounts.google.com/o/oauth2/v2/auth?client_id=${googleClientId}&redirect_uri=${origin}/api/auth/google&response_type=code&scope=openid%20email%20profile&state=${googleState}`}
               className="flex w-full items-center justify-center gap-2 rounded-lg border py-2 text-sm font-medium hover:bg-slate-50 transition shadow-sm"
             >
               <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -180,7 +188,7 @@ export default function SignupPage() {
             </a>
 
             <a
-              href={`https://github.com/login/oauth/authorize?client_id=${githubClientId}&redirect_uri=${origin}/api/auth/github&scope=user:email`}
+              href={`https://github.com/login/oauth/authorize?client_id=${githubClientId}&redirect_uri=${origin}/api/auth/github&scope=user:email&state=${githubState}`}
               className="flex w-full items-center justify-center gap-2 rounded-lg border py-2 text-sm font-medium hover:bg-slate-50 transition shadow-sm"
             >
               <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">

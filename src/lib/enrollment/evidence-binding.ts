@@ -120,7 +120,14 @@ export async function ingestEnrolledEvidence(
     return {
       ...masked,
       agentIdentityCommitment: input.subjectCommitment,
-      sourceDigest: digest,
+      // M2: for compliance_report we store the canonical payload JSON in the
+      // sourceDigest slot (matching the datacenter path) so the audit-grade
+      // package builder can map real control domains. The event_commitment_hash
+      // still fingerprints the exact payload for replay triage.
+      sourceDigest:
+        input.sourceType === "compliance_report"
+          ? JSON.stringify(input.payload)
+          : digest,
       externalTaskId:
         input.sourceType === "task_deliverable" && record.artifact_identifier
           ? record.artifact_identifier

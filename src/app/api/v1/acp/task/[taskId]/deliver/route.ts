@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { authenticateApiKey } from "@/lib/operator";
 
 export const dynamic = "force-dynamic";
 
@@ -7,11 +8,20 @@ export const dynamic = "force-dynamic";
  * ACP — Deliver task outcome with signed evidence
  * POST /api/v1/acp/task/:taskId/deliver
  * Body: { deliverable_digest: string, evidence_event_hash: string }
+ *
+ * H13 fix: delivery is now AUTHENTICATED, and only the engagement's worker (or
+ * an executive admin) may mark a task delivered. Previously anyone could flip
+ * an engagement to DELIVERED without verifying the evidence hash.
  */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ taskId: string }> }
 ) {
+  const operator = await authenticateApiKey(request.headers.get("authorization"));
+  if (!operator) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { taskId } = await params;
 
   let body: { deliverable_digest?: string; evidence_event_hash?: string };
@@ -31,6 +41,22 @@ export async function POST(
   const engagement = await prisma.engagement.findUnique({ where: { taskId } });
   if (!engagement) {
     return NextResponse.json({ error: "Task not found" }, { status: 404 });
+  }
+
+  // H13: only the worker (owner of the worker_commitment) may deliver. Because
+  // commitments are pseudonymous, we bind via the operator's own Agent/subject
+  // records: the operator must own an Agent row whose agentId equals the
+  // workerCommitment, OR be an executive admin.
+  const { isExecutiveAdmin } = await import("@/lib/admin/admin-auth");
+  const ownedAgent = await prisma.agent.findFirst({
+    where: { operatorId: operator.id, agentId: engagement.workerCommitment },
+    select: { id: true },
+  });
+  if (!ownedAgent && !isExecutiveAdmin(operator)) {
+    return NextResponse.json(
+      { error: "Forbidden: only the task worker or an executive admin may deliver" },
+      { status: 403 }
+    );
   }
 
   if (engagement.status !== "HELD") {

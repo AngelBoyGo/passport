@@ -5,6 +5,7 @@ import {
 } from "@/lib/datacenter/datacenter-service";
 import { checkInMemoryRateLimit, clientIpFromRequest, rateLimitResponse } from "@/lib/rateLimit";
 import { authenticateApiKey } from "@/lib/operator";
+import { readJsonBody } from "@/lib/http/body";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +46,11 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = (await request.json()) as DataCenterTelemetryPayload;
+    const bodyRead = await readJsonBody(request);
+    if (!bodyRead.ok) {
+      return NextResponse.json({ error: bodyRead.status === 413 ? "Payload too large" : "Invalid JSON" }, { status: bodyRead.status, headers: { ...NO_STORE, ...CORS } });
+    }
+    const body = bodyRead.data as DataCenterTelemetryPayload;
 
     if (!body.cluster_id || !body.event_type || !body.origin) {
       return NextResponse.json(
@@ -62,7 +67,13 @@ export async function POST(request: NextRequest) {
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: message }, { status: 400, headers: { ...NO_STORE, ...CORS } });
+    // Only surface client-actionable validation/plausibility messages; hide
+    // internal configuration errors (e.g. missing SIGNING keys, DB issues).
+    const isClientError = /exceeds physical|junction temperature|out of physical bounds|missing required|origin|delta|Cannot read|Invalid JSON|payload|plausibility/i.test(message);
+    return NextResponse.json(
+      { error: isClientError ? message : "Evidence ingest failed" },
+      { status: isClientError ? 400 : 500, headers: { ...NO_STORE, ...CORS } }
+    );
   }
 }
 

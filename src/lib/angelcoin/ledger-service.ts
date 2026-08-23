@@ -75,8 +75,10 @@ export async function loadJournalEntries(
 
 /**
  * Gets or creates an AngelCoin account for the subject commitment.
+ * H5: the operator who first touches a subject claims ownership of the account
+ * (`ownerOperatorId`), so later transfers can be attribution-checked.
  */
-export async function getOrCreateAccount(subjectCommitment: string) {
+export async function getOrCreateAccount(subjectCommitment: string, ownerOperatorId?: string) {
   assertValidSubjectCommitment(subjectCommitment);
 
   return prisma.angelCoinAccount.upsert({
@@ -84,9 +86,30 @@ export async function getOrCreateAccount(subjectCommitment: string) {
     create: {
       subjectCommitment,
       creditState: AngelCoinCreditState.ACTIVE,
+      ownerOperatorId: ownerOperatorId ?? null,
     },
     update: {},
   });
+}
+
+/**
+ * H5: verifies the authenticated operator owns (created) the subject account.
+ * Executive admins may act on the system account. Returns true when allowed.
+ */
+export async function assertCanTransferFrom(
+  operatorId: string,
+  fromCommitment: string,
+  executiveAdmin: boolean
+): Promise<boolean> {
+  if (executiveAdmin) return true;
+  const account = await prisma.angelCoinAccount.findUnique({
+    where: { subjectCommitment: fromCommitment },
+    select: { ownerOperatorId: true },
+  });
+  if (!account) return false; // can't send from an account that doesn't exist
+  if (account.ownerOperatorId && account.ownerOperatorId !== operatorId) return false;
+  if (!account.ownerOperatorId) return false;
+  return true;
 }
 
 /**

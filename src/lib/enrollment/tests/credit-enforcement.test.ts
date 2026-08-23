@@ -71,6 +71,7 @@ beforeEach(() => {
     accessTier: AccessTier.FULL,
     adminOverrideTier: null,
     backingMetadata: null,
+    ownerOperatorId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   }));
@@ -81,6 +82,7 @@ beforeEach(() => {
     accessTier: AccessTier.FULL,
     adminOverrideTier: null,
     backingMetadata: null,
+    ownerOperatorId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   }));

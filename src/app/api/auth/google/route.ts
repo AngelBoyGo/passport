@@ -2,20 +2,28 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSession } from "@/lib/auth/auth-service";
 import { prisma } from "@/lib/db";
 import { sessionCookieOptions } from "@/lib/auth/cookies";
+import {
+  getBaseUrl,
+  verifyOAuthState,
+  clearOAuthStateCookie,
+} from "@/lib/auth/oauth";
 
 export const dynamic = "force-dynamic";
-
-function getBaseUrl(request: NextRequest): string {
-  return process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
-}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
+  const state = searchParams.get("state");
   const baseUrl = getBaseUrl(request);
 
   if (!code) {
     return NextResponse.redirect(new URL("/login?error=no_code", baseUrl));
+  }
+
+  // Reject login-CSRF: state must match the cookie set by the config endpoint.
+  const stateCheck = verifyOAuthState(request, "google", state);
+  if (!stateCheck.ok) {
+    return NextResponse.redirect(new URL(stateCheck.redirectTo, baseUrl));
   }
 
   const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -71,6 +79,7 @@ export async function GET(request: NextRequest) {
 
   const session = await createSession(operator.id);
   const response = NextResponse.redirect(new URL("/welcome", baseUrl));
+  clearOAuthStateCookie(response, "google");
   response.cookies.set("session_token", session.token, sessionCookieOptions(request));
   return response;
 }

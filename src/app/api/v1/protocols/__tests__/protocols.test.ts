@@ -230,7 +230,10 @@ describe("Protocol Integrations", () => {
       const { POST } = await import("@/app/api/v1/agora/negotiate/route");
       const req = new NextRequest("https://passport.metis.gold/api/v1/agora/negotiate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer pp_valid_key",
+        },
         body: JSON.stringify({
           proposal_id: "prop-001",
           from_commitment: "a".repeat(64),
@@ -245,6 +248,23 @@ describe("Protocol Integrations", () => {
       expect(data.agora_version).toBe("1.0");
       expect(data.proposal_id).toBe("prop-001");
       expect(data.status).toBe("proposed");
+    });
+
+    it("rejects UNAUTHENTICATED negotiation (H13)", async () => {
+      const { POST } = await import("@/app/api/v1/agora/negotiate/route");
+      const req = new NextRequest("https://passport.metis.gold/api/v1/agora/negotiate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          proposal_id: "prop-anon",
+          from_commitment: "a".repeat(64),
+          action: "offer",
+        }),
+      });
+
+      const res = await POST(req);
+      expect(res.status).toBe(401);
+      expect(prismaMock.capabilityLedgerEntry.create).not.toHaveBeenCalled();
     });
   });
 });

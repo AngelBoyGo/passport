@@ -161,6 +161,7 @@ describe("applyAccessEvaluation", () => {
       accessTier: AccessTier.FULL,
       adminOverrideTier: null,
       backingMetadata: null,
+    ownerOperatorId: null,
       createdAt: new Date(),
       updatedAt: new Date(),
       journal: [
@@ -202,6 +203,7 @@ describe("setAdminOverride", () => {
       accessTier: AccessTier.SHELTERED,
       adminOverrideTier: AccessTier.FULL,
       backingMetadata: null,
+    ownerOperatorId: null,
       createdAt: new Date(),
       updatedAt: new Date(),
       journal: [],
@@ -229,6 +231,7 @@ describe("setAdminOverride", () => {
       accessTier: AccessTier.FULL,
       adminOverrideTier: null,
       backingMetadata: null,
+    ownerOperatorId: null,
       createdAt: new Date(),
       updatedAt: new Date(),
       journal: [

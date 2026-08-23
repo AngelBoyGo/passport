@@ -32,7 +32,12 @@ export async function POST(request: NextRequest) {
   }
 
   // Turnstile bot protection check
-  if (process.env.TURNSTILE_SECRET_KEY && body.turnstile_token) {
+  if (process.env.TURNSTILE_SECRET_KEY) {
+    // Security: when Turnstile is configured, the token is REQUIRED in
+    // production — omitting it must fail, not silently skip the challenge.
+    if (!body.turnstile_token) {
+      return NextResponse.json({ error: "Bot verification required." }, { status: 403 });
+    }
     const turnstileResult = await verifyTurnstileToken(body.turnstile_token);
     if (!turnstileResult.success) {
       return NextResponse.json({ error: "Bot verification failed. Please try again." }, { status: 403 });

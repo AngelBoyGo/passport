@@ -7,8 +7,31 @@ export const dynamic = "force-dynamic";
 /**
  * AGORA — Negotiation and decentralized interaction protocol adapter.
  * POST /api/v1/agora/negotiate — propose or record a cooperation agreement.
+ *
+ * H13 fix: negotiation is now AUTHENTICATED. It previously fell back to the
+ * FIRST operator in the database when no key was provided, attributing ledger
+ * writes to an arbitrary operator; it also "succeeded" even when nothing was
+ * persisted. Only authenticated operators may record proposals, and the action
+ * is constrained to a safe vocabulary.
  */
+const AGORA_ACTIONS = new Set([
+  "offer",
+  "propose",
+  "accept",
+  "reject",
+  "counter",
+  "withdraw",
+  "confirm",
+  "settle",
+  "join",
+]);
+
 export async function POST(request: NextRequest) {
+  const operator = await authenticateApiKey(request.headers.get("authorization"));
+  if (!operator) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   let body: {
     proposal_id?: string;
     from_commitment?: string;
@@ -29,22 +52,23 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  try {
-    const authenticatedOperator = await authenticateApiKey(request.headers.get("authorization"));
-    const operator = authenticatedOperator ?? (await prisma.operator.findFirst({ select: { id: true } }));
+  if (!AGORA_ACTIONS.has(body.action)) {
+    return NextResponse.json(
+      { error: `Unsupported action: ${body.action}. Allowed: proposal/accept/reject/counter/withdraw/confirm/settle.` },
+      { status: 400 }
+    );
+  }
 
-    if (operator) {
-      await prisma.capabilityLedgerEntry.create({
-        data: {
-          operatorId: operator.id,
-          agentId: body.from_commitment.slice(0, 64),
-          eventType: `agora:${body.action}`,
-          metadata: JSON.stringify({ proposal_id: body.proposal_id, terms: body.terms }),
-        },
-      });
-    }
+  try {
+    await prisma.capabilityLedgerEntry.create({
+      data: {
+        operatorId: operator.id,
+        agentId: body.from_commitment.slice(0, 64),
+        eventType: `agora:${body.action}`,
+        metadata: JSON.stringify({ proposal_id: body.proposal_id, terms: body.terms }),
+      },
+    });
   } catch (err) {
-    // Ledger recording error should not crash the negotiation proposal response
     console.error("Agora negotiation ledger persistence error:", err);
   }
 

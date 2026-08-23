@@ -18,6 +18,7 @@ import {
   zodValidationErrorResponse,
 } from "@/lib/validation/enrollmentSchemas";
 import { authenticateApiKey } from "@/lib/operator";
+import { dispatchWebhook } from "@/lib/webhooks/webhook-service";
 import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -98,6 +99,10 @@ export async function POST(
       rateLimitResponse(rate, getEnrollmentRateLimitMax())
     );
   }
+
+  // Resolve the calling operator (api key or service token) for webhook dispatch.
+  const callingOperator = await authenticateApiKey(request.headers.get("authorization"));
+  let serviceOperatorId: string | null = null;
 
   // Reject oversized payloads before parsing
   const contentLength = request.headers.get("content-length");
@@ -190,6 +195,21 @@ export async function POST(
       rate_limited: false,
       latency_ms: Date.now() - startedAt,
     });
+
+    // Fire the `evidence.anchored` webhook that the UI/docs advertise, so
+    // subscribers are notified the moment evidence is anchored.
+    if (callingOperator?.id || serviceOperatorId) {
+      dispatchWebhook(
+        (callingOperator?.id ?? serviceOperatorId)!,
+        "evidence.anchored",
+        {
+          event_commitment_hash: result.event_commitment_hash,
+          subject_commitment: id,
+          source_type: parsed.data.source_type,
+          enrollment_status: result.enrollment_status,
+        }
+      ).catch((err) => console.warn("evidence.anchored webhook dispatch failed:", err));
+    }
 
     return NextResponse.json(result, { status: 201 });
   } catch (err) {

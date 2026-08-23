@@ -2,22 +2,35 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSession } from "@/lib/auth/auth-service";
 import { prisma } from "@/lib/db";
 import { sessionCookieOptions } from "@/lib/auth/cookies";
+import {
+  getBaseUrl,
+  verifyOAuthState,
+  clearOAuthStateCookie,
+} from "@/lib/auth/oauth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
+  const state = searchParams.get("state");
+  const baseUrl = getBaseUrl(request);
 
   if (!code) {
-    return NextResponse.redirect(new URL("/login?error=no_code", request.url));
+    return NextResponse.redirect(new URL("/login?error=no_code", baseUrl));
+  }
+
+  // Reject login-CSRF: state must match the cookie set by the config endpoint.
+  const stateCheck = verifyOAuthState(request, "github", state);
+  if (!stateCheck.ok) {
+    return NextResponse.redirect(new URL(stateCheck.redirectTo, baseUrl));
   }
 
   const clientId = process.env.GITHUB_CLIENT_ID;
   const clientSecret = process.env.GITHUB_CLIENT_SECRET;
 
   if (!clientId || !clientSecret) {
-    return NextResponse.redirect(new URL("/login?error=github_not_configured", request.url));
+    return NextResponse.redirect(new URL("/login?error=github_not_configured", baseUrl));
   }
 
   // Exchange code for access token
@@ -38,7 +51,7 @@ export async function GET(request: NextRequest) {
   const accessToken = tokenData.access_token;
 
   if (!accessToken) {
-    return NextResponse.redirect(new URL("/login?error=github_auth_failed", request.url));
+    return NextResponse.redirect(new URL("/login?error=github_auth_failed", baseUrl));
   }
 
   // Get user info from GitHub
@@ -75,7 +88,8 @@ export async function GET(request: NextRequest) {
   // Create session
   const session = await createSession(operator.id);
 
-  const response = NextResponse.redirect(new URL("/welcome", request.url));
+  const response = NextResponse.redirect(new URL("/welcome", baseUrl));
+  clearOAuthStateCookie(response, "github");
   response.cookies.set("session_token", session.token, sessionCookieOptions(request));
 
   return response;

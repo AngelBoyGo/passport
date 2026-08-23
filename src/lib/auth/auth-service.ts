@@ -6,6 +6,20 @@ import { hash as argon2Hash, verify as argon2Verify } from "@node-rs/argon2";
 
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
+/**
+ * SESSION_SECRET must be present outside test/local env. Fallback in tests keeps
+ * the suite runnable; production without a secret now fails fast instead of
+ * silently signing session tokens with a public dev value.
+ */
+function sessionSecret(): string {
+  const secret = process.env.SESSION_SECRET;
+  if (secret) return secret;
+  if (process.env.NODE_ENV === "test" || process.env.NODE_ENV === "development") {
+    return "dev-session-secret";
+  }
+  throw new Error("SESSION_SECRET is required outside test/development environments");
+}
+
 export async function hashPassword(password: string): Promise<string> {
   return argon2Hash(password, { algorithm: 2 as any, memoryCost: 19456, timeCost: 2, outputLen: 32 });
 }
@@ -51,7 +65,7 @@ export function hashEmail(email: string): string {
 function generateSessionToken(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   const raw = bytesToHex(sha256(bytes));
-  const secret = process.env.SESSION_SECRET || "dev-session-secret";
+  const secret = sessionSecret();
   const signature = bytesToHex(sha256(utf8ToBytes(raw + secret)));
   return "sess_" + raw + signature;
 }
@@ -60,7 +74,7 @@ function verifySessionTokenSignature(token: string): boolean {
   if (!token.startsWith("sess_")) return false;
   const raw = token.slice(5, 69);
   const sig = token.slice(69);
-  const secret = process.env.SESSION_SECRET || "dev-session-secret";
+  const secret = sessionSecret();
   const expected = bytesToHex(sha256(utf8ToBytes(raw + secret)));
   return sig === expected;
 }

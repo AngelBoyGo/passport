@@ -6,14 +6,25 @@ import {
   zodValidationErrorResponse,
 } from "@/lib/validation/angelcoinSchemas";
 import { angelcoinErrorResponse } from "@/lib/angelcoin/route-errors";
+import { isExecutiveAdmin } from "@/lib/admin/admin-auth";
 
 /**
  * POST /api/v1/passport/credits/grants — operator grant of AngelCoin credits.
+ * H5 fix: minting credits is a privileged supply operation. Only executive
+ * admin operators may grant credits, so any key-holder can no longer inflate
+ * supply for arbitrary subjects.
  */
 export async function POST(request: NextRequest) {
   const operator = await authenticateApiKey(request.headers.get("authorization"));
   if (!operator) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!isExecutiveAdmin(operator)) {
+    return NextResponse.json(
+      { error: "Forbidden: only executive admins may grant credits" },
+      { status: 403 }
+    );
   }
 
   let body: unknown;
