@@ -95,7 +95,7 @@ describe("DataCenter Energy & Infrastructure Governance Domain", () => {
 
   describe("Telemetry Ingestion & Receipt Issuance", () => {
     it("ingests live hardware telemetry, issues signed receipt, and links evidence", async () => {
-      prismaMock.operator.findFirst.mockResolvedValue({ id: "op_default" });
+      prismaMock.operator.findFirst.mockResolvedValue({ id: "op_default", stripeCustomerId: "cus_default" });
       prismaMock.agent.findFirst.mockResolvedValue({ id: "agent_rec_01" });
       prismaMock.agentEvidence.create.mockResolvedValue({
         id: "ev_01",

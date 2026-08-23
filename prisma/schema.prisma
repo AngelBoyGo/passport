@@ -147,12 +147,18 @@ model Receipt {
   @@index([operatorId, domainCommitment])
 }
 
+enum ApiKeyRole {
+  ISSUER
+  HOLDER
+}
+
 model ApiKey {
-  id         String   @id @default(cuid())
+  id         String      @id @default(cuid())
   operatorId String
-  keyHash    String   @unique
+  keyHash    String      @unique
   name       String?
-  createdAt  DateTime @default(now())
+  role       ApiKeyRole  @default(ISSUER)
+  createdAt  DateTime    @default(now())
 
   operator Operator @relation(fields: [operatorId], references: [id])
 }

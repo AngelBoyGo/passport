@@ -44,6 +44,20 @@ export async function GET(
     );
   }
 
+  // H12 fix: cross-tenant reads are closed. A caller may only read evidence for
+  // a commitment that belongs to an Agent row owned by THEIR operator. This
+  // prevents any key-holder from pulling another operator's raw evidence.
+  const ownedAgent = await prisma.agent.findFirst({
+    where: { operatorId: operator.id, agentId: id },
+    select: { id: true },
+  });
+  if (!ownedAgent) {
+    return NextResponse.json(
+      { error: "Evidence for this commitment is not owned by the authenticated operator" },
+      { status: 404 }
+    );
+  }
+
   const { searchParams } = new URL(request.url);
   const sourceType = searchParams.get("source_type");
   const limit = Math.min(Number(searchParams.get("limit")) || 50, 100);

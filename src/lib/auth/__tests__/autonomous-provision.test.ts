@@ -28,13 +28,14 @@ describe("Autonomous Agent Self-Provisioning & Security Hardening", () => {
     vi.clearAllMocks();
     pubKeyHex = bytesToHex(await getPublicKey(privKey));
     process.env.INGESTION_COMMITMENT_SALT = "test-salt-123";
+    process.env.AUTONOMOUS_POW_DIFFICULTY = "3";
   });
 
   it("generates a valid challenge nonce with proof-of-work target", () => {
     const challenge = generateAutonomousChallenge(pubKeyHex);
 
     expect(challenge.challenge_nonce).toMatch(/^[0-9a-f]{64}$/i);
-    expect(challenge.pow_difficulty).toBe(3); // 3 leading hex zeros
+    expect(challenge.pow_difficulty).toBe(3); // lowered via test env
     expect(challenge.expires_at).toBeDefined();
   });
 
@@ -56,7 +57,7 @@ describe("Autonomous Agent Self-Provisioning & Security Hardening", () => {
       stripeCustomerId: "cus_auto_123",
       email: null,
       tier: "free",
-      credits: 100,
+      credits: 10,
     });
 
     prismaMock.apiKey.create.mockResolvedValue({

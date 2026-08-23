@@ -16,21 +16,21 @@ export default function WelcomePage() {
     },
     {
       title: "Step 1: Get an API key",
-      body: "Your API key is how your agents authenticate with Passport. We created one for you during signup — you can find it in the dashboard.",
+      body: "Your API key is how your agents authenticate with Passport. Generate one in the dashboard — it only takes a click (choose Enterprise Issuer for fleets or Agent Holder for a single agent).",
       action: "Go to dashboard →",
       href: "/dashboard",
     },
     {
       title: "Step 2: Enroll your first agent",
       body: "Agents prove their identity using ed25519 cryptography. Your agent generates a keypair, you enroll it, and it gets a Passport. Then it can start posting receipts.",
-      action: "Read the enrollment guide →",
-      href: "/docs/getting-started#2-enroll-an-agent",
+      action: "Enroll an agent now",
+      href: "/enroll",
     },
     {
       title: "Step 3: Post evidence",
       body: "Once enrolled, your agent posts evidence of completed work. Each evidence event can become a signed receipt automatically via the evidence bridge.",
-      action: "Read the evidence guide →",
-      href: "/docs/getting-started#6-post-evidence",
+      action: "See how to post evidence",
+      href: "/docs/integrations",
     },
     {
       title: "You're all set",

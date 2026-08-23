@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 
 const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
@@ -102,5 +103,49 @@ describe("W3C Verifiable Credential — Portable Agent Reputation (Section 2.1)"
 
     const vc = await generateAgentVerifiableCredential("unknown_commitment");
     expect(vc).toBeNull();
+  });
+
+  it("rejects a credential signed by a NON-pinned (attacker) key (C1)", async () => {
+    // Build a forged credential that CLAIMS to be issued by Passport (issuer
+    // DID uses an attacker key whose pubkey is not in the pinned transparency
+    // log). Even though the signature is cryptographically valid under the
+    // attacker's key, the verifier must reject it because the key isn't pinned.
+    const { sign: edSign, getPublicKey: gk } = await import("@noble/ed25519");
+    const { canonicalJson, sha256Hex } = await import("@/lib/receipt/canonical");
+
+    const attackerSeed = hexToBytes("5".repeat(64));
+    const attackerPub = bytesToHex(await gk(attackerSeed));
+    const did = `did:key:z${attackerPub}`;
+
+    const forged = {
+      "@context": ["https://www.w3.org/ns/credentials/v2"],
+      id: `urn:uuid:${crypto.randomUUID()}`,
+      type: ["VerifiableCredential", "AgentReputationCredential"],
+      issuer: did,
+      issuanceDate: new Date().toISOString(),
+      validFrom: new Date().toISOString(),
+      credentialSubject: {
+        id: did,
+        agent_commitment_hash: commitment,
+        totals: { evidence_count: 999, artifact_count: 999, correction_count: 0, failure_count: 0 },
+      },
+    };
+
+    const canonicalHash = sha256Hex(canonicalJson(forged as unknown as Record<string, unknown>));
+    const sigBytes = await edSign(utf8ToBytes(canonicalHash), attackerSeed);
+    const forgedCred = {
+      ...forged,
+      proof: {
+        type: "Ed25519Signature2020",
+        created: new Date().toISOString(),
+        verificationMethod: `${did}#attacker`,
+        proofPurpose: "assertionMethod",
+        proofValue: bytesToHex(sigBytes),
+      },
+    };
+
+    const verification = await verifyAgentVerifiableCredential(forgedCred as any);
+    expect(verification.valid).toBe(false);
+    expect(verification.error).toMatch(/pinned|transparency|issuer/i);
   });
 });

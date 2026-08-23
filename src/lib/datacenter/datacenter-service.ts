@@ -6,6 +6,8 @@ import { signReceipt, getPublicKeyHex } from "@/lib/receipt/signer";
 import type { ReceiptPayload } from "@/lib/receipt/types";
 import { prisma } from "@/lib/db";
 import { evaluateAndDispatchReputationSignals } from "@/lib/webhooks/webhook-service";
+import { getKeyTransparencyLog } from "@/lib/transparency/key-log";
+import { operatorIdFromStripe } from "@/lib/operator";
 
 export type DataCenterEventType =
   | "HARDWARE_POWER_VALIDATION"
@@ -187,20 +189,25 @@ export async function ingestDataCenterTelemetry(
 
   // Find or use default operator
   const op = operatorId
-    ? { id: operatorId }
-    : await prisma.operator.findFirst({ select: { id: true } });
-  const finalOperatorId = op?.id ?? "op_system_datacenter";
+    ? await prisma.operator.findUnique({ where: { id: operatorId } })
+    : await prisma.operator.findFirst();
+  const dbOperatorId = op?.id ?? "op_system_datacenter";
+  const opStripeCustomerId = op?.stripeCustomerId ?? "system";
+  // H10: sign receipts with the PUBLIC operator id (op_cus_...), identical to
+  // the canonical receipt path, so public verification reconstructs the same
+  // canonical payload and passes.
+  const publicOperatorId = operatorIdFromStripe(opStripeCustomerId);
 
   // Find or create agent record for this cluster
   let agent = await prisma.agent.findFirst({
-    where: { operatorId: finalOperatorId, agentId: payload.cluster_id },
+    where: { operatorId: dbOperatorId, agentId: payload.cluster_id },
     select: { id: true },
   });
 
   if (!agent) {
     agent = await prisma.agent.create({
       data: {
-        operatorId: finalOperatorId,
+        operatorId: dbOperatorId,
         agentId: payload.cluster_id,
         domain: "SYSTEM_INTEGRATION",
       },
@@ -231,7 +238,7 @@ export async function ingestDataCenterTelemetry(
   const receiptContent: ReceiptPayload = {
     receipt_id: receiptId,
     issued_at: now.toISOString(),
-    operator_id: finalOperatorId,
+    operator_id: publicOperatorId,
     agent_id: payload.cluster_id,
     domain: "SYSTEM_INTEGRATION",
     receipt_type: "custody",
@@ -249,7 +256,7 @@ export async function ingestDataCenterTelemetry(
     data: {
       receiptId,
       issuedAt: now,
-      operatorId: finalOperatorId,
+      operatorId: dbOperatorId,
       agentId: payload.cluster_id,
       agentRecordId: agent.id,
       receiptType: "datacenter_energy_receipt",
@@ -279,7 +286,7 @@ export async function ingestDataCenterTelemetry(
 
   // If thermal throttle occurred, dispatch reputation degradation alert
   if (payload.thermal_throttle_observed) {
-    evaluateAndDispatchReputationSignals(finalOperatorId, commitment, {
+    evaluateAndDispatchReputationSignals(dbOperatorId, commitment, {
       event: "reputation.degraded",
       reason: `Thermal throttle observed on ${payload.instance_id} (${payload.peak_junction_temp_c}°C)`,
       failure_rate: 1.0,
@@ -595,18 +602,28 @@ export async function verifyDataCenterSustainabilityVC(
   const { proof, ...unsigned } = vc;
   const canonicalHash = sha256Hex(canonicalJson(unsigned as unknown as Record<string, unknown>));
 
-  let issuerPubKeyHex = "";
-  const match = vc.proof.verificationMethod?.match(/did:key:z([0-9a-f]{64})/i) ||
-    vc.issuer?.match(/did:key:z([0-9a-f]{64})/i);
-
-  if (match) {
-    issuerPubKeyHex = match[1];
-  } else {
-    try {
-      issuerPubKeyHex = getPublicKeyHex();
-    } catch {
-      return { valid: false, error: "Unable to resolve issuer public key" };
+  // SECURITY (C1): pin to the published Passport transparency-log key; never
+  // trust a key embedded in the credential itself.
+  let issuerPubKeyHex: string;
+  try {
+    const log = getKeyTransparencyLog();
+    const pinnedKeys = log.entries
+      .filter((e) => e.status === "active" || e.status === "rotated")
+      .map((e) => e.public_key.toLowerCase());
+    const claimed = vc.issuer || vc.proof.verificationMethod || "";
+    const match = claimed.match(/did:key:z([0-9a-f]{64})/i);
+    if (match) {
+      const claimedKey = match[1].toLowerCase();
+      const active = log.entries.find((e) => e.status === "active");
+      issuerPubKeyHex = pinnedKeys.includes(claimedKey)
+        ? claimedKey
+        : active?.public_key.toLowerCase() ?? getPublicKeyHex().toLowerCase();
+    } else {
+      const active = log.entries.find((e) => e.status === "active");
+      issuerPubKeyHex = active?.public_key.toLowerCase() ?? getPublicKeyHex().toLowerCase();
     }
+  } catch {
+    return { valid: false, error: "Unable to resolve a pinned Passport issuer key" };
   }
 
   try {

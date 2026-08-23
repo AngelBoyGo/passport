@@ -3,9 +3,13 @@ import { NextRequest } from "next/server";
 
 const authenticateApiKeyMock = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/operator", () => ({
-  authenticateApiKey: (...args: unknown[]) => authenticateApiKeyMock(...args),
-}));
+vi.mock("@/lib/operator", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/operator")>();
+  return {
+    ...actual,
+    authenticateApiKey: (...args: unknown[]) => authenticateApiKeyMock(...args),
+  };
+});
 
 const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
@@ -13,7 +17,7 @@ const { prismaMock } = vi.hoisted(() => ({
     agentEvidence: { create: vi.fn(), findMany: vi.fn(), count: vi.fn() },
     receipt: { create: vi.fn(), findMany: vi.fn(), findUnique: vi.fn() },
     evidenceReceiptLink: { create: vi.fn() },
-    operator: { findFirst: vi.fn() },
+    operator: { findFirst: vi.fn(), findUnique: vi.fn() },
     agent: { findFirst: vi.fn(), create: vi.fn() },
     apiKey: { findUnique: vi.fn() },
   },
@@ -82,7 +86,7 @@ describe("DataCenter API Routes", () => {
 
   it("POST /api/v1/datacenter/evidence — allows authenticated ISSUER write and returns signed receipt", async () => {
     authenticateApiKeyMock.mockResolvedValue(issuerOp);
-    prismaMock.operator.findFirst.mockResolvedValue({ id: "op_default" });
+    prismaMock.operator.findUnique.mockResolvedValue({ id: "op_issuer_1", stripeCustomerId: "cus_issuer" });
     prismaMock.agent.findFirst.mockResolvedValue({ id: "agent_rec_01" });
     prismaMock.agentEvidence.create.mockResolvedValue({
       id: "ev_01",

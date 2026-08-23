@@ -15,6 +15,14 @@ describe("SSRF guard for outbound webhook delivery", () => {
     expect(validateWebhookUrl("http://myhost.local/x")).toMatch(/unsafe|private/i);
   });
 
+  it("rejects IPv4-mapped IPv6 and trailing-dot bypasses (H9)", () => {
+    expect(validateWebhookUrl("http://[::ffff:127.0.0.1]/x")).toMatch(/unsafe|private/i);
+    expect(validateWebhookUrl("http://[::ffff:169.254.169.254]/x")).toMatch(/unsafe|private/i);
+    expect(validateWebhookUrl("http://[::ffff:7f00:1]/x")).toMatch(/unsafe|private/i);
+    expect(validateWebhookUrl("http://127.0.0.1./x")).toMatch(/unsafe|private/i);
+    expect(validateWebhookUrl("http://localhost./x")).toMatch(/unsafe|private/i);
+  });
+
   it("rejects private and link-local IPv4 ranges", () => {
     expect(validateWebhookUrl("http://10.0.0.5/x")).toMatch(/unsafe|private/i);
     expect(validateWebhookUrl("http://172.16.4.1/x")).toMatch(/unsafe|private/i);

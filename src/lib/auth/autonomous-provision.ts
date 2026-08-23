@@ -14,7 +14,17 @@ interface StoredChallenge {
 
 const activeChallenges = new Map<string, StoredChallenge>();
 const CHALLENGE_TTL_MS = 120_000; // 2 minutes
-const DEFAULT_POW_DIFFICULTY = 3; // 3 leading hex zeroes (e.g. "000...")
+// H6 fix: raise difficulty so mass credit-farming is more costly per mint.
+// Default 6 (~17M hashes, seconds) in production; tests may lower it via env.
+// Resolved at call-time so tests that set env in beforeEach take effect.
+function resolvePoWDifficulty(): number {
+  const raw = Number(process.env.AUTONOMOUS_POW_DIFFICULTY);
+  const difficulty = Number.isFinite(raw) && raw >= 3 ? Math.min(Math.floor(raw), 8) : 6;
+  return difficulty;
+}
+// H6: cap free self-service credits per autonomous mint to bound total supply
+// an attacker can farm (operator must top up via formal grant/Stripe).
+const AUTONOMOUS_MINT_CREDITS = 10;
 
 function cleanupStaleChallenges() {
   const now = Date.now();
@@ -71,7 +81,7 @@ export function generateAutonomousChallenge(publicKeyHex: string): {
 
   return {
     challenge_nonce: nonce,
-    pow_difficulty: DEFAULT_POW_DIFFICULTY,
+    pow_difficulty: resolvePoWDifficulty(),
     expires_at: new Date(expiresAt).toISOString(),
   };
 }
@@ -79,7 +89,7 @@ export function generateAutonomousChallenge(publicKeyHex: string): {
 /**
  * Client-side solver helper for autonomous agents to compute PoW nonce.
  */
-export function solveAutonomousPoW(challengeNonce: string, difficulty = DEFAULT_POW_DIFFICULTY): string {
+export function solveAutonomousPoW(challengeNonce: string, difficulty = resolvePoWDifficulty()): string {
   const target = "0".repeat(difficulty);
   let iteration = 0;
 
@@ -99,7 +109,7 @@ export function solveAutonomousPoW(challengeNonce: string, difficulty = DEFAULT_
 export function verifyAutonomousPoW(
   challengeNonce: string,
   powNonce: string,
-  difficulty = DEFAULT_POW_DIFFICULTY
+  difficulty = resolvePoWDifficulty()
 ): boolean {
   const target = "0".repeat(difficulty);
   const hash = bytesToHex(sha256(utf8ToBytes(`${challengeNonce}:${powNonce}`)));
@@ -184,7 +194,7 @@ export async function provisionAutonomousAgent(
       stripeCustomerId,
       email: null,
       tier: "free",
-      credits: 100,
+      credits: AUTONOMOUS_MINT_CREDITS,
     },
   });
 
@@ -232,6 +242,6 @@ export async function provisionAutonomousAgent(
     did: `did:key:z${pubKeyClean}`,
     display_name: agentName,
     domain: operationalDomain,
-    initial_credits: 100,
+    initial_credits: AUTONOMOUS_MINT_CREDITS,
   };
 }

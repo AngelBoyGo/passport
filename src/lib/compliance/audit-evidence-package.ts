@@ -150,7 +150,10 @@ export async function buildAuditEvidencePackage(
   };
 
   const contentHash = sha256Hex(canonicalJson(rawPackage as unknown as Record<string, unknown>));
-  const signatureBytes = await sign(hexToBytes(contentHash), getPrivateKeyBytes());
+  // M3 fix: sign the SAME message convention as every other Passport signer
+  // (receipts, checkpoints, notary, VCs, compliance packages) — the UTF-8 of the
+  // hex digest string — so external verifiers following the documented rule work.
+  const signatureBytes = await sign(utf8ToBytes(contentHash), getPrivateKeyBytes());
 
   return {
     ...rawPackage,

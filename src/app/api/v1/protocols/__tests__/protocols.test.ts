@@ -94,7 +94,10 @@ describe("Protocol Integrations", () => {
       const { POST } = await import("@/app/api/v1/a2a/tasks/route");
       const req = new NextRequest("https://passport.metis.gold/api/v1/a2a/tasks", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer pp_valid_key",
+        },
         body: JSON.stringify({
           jsonrpc: "2.0",
           id: "req-2",
@@ -107,6 +110,31 @@ describe("Protocol Integrations", () => {
       const data = await res.json();
       expect(data.result.status).toBe("delivered");
       expect(data.result.receipt_id).toBe("rcpt_999");
+    });
+
+    it("rejects unauthenticated A2A requests (C3)", async () => {
+      const { POST } = await import("@/app/api/v1/a2a/tasks/route");
+      const req = new NextRequest("https://passport.metis.gold/api/v1/a2a/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: "req-anon",
+          method: "tasks/send",
+          params: {
+            task_id: "a2a-anon-001",
+            hirer_commitment: "a".repeat(64),
+            worker_commitment: "b".repeat(64),
+            amount: 1,
+          },
+        }),
+      });
+
+      const res = await POST(req);
+      expect(res.status).toBe(401);
+      const data = await res.json();
+      expect(data.error.code).toBe(-32001);
+      expect(prismaMock.engagement.create).not.toHaveBeenCalled();
     });
   });
 

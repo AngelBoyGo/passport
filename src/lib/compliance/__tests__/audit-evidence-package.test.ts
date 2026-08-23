@@ -84,7 +84,7 @@ describe("Audit-Grade Compliance Evidence Aggregation (2.5)", () => {
     expect(recalcHash).toBe(pkg!.content_hash);
     const valid = await verify(
       hexToBytes(pkg!.signature),
-      hexToBytes(pkg!.content_hash),
+      utf8ToBytes(pkg!.content_hash),
       hexToBytes(getPublicKeyHex())
     );
     expect(valid).toBe(true);

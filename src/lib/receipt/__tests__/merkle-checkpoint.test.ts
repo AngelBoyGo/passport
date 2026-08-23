@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { hexToBytes as h } from "@noble/hashes/utils.js";
 
 const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
@@ -63,6 +64,39 @@ describe("Receipt Merkle Root & External Chain Anchoring (Section 2.4)", () => {
     const tampered = { ...checkpoint, receipt_count: 999 };
 
     const isValid = await verifyReceiptCheckpoint(tampered);
+    expect(isValid).toBe(false);
+  });
+
+  it("rejects a self-signed checkpoint whose embedded key is NOT pinned (C2)", async () => {
+    // An attacker fabricates a checkpoint using their own key and embeds their
+    // public key in the payload. verifyReceiptCheckpoint with NO pinned key
+    // passed must NOT trust the embedded key — it must fail.
+    const { sign, getPublicKey } = await import("@noble/ed25519");
+    const { sha256Hex, canonicalJson } = await import("@/lib/receipt/canonical");
+    const { hexToBytes: h2b, utf8ToBytes: u2b, bytesToHex: b2h } = await import("@noble/hashes/utils.js");
+
+    const attackerSeed = "7".repeat(64);
+    const attackerPub = b2h(await getPublicKey(h(attackerSeed)));
+    const forged = {
+      checkpoint_id: "ckpt_forged",
+      timestamp: new Date().toISOString(),
+      receipt_count: 1,
+      merkle_root: "deadbeef".repeat(8),
+      previous_checkpoint_hash: null,
+    };
+    const contentHash = sha256Hex(canonicalJson(forged as unknown as Record<string, unknown>));
+    const signature = b2h(await sign(u2b(contentHash), h(attackerSeed)));
+
+    const forgeCkpt = {
+      ...forged,
+      content_hash: contentHash,
+      signature,
+      algorithm: "ed25519",
+      public_key: attackerPub,
+    };
+
+    // No pinned key supplied → must use only transparency-log pinned key → fail.
+    const isValid = await verifyReceiptCheckpoint(forgeCkpt as any);
     expect(isValid).toBe(false);
   });
 });

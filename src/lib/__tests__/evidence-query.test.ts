@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const authenticateApiKeyMock = vi.fn();
 const evidenceFindManyMock = vi.fn();
+const agentFindFirstMock = vi.fn();
 
 vi.mock("@/lib/operator", () => ({
   authenticateApiKey: (...args: unknown[]) => authenticateApiKeyMock(...args),
@@ -11,6 +12,9 @@ vi.mock("@/lib/db", () => ({
   prisma: {
     agentEvidence: {
       findMany: (...args: unknown[]) => evidenceFindManyMock(...args),
+    },
+    agent: {
+      findFirst: (...args: unknown[]) => agentFindFirstMock(...args),
     },
   },
 }));
@@ -22,7 +26,9 @@ beforeEach(() => {
   vi.resetModules();
   authenticateApiKeyMock.mockReset();
   evidenceFindManyMock.mockReset();
+  agentFindFirstMock.mockReset();
   authenticateApiKeyMock.mockResolvedValue(operator);
+  agentFindFirstMock.mockResolvedValue({ id: "agent_rec" });
 });
 
 describe("GET /api/v1/passport/agents/:id/evidence", () => {

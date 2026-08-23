@@ -92,15 +92,19 @@ export async function authenticateApiKey(authHeader: string | null) {
 
   if (!apiKey?.operator) return null;
 
-  const role: "ISSUER" | "HOLDER" = key.startsWith("pp_usr_") ? "HOLDER" : "ISSUER";
+  // C4: role comes from the PERSISTED row, never inferred from the presented
+  // key prefix (an attacker could self-label a fabricated pp_ent_ prefix).
+  const role: "ISSUER" | "HOLDER" = apiKey.role === "HOLDER" ? "HOLDER" : "ISSUER";
   return {
     ...apiKey.operator,
     apiKeyRole: role,
+    apiKeyRow: apiKey,
   };
 }
 
 /**
  * Creates a new API key for an operator (Enterprise Issuer or Subject Holder); returns the raw key once.
+ * Persists the role ON THE ROW (C4), so RBAC is enforced from stored state.
  * Gracefully supports (operatorId, name, role, client) or (operatorId, name, client).
  */
 export async function createApiKey(
@@ -126,29 +130,27 @@ export async function createApiKey(
       operatorId,
       keyHash: hashApiKey(rawKey),
       name,
+      role,
     },
   });
   return rawKey;
 }
 
 /**
- * Decrements operator credits; returns false if insufficient.
+ * Decrements operator credits atomically; returns false if insufficient.
+ * Uses an atomic conditional update (H7): WHERE credits >= amount, so
+ * concurrent spends cannot push the balance negative (double-spend fix).
  */
 export async function decrementCredits(
   operatorId: string,
   amount = 1,
   client: PrismaTx | typeof prisma = prisma
 ) {
-  const operator = await client.operator.findUnique({
-    where: { id: operatorId },
-  });
-  if (!operator || operator.credits < amount) return false;
-
-  await client.operator.update({
-    where: { id: operatorId },
+  const result = await client.operator.updateMany({
+    where: { id: operatorId, credits: { gte: amount } },
     data: { credits: { decrement: amount } },
   });
-  return true;
+  return result.count > 0;
 }
 
 /**

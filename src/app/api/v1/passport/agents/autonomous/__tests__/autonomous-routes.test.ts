@@ -25,6 +25,7 @@ describe("Autonomous Agent Provisioning REST Endpoints", () => {
     vi.clearAllMocks();
     pubKeyHex = bytesToHex(await getPublicKey(privKey));
     process.env.INGESTION_COMMITMENT_SALT = "test-salt-123";
+    process.env.AUTONOMOUS_POW_DIFFICULTY = "3";
     process.env.NEXT_PUBLIC_APP_URL = "https://passport.metis.gold";
   });
 

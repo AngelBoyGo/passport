@@ -34,7 +34,7 @@ function isIpv4String(ip: string): boolean {
 
 function isReservedIpv6(ip: string): boolean {
   const lower = ip.toLowerCase();
-  return (
+  if (
     lower === "::1" ||
     lower === "::" ||
     lower.startsWith("fc") ||
@@ -43,7 +43,28 @@ function isReservedIpv6(ip: string): boolean {
     lower.startsWith("fe9") ||
     lower.startsWith("fea") ||
     lower.startsWith("feb")
-  );
+  ) {
+    return true;
+  }
+  // H9: IPv4-mapped loopback/link-local/private via ::ffff:a.b.c.d
+  const mapped = lower.match(/^::ffff:([0-9a-f.]+)$/);
+  if (mapped) {
+    const tail = mapped[1];
+    // Decompose the hex tail into dotted groups like 7f00:1 → 127.0.0.1
+    if (/^[0-9a-f.:]+$/.test(tail)) {
+      const hexPart = tail.toLowerCase();
+      const parts = hexPart.split(":");
+      if (parts.length === 2) {
+        const hi = parseInt(parts[0], 16);
+        const lo = parseInt(parts[1], 16);
+        const ipv4 = `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
+        if (isPrivateIpv4(ipv4.split(".").map(Number))) return true;
+      }
+    }
+    // Literal dotted form inside mapped address
+    if (isIpv4String(tail)) return isPrivateIpv4(tail.split(".").map(Number));
+  }
+  return false;
 }
 
 /**
@@ -55,22 +76,26 @@ export function isUnsafeWebhookHost(hostname: string): boolean {
 
   const lower = hostname.toLowerCase().trim();
 
+  // H9: trailing-dot hostnames resolve in DNS like the bare name but evade the
+  // string classifier (e.g. "127.0.0.1.", "localhost."). Strip the trailing dot.
+  const normalized = lower.endsWith(".") ? lower.slice(0, -1) : lower;
+
   if (
-    lower === "localhost" ||
-    lower === "localhost.localdomain" ||
-    lower.endsWith(".localhost") ||
-    lower.endsWith(".local") ||
-    lower.endsWith(".internal") ||
-    lower.endsWith(".lan")
+    normalized === "localhost" ||
+    normalized === "localhost.localdomain" ||
+    normalized.endsWith(".localhost") ||
+    normalized.endsWith(".local") ||
+    normalized.endsWith(".internal") ||
+    normalized.endsWith(".lan")
   ) {
     return true;
   }
 
-  if (isIP(lower) === 4 || isIpv4String(lower)) {
-    return isPrivateIpv4(lower.split(".").map((p) => parseInt(p, 10)));
+  if (isIP(normalized) === 4 || isIpv4String(normalized)) {
+    return isPrivateIpv4(normalized.split(".").map((p) => parseInt(p, 10)));
   }
-  if (isIP(lower) === 6) {
-    return isReservedIpv6(lower);
+  if (isIP(normalized) === 6) {
+    return isReservedIpv6(normalized);
   }
 
   if (

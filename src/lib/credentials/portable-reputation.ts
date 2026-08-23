@@ -5,7 +5,36 @@ import "@/lib/receipt/crypto";
 import { canonicalJson, sha256Hex } from "@/lib/receipt/canonical";
 import { getAgentProfile } from "@/lib/public-portal/portal-service";
 import { getPublicKeyHex } from "@/lib/receipt/signer";
+import { getKeyTransparencyLog } from "@/lib/transparency/key-log";
 import { prisma } from "@/lib/db";
+
+/**
+ * C1 fix — resolve the issuer verifying key ONLY from Passport's published key
+ * transparency log. Never from the credential (attacker-controlled). A
+ * credential claiming to be issued by Passport must verify under a Passport
+ * pinned key, or it fails.
+ */
+function resolvePinnedIssuerKey(issuer?: string, verificationMethod?: string): string {
+  const log = getKeyTransparencyLog();
+  const pinnedKeys = log.entries
+    .filter((e) => e.status === "active" || e.status === "rotated")
+    .map((e) => e.public_key.toLowerCase());
+
+  // If the credential claims a Passport issuer DID, extract that key and ensure
+  // it appears in the pinned transparency log. Otherwise reject.
+  const claimed = issuer || verificationMethod || "";
+  const claimedMatch = claimed.match(/did:key:z([0-9a-f]{64})/i);
+  if (claimedMatch) {
+    const claimedKey = claimedMatch[1].toLowerCase();
+    if (pinnedKeys.includes(claimedKey)) return claimedKey;
+    throw new Error("Issuer key is not in the Passport transparency log");
+  }
+
+  // No claimed issuer → only the active pinned key may verify.
+  const active = log.entries.find((e) => e.status === "active");
+  if (active) return active.public_key.toLowerCase();
+  return getPublicKeyHex().toLowerCase();
+}
 
 export interface AgentVerifiableCredential {
   "@context": string[];
@@ -145,19 +174,14 @@ export async function verifyAgentVerifiableCredential(
   const { proof, ...unsigned } = vc;
   const canonicalHash = sha256Hex(canonicalJson(unsigned as unknown as Record<string, unknown>));
 
-  // Extract issuer public key from DID or verificationMethod
+  // SECURITY (C1): resolve the issuer key ONLY from Passport's pinned,
+  // transparency-log-published key(s). Never accept a key embedded in the
+  // credential itself — an attacker could self-sign and pass verification.
   let issuerPubKeyHex = "";
-  const match = vc.proof.verificationMethod?.match(/did:key:z([0-9a-f]{64})/i) ||
-    vc.issuer?.match(/did:key:z([0-9a-f]{64})/i);
-
-  if (match) {
-    issuerPubKeyHex = match[1];
-  } else {
-    try {
-      issuerPubKeyHex = getPublicKeyHex();
-    } catch {
-      return { valid: false, error: "Unable to resolve issuer public key" };
-    }
+  try {
+    issuerPubKeyHex = resolvePinnedIssuerKey(vc.issuer, vc.proof.verificationMethod);
+  } catch {
+    return { valid: false, error: "Unable to resolve a pinned Passport issuer key" };
   }
 
   try {

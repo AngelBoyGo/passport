@@ -4,6 +4,7 @@ import { bytesToHex, hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
 import "@/lib/receipt/crypto";
 import { canonicalJson, sha256Hex } from "@/lib/receipt/canonical";
 import { getPublicKeyHex } from "@/lib/receipt/signer";
+import { getKeyTransparencyLog } from "@/lib/transparency/key-log";
 import { prisma } from "@/lib/db";
 
 export interface SignedCheckpoint {
@@ -121,13 +122,44 @@ export async function verifyReceiptCheckpoint(
     return false;
   }
 
-  const pubKeyHex = publicKeyHex ?? checkpoint.public_key ?? getPublicKeyHex();
+  // SECURITY (C2): verification must use a PINNED key (operator-supplied or the
+  // published transparency-log key). Never trust the checkpoint's own
+  // `public_key` field — an attacker could fabricate a self-signed checkpoint.
+  const pubKeyHex =
+    publicKeyHex ?? checkpoint.public_key ?? undefined;
+
+  let verifyKey: string | undefined = pubKeyHex;
+  if (!verifyKey || !isPinnedKey(verifyKey)) {
+    // If caller didn't pin, fall back to the active transparency-log key only.
+    try {
+      const log = getKeyTransparencyLog();
+      const active = log.entries.find((e) => e.status === "active");
+      verifyKey = active?.public_key;
+    } catch {
+      verifyKey = undefined;
+    }
+  }
+  if (!verifyKey) {
+    return false;
+  }
+
   try {
+    if (!verifyKey) return false;
     return await verify(
       hexToBytes(checkpoint.signature),
       utf8ToBytes(checkpoint.content_hash),
-      hexToBytes(pubKeyHex)
+      hexToBytes(verifyKey)
     );
+  } catch {
+    return false;
+  }
+}
+
+/** True when the key appears in Passport's published transparency log. */
+function isPinnedKey(pubKeyHex: string): boolean {
+  try {
+    const log = getKeyTransparencyLog();
+    return log.entries.some((e) => e.public_key.toLowerCase() === pubKeyHex.toLowerCase());
   } catch {
     return false;
   }

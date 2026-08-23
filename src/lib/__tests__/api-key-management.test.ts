@@ -94,7 +94,7 @@ describe("POST /api/v1/operator/api-keys", () => {
     const body = await response.json();
     expect(body.rawKey).toBe("pp_new_raw_key_abc123");
     expect(body.name).toBe("test-key");
-    expect(createApiKeyMock).toHaveBeenCalledWith("op_test_cuid", "test-key");
+    expect(createApiKeyMock).toHaveBeenCalledWith("op_test_cuid", "test-key", "ISSUER");
   });
 
   it("creates key without name", async () => {

@@ -11,35 +11,44 @@ type JsonRpcRequest = {
   params?: Record<string, unknown>;
 };
 
+function jsonRpcError(id: string | number | null, code: number, message: string, status = 400) {
+  return NextResponse.json({ jsonrpc: "2.0", id: id ?? null, error: { code, message } }, { status });
+}
+
 /**
  * A2A (Agent2Agent) Protocol Endpoint
  * Implements JSON-RPC 2.0 task delegation over HTTP(S).
  *
+ * SECURITY (C3): every mutating + disclosure method now REQUIRES a valid Bearer
+ * API key. Previously tasks/send, tasks/get, and tasks/cancel were completely
+ * unauthenticated — anyone could create fake escrow engagements, cancel other
+ * operators' engagements, or read delivery proof / receipt ids.
+ *
  * Supported methods:
- * - `tasks/send`: Delegate a task to an agent (creates a Passport engagement with escrow)
- * - `tasks/get`: Get task status and delivery proof
- * - `tasks/cancel`: Cancel a task and unlock escrow
- * - `tasks/list`: List tasks for a worker or hirer
+ * - `tasks/send`: Delegate a task to an agent (creates a Passport engagement)
+ * - `tasks/get`: Get task status and delivery proof (requires key)
+ * - `tasks/cancel`: Cancel a task (requires key; caller must be hirer or worker)
+ * - `tasks/list`: List tasks for a worker or hirer (requires key)
  */
 export async function POST(request: NextRequest) {
   let body: JsonRpcRequest;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json(
-      { jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error" } },
-      { status: 400 }
-    );
+    return jsonRpcError(null, -32700, "Parse error");
   }
 
   if (body.jsonrpc !== "2.0" || !body.method || body.id === undefined) {
-    return NextResponse.json(
-      { jsonrpc: "2.0", id: body.id ?? null, error: { code: -32600, message: "Invalid Request" } },
-      { status: 400 }
-    );
+    return jsonRpcError(body.id ?? null, -32600, "Invalid Request");
   }
 
   const { method, params = {}, id } = body;
+
+  // Authenticate up front: all supported methods require a valid key.
+  const operator = await authenticateApiKey(request.headers.get("authorization"));
+  if (!operator) {
+    return jsonRpcError(id, -32001, "Unauthorized: a valid Bearer API key is required", 401);
+  }
 
   try {
     switch (method) {
@@ -50,11 +59,10 @@ export async function POST(request: NextRequest) {
         const amount = Number(params.amount || 0);
 
         if (!hirerCommitment || !workerCommitment) {
-          return NextResponse.json({
-            jsonrpc: "2.0",
-            id,
-            error: { code: -32602, message: "Invalid params: hirer_commitment and worker_commitment required" },
-          });
+          return jsonRpcError(id, -32602, "Invalid params: hirer_commitment and worker_commitment required");
+        }
+        if (!Number.isFinite(amount) || amount < 0) {
+          return jsonRpcError(id, -32602, "Invalid params: amount must be a non-negative number");
         }
 
         const engagement = await prisma.engagement.create({
@@ -84,20 +92,12 @@ export async function POST(request: NextRequest) {
       case "tasks/get": {
         const taskId = String(params.task_id || "");
         if (!taskId) {
-          return NextResponse.json({
-            jsonrpc: "2.0",
-            id,
-            error: { code: -32602, message: "Invalid params: task_id required" },
-          });
+          return jsonRpcError(id, -32602, "Invalid params: task_id required");
         }
 
         const engagement = await prisma.engagement.findUnique({ where: { taskId } });
         if (!engagement) {
-          return NextResponse.json({
-            jsonrpc: "2.0",
-            id,
-            error: { code: -32004, message: "Task not found" },
-          });
+          return jsonRpcError(id, -32004, "Task not found");
         }
 
         return NextResponse.json({
@@ -118,11 +118,18 @@ export async function POST(request: NextRequest) {
         const taskId = String(params.task_id || "");
         const engagement = await prisma.engagement.findUnique({ where: { taskId } });
         if (!engagement) {
-          return NextResponse.json({
-            jsonrpc: "2.0",
-            id,
-            error: { code: -32004, message: "Task not found" },
-          });
+          return jsonRpcError(id, -32004, "Task not found");
+        }
+
+        // Authorization (C3): only the hirer or worker of the task may cancel it.
+        if (
+          operator.id &&
+          !(
+            engagement.hirerCommitment.includes(operator.id) ||
+            engagement.workerCommitment.includes(operator.id)
+          )
+        ) {
+          return jsonRpcError(id, -32003, "Forbidden: only the hirer or worker may cancel this task", 403);
         }
 
         const updated = await prisma.engagement.update({
@@ -137,18 +144,24 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      default:
-        return NextResponse.json({
-          jsonrpc: "2.0",
-          id,
-          error: { code: -32601, message: `Method not found: ${method}` },
+      case "tasks/list": {
+        const commitment = String(params.commitment || "");
+        if (!commitment) {
+          return jsonRpcError(id, -32602, "Invalid params: commitment required");
+        }
+        const tasks = await prisma.engagement.findMany({
+          where: { OR: [{ hirerCommitment: commitment }, { workerCommitment: commitment }] },
+          orderBy: { updatedAt: "desc" },
+          take: 50,
+          select: { taskId: true, status: true, amount: true, updatedAt: true },
         });
+        return NextResponse.json({ jsonrpc: "2.0", id, result: { tasks } });
+      }
+
+      default:
+        return jsonRpcError(id, -32601, `Method not found: ${method}`);
     }
   } catch (err) {
-    return NextResponse.json({
-      jsonrpc: "2.0",
-      id,
-      error: { code: -32603, message: err instanceof Error ? err.message : "Internal error" },
-    });
+    return jsonRpcError(id, -32603, err instanceof Error ? err.message : "Internal error");
   }
 }

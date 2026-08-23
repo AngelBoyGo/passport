@@ -1,6 +1,25 @@
 # Recursive loop tracker — Passport + HostHub FFD
 
-Last updated: **2026-08-21** (Loop 30 Agentic Payments + Zero-Manual Auto-Onboard, DC Documentation & Security Hardening Sweep — 131 test files, 763 tests green)
+Last updated: **2026-08-21** (Loop 31 Security Patch Batch from 3-way Audit — 121 test files, 739 tests green)
+
+---
+
+## Loop 31: Critical-Security Patch Batch (from parallel security/protocol/UX audits)
+
+| Finding | Severity | Patch | Status |
+|---|---|---|---|
+| C1 — VC verifier trusted attacker-supplied key (VC forgery) | CRITICAL | Pin issuer keys to transparency log in `portable-reputation.ts` + `datacenter-service.ts` | Fixed + regression test |
+| C2 — Checkpoint verifier accepted embedded attacker key | CRITICAL | Require pinned/transparency-log key, never `checkpoint.public_key` fallback | Fixed + regression test |
+| C3 — A2A tasks unauthenticated (create/cancel/get) | CRITICAL | Mandatory Bearer key; cancel restricted to hirer/worker | Fixed + test |
+| C4 — API-key role inferred from self-declared prefix | CRITICAL | Persist `ApiKey.role` column; HOLDER cannot mint ISSUER | Fixed |
+| H7 — Credit double-spend race | HIGH | Atomic `updateMany({ where credits gte })` in `decrementCredits` | Fixed |
+| H9 — SSRF mapped-IPv6/trailing-dot bypass | HIGH | `::ffff:` decode + trailing-dot normalization | Fixed + tests |
+| H10 — Datacenter receipts fail public verify (operator_id) | HIGH | Sign with public `op_cus_...` like canonical path | Fixed |
+| H11 — Admin overview leaks global data to any user | HIGH | Non-exec scoped to own operator | Fixed |
+| H12 — Evidence GET cross-tenant unmasked read | HIGH | Require owned `Agent` row | Fixed + test |
+| H6 — Autonomous free-credit farming (PoW 3, 100 credits) | HIGH | PoW difficulty 6 (env-tunable), credits capped at 10 | Fixed + tests |
+| M3 — Audit package wrong signing convention | MEDIUM | Sign `utf8ToBytes(hex)` to match all other signers | Fixed + test |
+| H16 — Welcome copy false + dead anchors | MEDIUM | Correct copy + link to /enroll + /docs/integrations | Fixed |
 
 ---
 

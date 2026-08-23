@@ -20,6 +20,36 @@ export async function GET(request: NextRequest) {
   const executiveAdmin = isExecutiveAdmin(operator);
 
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+  // NON-EXEC (H11): any session user must only see their OWN operator-scoped
+  // data — never global enrollment/evidence/engagement counts, recent
+  // cross-tenant evidence, or infrastructure health flags.
+  if (!executiveAdmin) {
+    const [scopedReceipts, scopedReceiptsToday, slashing, recentReceipts] = await Promise.all([
+      prisma.receipt.count({ where: { operatorId: operator.id } }),
+      prisma.receipt.count({ where: { operatorId: operator.id, issuedAt: { gte: since } } }),
+      prisma.slashingLedger.aggregate({ where: { operatorId: operator.id }, _sum: { penaltyCents: true }, _count: true }),
+      prisma.receipt.findMany({ where: { operatorId: operator.id }, orderBy: { issuedAt: "desc" }, take: 8, select: { receiptId: true, status: true, receiptType: true, issuedAt: true, agentId: true } }),
+    ]);
+    return NextResponse.json(
+      {
+        generatedAt: new Date().toISOString(),
+        executiveAdmin: false,
+        operator: { email: operator.email, tier: operator.tier, credits: operator.credits, accountStatus: operator.accountStatus, stakeBalanceCents: operator.stakeBalanceCents },
+        metrics: {
+          receipts: scopedReceipts,
+          receiptsToday: scopedReceiptsToday,
+          issuedAgents: null,
+          evidence: null,
+          engagements: null,
+          slashingEvents: slashing._count,
+          slashedCents: slashing._sum.penaltyCents ?? 0,
+        },
+      },
+      { headers: NO_STORE }
+    );
+  }
+
   const [receipts, receiptsToday, enrollments, evidence, engagements, slashing, recentReceipts, recentEvidence, recentEngagements] = await Promise.all([
     prisma.receipt.count({ where: { operatorId: operator.id } }),
     prisma.receipt.count({ where: { operatorId: operator.id, issuedAt: { gte: since } } }),
