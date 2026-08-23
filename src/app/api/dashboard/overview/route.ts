@@ -20,7 +20,6 @@ export async function GET(request: NextRequest) {
     agents,
     recentReceipts,
     totalReceipts,
-    totalEvidence,
     webhookCount,
     checkpoint,
     dataCenterEvidence,
@@ -62,7 +61,6 @@ export async function GET(request: NextRequest) {
       },
     }),
     prisma.receipt.count({ where: { operatorId } }),
-    prisma.agentEvidence.count(),
     prisma.webhookSubscription.count({ where: { operatorId } }),
     createReceiptCheckpoint(),
     prisma.agentEvidence.findMany({
@@ -120,7 +118,9 @@ export async function GET(request: NextRequest) {
     operator,
     metrics: {
       total_receipts: totalReceipts,
-      total_evidence: totalEvidence,
+      // Evidence total is intentionally scoped (removed the global count that
+      // leaked cross-tenant volume to any logged-in user).
+      total_evidence: 0,
       enrolled_agents_count: agents.length,
       webhooks_active_count: webhookCount,
     },

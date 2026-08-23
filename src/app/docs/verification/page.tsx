@@ -156,6 +156,16 @@ export default function DocsVerification() {
             and a 5-second per-attempt timeout; a delivery that still fails is marked{" "}
             <code className="px-1 font-mono text-xs">deadLetter: true</code>.
           </p>
+          <p>
+            <strong>Receiver verification kit:</strong> recompute{" "}
+            <code className="px-1 font-mono text-xs">sha256-hex(bodyBytes + secret)</code> over the{" "}
+            <em>exact serialized bytes</em> you received (do not re-stringify), compare constant-time against{" "}
+            <code className="px-1 font-mono text-xs">X-Passport-Signature</code>, and enforce the{" "}
+            <code className="px-1 font-mono text-xs">timestamp</code> is within ~5 minutes to block replays.
+            Passport ships <code className="px-1 font-mono text-xs">verifyWebhookSignature</code> (constant-time +
+            optional freshness) in <code className="px-1 font-mono text-xs">src/lib/webhooks/webhook-service.ts</code>.
+            Reference guide: <code className="px-1 font-mono text-xs">GET /api/v1/webhooks/verify-guide</code>.
+          </p>
         </div>
       </Section>
 

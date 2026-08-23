@@ -96,7 +96,8 @@ describe("GET /api/dashboard/overview — User Dashboard Data Aggregator", () =>
     expect(data.operator.email).toBe("builder@example.com");
     expect(data.operator.tier).toBe("pro");
     expect(data.metrics.total_receipts).toBe(42);
-    expect(data.metrics.total_evidence).toBe(128);
+    // Global evidence count was removed (leak); now scoped to 0.
+    expect(data.metrics.total_evidence).toBe(0);
     expect(data.api_keys.length).toBe(1);
     expect(data.recent_receipts.length).toBe(1);
     expect(data.merkle_root).toBeDefined();

@@ -37,22 +37,25 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  const canTransfer = await assertCanTransferFrom(
-    operator.id,
-    parsed.data.from_commitment,
-    isExecutiveAdmin(operator)
-  );
-  if (!canTransfer) {
-    return NextResponse.json(
-      { error: "Forbidden: source commitment is not owned by the authenticated operator" },
-      { status: 403 }
-    );
-  }
-
   try {
-    // Claim ownership on the sender's account if it does not yet exist (the
-    // operator is effectively the creator/steward of the source commitment).
+    // H5 fix: claim ownership FIRST so a fresh/legacy (null-owner) account is
+    // bound to the calling operator before the ownership gate runs. Without
+    // this, a legitimate first-time sender could never transfer (the old order
+    // gated before claiming, making peer transfers effectively dead).
     await getOrCreateAccount(parsed.data.from_commitment, operator.id);
+
+    const canTransfer = await assertCanTransferFrom(
+      operator.id,
+      parsed.data.from_commitment,
+      isExecutiveAdmin(operator)
+    );
+    if (!canTransfer) {
+      return NextResponse.json(
+        { error: "Forbidden: source commitment is not owned by the authenticated operator" },
+        { status: 403 }
+      );
+    }
+
     const result = await transferCredits(
       parsed.data.from_commitment,
       parsed.data.to_commitment,

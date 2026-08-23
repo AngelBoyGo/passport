@@ -1,6 +1,22 @@
 # Recursive loop tracker — Passport + HostHub FFD
 
-Last updated: **2026-08-21** (Loop 33 Deferred-Items Closure — 122 test files, 746 tests green)
+Last updated: **2026-08-21** (Loop 34 Re-Audit Validation + Capability/Receiver-Kit TDD — 123 test files, 755 tests green)
+
+---
+
+## Loop 34: Fresh Re-Audit Fixes + Governance UI + Receiver Kit
+
+| Item | Severity | Patch | Status |
+|---|---|---|---|
+| Re-audit F1 — AngelCoin ownership gate blocked legit peer transfers | HIGH | Claim (bind owner) BEFORE gate; allow null-owner legacy accounts; only block foreign-owner | Fixed + tests |
+| Re-audit F4 — metering non-atomic + duplicate ledger rows | HIGH | `meterAttestation` now uses atomic `decrementCredits` in-tx; ledger written once with returned meter_ref | Fixed + tests |
+| Re-audit F2/3 — fabricated transparency log + false in-memory checkpoint chain | MED | Documented + removed false auto-chain (explicit `previousCheckpointHash` only) | Fixed |
+| Re-audit F6 — body-limit fallback buffered unbounded | LOW | Noted (stream path is sound); left as future hardening | Documented |
+| Re-audit F7 — legacy pp_usr_ keys default to ISSUER on backfill | INFO | Flagged (needs migration for pre-column DBs) | Documented |
+| Governance snapshot endpoint + dashboard Wallet & Access panel | NEW | `GET /api/v1/passport/agents/:id/governance` composes wallet/live/access/journal; dashboard panel auto-loads | Complete + 3 tests |
+| admin/proxy removed (honest 410) | NEW | Removed misleading stub; returns 410 AD-MIN PROXY REMOVED | Complete |
+| Receiver verification kit | NEW | `verifyWebhookSignature` (constant-time + freshness) + `GET /api/v1/webhooks/verify-guide` + docs snippet | Complete + 4 tests |
+| Dashboard overview global-evidence leak | MED | Removed unscoped `agentEvidence.count()` | Fixed + test |
 
 ---
 

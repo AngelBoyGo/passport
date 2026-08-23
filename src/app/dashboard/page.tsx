@@ -64,6 +64,9 @@ export default function UserDashboard() {
   const [complianceFramework, setComplianceFramework] = useState("EU_AI_ACT");
   const [exportingVC, setExportingVC] = useState(false);
   const [vcModalData, setVcModalData] = useState<any | null>(null);
+  const [governance, setGovernance] = useState<any | null>(null);
+  const [governanceAgent, setGovernanceAgent] = useState<string | null>(null);
+  const [governanceLoading, setGovernanceLoading] = useState(false);
 
   const loadDashboard = useCallback(async () => {
     try {
@@ -93,6 +96,17 @@ export default function UserDashboard() {
   useEffect(() => {
     loadDashboard();
   }, [loadDashboard]);
+
+  // Auto-load the first agent's governance snapshot (wallet/access/live) once
+  // the overview data arrives and an agent commitment is present.
+  useEffect(() => {
+    const firstAgent = data?.agents?.[0];
+    const commitment = firstAgent?.agentId;
+    if (commitment && /^[0-9a-f]{64}$/i.test(commitment) && !governanceAgent) {
+      loadGovernance(commitment);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
 
   async function handleLogout() {
     try {
@@ -124,6 +138,25 @@ export default function UserDashboard() {
       setCreatingKey(false);
     }
   }
+
+  const loadGovernance = useCallback(async (commitment: string) => {
+    try {
+      setGovernanceLoading(true);
+      const res = await fetch(`/api/v1/passport/agents/${commitment}/governance`, {
+        cache: "no-store",
+      });
+      if (res.ok) {
+        setGovernance(await res.json());
+        setGovernanceAgent(commitment);
+      } else {
+        setGovernance(null);
+      }
+    } catch {
+      setGovernance(null);
+    } finally {
+      setGovernanceLoading(false);
+    }
+  }, []);
 
   const copyText = (text: string, label: string) => {
     if (typeof navigator !== "undefined") {
@@ -401,6 +434,73 @@ export default function UserDashboard() {
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Agent Wallet & Access Control panel (from governance endpoint) */}
+        {governanceAgent && (
+          <div className="rounded-xl border border-purple-500/30 bg-purple-950/20 p-6 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-purple-900/60 pb-4">
+              <div>
+                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <span>👛</span> Agent Wallet & Access Control
+                </h2>
+                <p className="text-xs text-slate-300 font-mono">commitment {governanceAgent.slice(0, 12)}…</p>
+              </div>
+              <button
+                onClick={() => loadGovernance(governanceAgent)}
+                disabled={governanceLoading}
+                className="rounded-lg border border-purple-700/50 bg-slate-900 px-3 py-1.5 text-xs font-medium text-purple-200 hover:bg-slate-800 transition"
+              >
+                {governanceLoading ? "Refreshing…" : "Refresh"}
+              </button>
+            </div>
+
+            {governance ? (
+              <div className="grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-lg bg-slate-900 border border-slate-800 p-4">
+                  <span className="text-[10px] font-semibold uppercase text-slate-400">Available Credits</span>
+                  <p className="mt-1 text-2xl font-bold text-purple-300">{governance.wallet?.credits ?? 0}</p>
+                  <p className="mt-0.5 text-slate-400">granted {governance.wallet?.granted ?? 0} · spent {governance.wallet?.spent ?? 0}</p>
+                </div>
+                <div className="rounded-lg bg-slate-900 border border-slate-800 p-4">
+                  <span className="text-[10px] font-semibold uppercase text-slate-400">Access Tier</span>
+                  <p className="mt-1 text-2xl font-bold text-white">{governance.access_tier ?? "—"}</p>
+                  <p className="mt-0.5 text-slate-400">live status: {governance.live_status?.statusLabel ?? "—"}</p>
+                </div>
+                <div className="rounded-lg bg-slate-900 border border-slate-800 p-4">
+                  <span className="text-[10px] font-semibold uppercase text-slate-400">Admin Override</span>
+                  <p className="mt-1 text-2xl font-bold text-sky-300">{governance.access_override ?? "None"}</p>
+                  <p className="mt-0.5 text-slate-400">evaluated deterministically from balance</p>
+                </div>
+                <div className="rounded-lg bg-slate-900 border border-slate-800 p-4">
+                  <span className="text-[10px] font-semibold uppercase text-slate-400">Locked Balance</span>
+                  <p className="mt-1 text-2xl font-bold text-amber-300">{governance.wallet?.locked ?? 0}</p>
+                  <p className="mt-0.5 text-slate-400">escrow / SLA commitments</p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400">
+                No AngelCoin account or journal found for this agent. Credits are minted on first activity.
+              </p>
+            )}
+
+            {governance?.recent_journal?.length > 0 && (
+              <div className="rounded-lg bg-slate-950 border border-slate-800 p-3">
+                <p className="text-[10px] font-semibold uppercase text-slate-400 mb-2">Recent Credit Journal</p>
+                <div className="space-y-1">
+                  {governance.recent_journal.map((entry: any) => (
+                    <div key={entry.id} className="flex items-center justify-between text-[11px] font-mono">
+                      <span className="text-slate-300">{entry.entry_type}</span>
+                      <span className={entry.amount >= 0 ? "text-emerald-400" : "text-rose-400"}>
+                        {entry.amount >= 0 ? "+" : ""}{entry.amount}
+                      </span>
+                      <span className="text-slate-500">{new Date(entry.created_at).toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

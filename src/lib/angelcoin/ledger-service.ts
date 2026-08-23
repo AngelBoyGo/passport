@@ -106,9 +106,12 @@ export async function assertCanTransferFrom(
     where: { subjectCommitment: fromCommitment },
     select: { ownerOperatorId: true },
   });
-  if (!account) return false; // can't send from an account that doesn't exist
+  // Legit path: the route claims ownership (binding ownerOperatorId) before
+  // this gate, so an account will exist owned by the operator. Allow null-owner
+  // (legacy/first-touch backfill) so peer transfers aren't dead; only block
+  // when a DIFFERENT operator already owns it.
+  if (!account) return true; // no existing claim → route will bind it
   if (account.ownerOperatorId && account.ownerOperatorId !== operatorId) return false;
-  if (!account.ownerOperatorId) return false;
   return true;
 }
 

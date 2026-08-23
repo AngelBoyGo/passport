@@ -360,6 +360,19 @@ export async function GET(request: NextRequest) {
           responses: { "200": { description: "Documentation manifest" } },
         },
       },
+      "/api/v1/passport/agents/{id}/governance": {
+        get: {
+          summary: "Composed agent wallet + live status + access tier + recent credit journal (dashboard)",
+          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "Governance snapshot" }, "404": { description: "No account/journal" } },
+        },
+      },
+      "/api/v1/webhooks/verify-guide": {
+        get: {
+          summary: "Receiver verification reference — algorithm + example for verifying webhook signatures/timestamps",
+          responses: { "200": { description: "Verification guide" } },
+        },
+      },
     },
   };
 

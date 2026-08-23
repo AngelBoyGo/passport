@@ -14,6 +14,7 @@ import {
   dispatchWebhook,
   computeWebhookSignature,
   deliverWebhookWithRetry,
+  verifyWebhookSignature,
 } from "@/lib/webhooks/webhook-service";
 
 describe("Webhook Queue & Retry Engine", () => {
@@ -30,6 +31,38 @@ describe("Webhook Queue & Retry Engine", () => {
 
       expect(sig1).toBe(sig2);
       expect(sig1).toMatch(/^[0-9a-f]{64}$/);
+    });
+  });
+
+  describe("verifyWebhookSignature (receiver kit)", () => {
+    const secret = "whsec_receiver_1";
+    it("accepts a genuine signature", () => {
+      const payload = { event: "reputation.degraded", data: { a: 1 }, timestamp: new Date().toISOString() };
+      const sig = computeWebhookSignature(payload, secret);
+      const result = verifyWebhookSignature({ payload, signature: sig, secret, maxAgeMs: 60_000 });
+      expect(result.valid).toBe(true);
+    });
+
+    it("rejects a tampered signature (constant-time compare)", () => {
+      const payload = { event: "reputation.degraded", data: { a: 1 } };
+      const result = verifyWebhookSignature({ payload, signature: "f".repeat(64), secret });
+      expect(result.valid).toBe(false);
+      expect(result.error).toMatch(/mismatch/i);
+    });
+
+    it("rejects a payload outside the freshness window", () => {
+      const payload = { event: "reputation.degraded", timestamp: new Date(Date.now() - 600_000).toISOString() };
+      const sig = computeWebhookSignature(payload, secret);
+      const result = verifyWebhookSignature({ payload, signature: sig, secret, maxAgeMs: 60_000 });
+      expect(result.valid).toBe(false);
+      expect(result.error).toMatch(/freshness/i);
+    });
+
+    it("accepts a signature without a freshness window", () => {
+      const payload = { event: "evidence.anchored", data: { id: "x" } };
+      const sig = computeWebhookSignature(payload, secret);
+      const result = verifyWebhookSignature({ payload, signature: sig, secret });
+      expect(result.valid).toBe(true);
     });
   });
 

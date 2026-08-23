@@ -80,10 +80,12 @@ export async function createReceiptCheckpoint(options?: {
   const timestamp = new Date().toISOString();
   const publicKey = getPublicKeyHex();
 
-  // H3: chain headers on successive checkpoints so the "append-only" claim is
-  // structurally real (previous_checkpoint_hash). Within a process we remember
-  // the last checkpoint; callers may also pass it explicitly.
-  const previousHash = options?.previousCheckpointHash ?? lastCheckpointContentHash ?? null;
+  // H3: chain on EXPLICITLY supplied previous checkpoint hash only. We do NOT
+  // auto-chain from in-process memory: a module-level cache would fabricate
+  // unrelated links across endpoints/instances and break the reproducibility
+  // an auditor relies on. Callers that want a real append-only chain must pass
+  // the previous checkpoint hash (e.g. from a persisted checkpoint store).
+  const previousHash = options?.previousCheckpointHash ?? null;
 
   const unsigned = {
     checkpoint_id: checkpointId,
@@ -104,16 +106,14 @@ export async function createReceiptCheckpoint(options?: {
     algorithm: "ed25519",
     public_key: publicKey,
   };
-  lastCheckpointContentHash = contentHash;
   return checkpoint;
 }
 
-/** In-process memory of the last checkpoint hash so headers chain (H3). */
-let lastCheckpointContentHash: string | null = null;
-
-export function resetCheckpointChain(): void {
-  lastCheckpointContentHash = null;
-}
+/**
+ * DEPRECATED: retained as a no-op for API-compat. Chaining is now explicit only
+ * (callers pass previousCheckpointHash); no in-process chain state exists.
+ */
+export function resetCheckpointChain(): void {}
 
 /**
  * Validates a Merkle checkpoint's signature and canonical hash offline.

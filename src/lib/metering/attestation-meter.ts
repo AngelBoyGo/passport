@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/db";
 import { decrementCredits } from "@/lib/operator";
-import { recordCapabilityEvent } from "@/lib/operator";
 import { getPublicKeyHex } from "@/lib/receipt/signer";
 
 /**
@@ -88,22 +87,21 @@ export async function meterAttestation(
   // UP to at least 1 whole credit so DB integrity is never violated.
   const creditsNeeded = Math.max(1, Math.ceil(microsToCredits(price.price_micros)));
 
+  const meterRef = `meter_${crypto.randomUUID().replace(/-/g, "").slice(0, 16)}`;
   let result: { allowed: boolean; reason?: string } = { allowed: false };
 
+  // H7/F4 fix: use the ATOMIC `decrementCredits` (updateMany WHERE credits >= n)
+  // inside the transaction so concurrent metered charges cannot overspend below
+  // zero, and write the ledger entry ONCE with the returned meter_ref.
   await prisma.$transaction(async (tx) => {
-    const available = await tx.operator.findUnique({
-      where: { id: operatorId },
-      select: { credits: true },
-    });
-    const credits = available?.credits ?? 0;
-    if (credits < creditsNeeded) {
+    const debited = await decrementCredits(operatorId, creditsNeeded, tx);
+    if (!debited) {
       result = {
         allowed: false,
-        reason: `Insufficient credits: need ${creditsNeeded}, have ${credits}`,
+        reason: "Insufficient credits",
       };
       return;
     }
-    const meterRef = `meter_${crypto.randomUUID().replace(/-/g, "").slice(0, 16)}`;
     await tx.capabilityLedgerEntry.create({
       data: {
         operatorId,
@@ -115,10 +113,6 @@ export async function meterAttestation(
           product,
         }),
       },
-    });
-    await tx.operator.update({
-      where: { id: operatorId },
-      data: { credits: { decrement: creditsNeeded } },
     });
     result = { allowed: true };
   });
@@ -134,14 +128,6 @@ export async function meterAttestation(
   }
 
   const remaining = await getOperatorCreditBalance(operatorId);
-  const meterRef = `meter_${crypto.randomUUID().replace(/-/g, "").slice(0, 16)}`;
-  await recordCapabilityEvent(
-    operatorId,
-    `meter:${product}`,
-    subjectCommitment,
-    undefined,
-    JSON.stringify({ meter_ref: meterRef, price_micros: price.price_micros, product })
-  ).catch(() => {});
 
   return {
     allowed: true,

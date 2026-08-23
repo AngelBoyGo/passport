@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 import { validateWebhookUrl } from "@/lib/security/ssrf";
+import { timingSafeEqual } from "node:crypto";
 
 export type WebhookEvent =
   | "evidence.anchored"
@@ -36,6 +37,38 @@ export function computeWebhookSignature(
 ): string {
   const jsonStr = typeof payload === "string" ? payload : JSON.stringify(payload);
   return bytesToHex(sha256(utf8ToBytes(jsonStr + secret)));
+}
+
+/**
+ * Verifies a webhook payload against the delivered signature using the
+ * subscription secret. Constant-time comparison; optionally enforces a
+ * delivery freshness window on the body's `timestamp` field.
+ */
+export function verifyWebhookSignature(opts: {
+  payload: unknown;
+  signature: string;
+  secret: string;
+  maxAgeMs?: number;
+}): { valid: boolean; error?: string } {
+  const expected = computeWebhookSignature(opts.payload, opts.secret);
+  const expectedBuf = Buffer.from(expected, "hex");
+  const receivedBuf = Buffer.from(opts.signature, "hex");
+  if (expectedBuf.length !== receivedBuf.length) {
+    return { valid: false, error: "Signature length mismatch" };
+  }
+  if (!timingSafeEqual(expectedBuf, receivedBuf)) {
+    return { valid: false, error: "Signature mismatch" };
+  }
+  if (opts.maxAgeMs) {
+    const body = opts.payload as { timestamp?: string };
+    if (body?.timestamp) {
+      const age = Date.now() - new Date(body.timestamp).getTime();
+      if (!Number.isFinite(age) || age < 0 || age > opts.maxAgeMs) {
+        return { valid: false, error: "Payload timestamp outside freshness window" };
+      }
+    }
+  }
+  return { valid: true };
 }
 
 /**

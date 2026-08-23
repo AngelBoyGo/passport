@@ -61,21 +61,23 @@ describe("Reputation-as-a-Service Metering (2.7)", () => {
     expect(result.allowed).toBe(true);
     expect(result.price_micros).toBe(500_000);
     expect(result.credits_charged).toBe(1); // fractional prices round UP to 1 whole credit
-    expect(prismaMock.operator.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ credits: { decrement: 1 } }) })
-    );
+    expect(decrementCredits).toHaveBeenCalled();
     expect(prismaMock.capabilityLedgerEntry.create).toHaveBeenCalled();
+    // ledger entry written ONCE with the returned meter_ref (F4 fix)
+    const written = prismaMock.capabilityLedgerEntry.create.mock.calls[0][0].data.metadata;
+    expect(JSON.parse(written).meter_ref).toBe(result.meter_ref);
+    expect(prismaMock.capabilityLedgerEntry.create).toHaveBeenCalledTimes(1);
   });
 
-  it("refuses when the operator has insufficient credit balance", async () => {
-    prismaMock.operator.findUnique.mockResolvedValue({ credits: 0 });
+  it("refuses when the operator has insufficient credit balance (atomic gate)", async () => {
+    decrementCredits.mockResolvedValueOnce(false);
 
     const result = await meterAttestation("op_1", "audit_package_generation");
 
     expect(result.allowed).toBe(false);
     expect(result.reason).toMatch(/Insufficient credits/i);
     expect(result.credits_charged).toBe(0);
-    expect(prismaMock.operator.update).not.toHaveBeenCalled();
+    expect(prismaMock.capabilityLedgerEntry.create).not.toHaveBeenCalled();
   });
 
   it("reports the current credit balance", async () => {
