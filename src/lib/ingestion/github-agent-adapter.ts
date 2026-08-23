@@ -870,6 +870,27 @@ export async function persistEvidence(
   records: MaskedAgentEvidence[]
 ): Promise<void> {
   for (const record of records) {
+    // L1: salt-rotation-safe semantic dedup. exact eventCommitmentHash the upsert
+    // below already catches. This pre-check also blocks near-duplicates whose
+    // commitment differs because they were computed under the PREVIOUS salt
+    // (INGESTION_COMMITMENT_SALT_PREVIOUS rotation) — same identity + type +
+    // source + observedAt window means skip.
+    const skip = await prisma.agentEvidence.findFirst({
+      where: {
+        agentIdentityCommitment: record.agentIdentityCommitment,
+        sourceType: record.sourceType,
+        normalizedEventType: record.normalizedEventType,
+        observedAt: {
+          gte: new Date(record.observedAt.getTime() - 1000),
+          lte: new Date(record.observedAt.getTime() + 1000),
+        },
+        ...(record.sourceUrl ? { sourceUrl: record.sourceUrl } : {}),
+        ...(record.commitSha ? { commitSha: record.commitSha } : {}),
+      },
+      select: { id: true },
+    });
+    if (skip) continue;
+
     await prisma.agentEvidence.upsert({
       where: { eventCommitmentHash: record.eventCommitmentHash },
       create: {

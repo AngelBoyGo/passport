@@ -14,7 +14,7 @@ vi.mock("@/lib/operator", async (importOriginal) => {
 const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
     agentEnrollment: { findUnique: vi.fn(), upsert: vi.fn() },
-    agentEvidence: { create: vi.fn(), findMany: vi.fn(), count: vi.fn() },
+    agentEvidence: { create: vi.fn(), findMany: vi.fn(), count: vi.fn(), findFirst: vi.fn() },
     receipt: { create: vi.fn(), findMany: vi.fn(), findUnique: vi.fn() },
     evidenceReceiptLink: { create: vi.fn() },
     operator: { findFirst: vi.fn(), findUnique: vi.fn() },

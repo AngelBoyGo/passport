@@ -6,6 +6,7 @@ const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
     operator: { findUnique: vi.fn(), update: vi.fn() },
     capabilityLedgerEntry: { findFirst: vi.fn(), create: vi.fn() },
+    externalSettlement: { create: vi.fn() },
     $transaction: vi.fn(async (fn: (tx: any) => Promise<void>) => fn(prismaMock)),
   },
 }));
@@ -143,9 +144,9 @@ describe("Agentic Payments (agent wallets, scoped spend, external rails)", () =>
     expect(result.new_balance).toBe(15);
   });
 
-  it("rejects a duplicate external settlement reference", async () => {
+  it("rejects a duplicate external settlement reference (unique constraint)", async () => {
     process.env.AGENTIC_PAY_RAIL_SECRET = "rail-secret";
-    prismaMock.capabilityLedgerEntry.findFirst.mockResolvedValue({ id: "existing" });
+    prismaMock.externalSettlement.create.mockRejectedValue({ code: "P2002" });
     const sig = railSignature("ref-dup", 5, "x402", "rail-secret");
     const result = await settleExternalRailPayment({
       operatorId: "op_1",

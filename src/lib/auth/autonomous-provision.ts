@@ -5,14 +5,6 @@ import { prisma } from "@/lib/db";
 import { hashApiKey } from "@/lib/operator";
 import { sha256Hex } from "@/lib/receipt/canonical";
 
-interface StoredChallenge {
-  nonce: string;
-  publicKeyHex: string;
-  expiresAt: number;
-  consumed: boolean;
-}
-
-const activeChallenges = new Map<string, StoredChallenge>();
 const CHALLENGE_TTL_MS = 120_000; // 2 minutes
 // H6 fix: raise difficulty so mass credit-farming is more costly per mint.
 // Default 6 (~17M hashes, seconds) in production; tests may lower it via env.
@@ -26,12 +18,11 @@ function resolvePoWDifficulty(): number {
 // an attacker can farm (operator must top up via formal grant/Stripe).
 const AUTONOMOUS_MINT_CREDITS = 10;
 
-function cleanupStaleChallenges() {
-  const now = Date.now();
-  for (const [nonce, item] of activeChallenges.entries()) {
-    if (item.expiresAt < now || item.consumed) {
-      activeChallenges.delete(nonce);
-    }
+async function cleanupStaleChallenges(): Promise<void> {
+  try {
+    await prisma.provisionChallenge.deleteMany({ where: { expiresAt: { lt: new Date() } } });
+  } catch {
+    // non-fatal
   }
 }
 
@@ -59,30 +50,34 @@ function resolveProvisionSalt(): string {
 
 /**
  * Generates an ephemeral cryptographic challenge with a lightweight Proof-of-Work requirement.
+ * Persisted in the DB (ProvisionChallenge) so any instance can verify/consume it — the
+ * in-memory Map approach was not safe across multi-instance deployments.
  */
-export function generateAutonomousChallenge(publicKeyHex: string): {
+export async function generateAutonomousChallenge(publicKeyHex: string): Promise<{
   challenge_nonce: string;
   pow_difficulty: number;
   expires_at: string;
-} {
-  cleanupStaleChallenges();
+}> {
+  await cleanupStaleChallenges().catch(() => {});
 
   const rawBytes = crypto.getRandomValues(new Uint8Array(32));
   const nonce = bytesToHex(rawBytes);
   const now = Date.now();
-  const expiresAt = now + CHALLENGE_TTL_MS;
+  const expiresAt = new Date(now + CHALLENGE_TTL_MS);
 
-  activeChallenges.set(nonce, {
-    nonce,
-    publicKeyHex: publicKeyHex.toLowerCase(),
-    expiresAt,
-    consumed: false,
+  await prisma.provisionChallenge.create({
+    data: {
+      nonce,
+      publicKeyHex: publicKeyHex.toLowerCase(),
+      expiresAt,
+      consumed: false,
+    },
   });
 
   return {
     challenge_nonce: nonce,
     pow_difficulty: resolvePoWDifficulty(),
-    expires_at: new Date(expiresAt).toISOString(),
+    expires_at: expiresAt.toISOString(),
   };
 }
 
@@ -146,25 +141,25 @@ export async function provisionAutonomousAgent(
   const { public_key, challenge_nonce, pow_nonce, signature, display_name, domain } = params;
   const pubKeyClean = public_key.toLowerCase().trim();
 
-  // 1. Check Nonce
-  const challenge = activeChallenges.get(challenge_nonce);
-  if (!challenge || challenge.consumed || challenge.expiresAt < Date.now()) {
+  // 1. Check Nonce (DB-backed, cross-instance safe) + atomically consume to
+  //    prevent replay even under concurrent requests.
+  const consumed = await prisma.provisionChallenge.updateMany({
+    where: {
+      nonce: challenge_nonce,
+      consumed: false,
+      expiresAt: { gte: new Date() },
+      publicKeyHex: pubKeyClean,
+    },
+    data: { consumed: true, consumedAt: new Date() },
+  });
+  if (consumed.count !== 1) {
     throw new Error("Challenge nonce has expired or already been consumed");
   }
 
-  // 2. Enforce Public Key Match
-  if (challenge.publicKeyHex !== pubKeyClean) {
-    throw new Error("Public key does not match the challenge initiation key");
-  }
-
-  // 3. Verify PoW
+  // 2. Verify PoW
   if (!verifyAutonomousPoW(challenge_nonce, pow_nonce)) {
     throw new Error("Invalid Proof-of-Work computation");
   }
-
-  // 4. Burn Nonce Immediately (Replay Attack Prevention)
-  challenge.consumed = true;
-  activeChallenges.delete(challenge_nonce);
 
   // 5. Verify Ed25519 Proof of Possession Signature over sha256(challenge_nonce + ":" + pow_nonce + ":" + public_key)
   const message = `${challenge_nonce}:${pow_nonce}:${pubKeyClean}`;

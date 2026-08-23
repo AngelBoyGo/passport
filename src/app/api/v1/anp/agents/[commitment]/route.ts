@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { isValidAgentCommitmentHash } from "@/lib/public-portal/portal-service";
+import { encodeDidKeyZ, encodeMultibaseEd25519 } from "@/lib/crypto/multibase";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,12 @@ export async function GET(
   }
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin;
-  const did = `did:key:z${enrollment.publicKey.slice(0, 32)}`;
+
+  // ANP fix: use proper did:key (multicodec ed25519) and W3C Multikey encodings,
+  // not the previous hex-prefix concatenation which was not valid multibase.
+  const didKeyValue = encodeDidKeyZ(enrollment.publicKey); // "z" + base58btc(0xed01||32-byte)
+  const did = `did:key:${didKeyValue}`;
+  const publicKeyMultibase = encodeMultibaseEd25519(enrollment.publicKey);
 
   const didDoc = {
     "@context": [
@@ -43,14 +49,14 @@ export async function GET(
     ],
     verificationMethod: [
       {
-        id: `${did}#${enrollment.publicKey.slice(0, 16)}`,
+        id: `${did}#key-1`,
         type: "Multikey",
         controller: did,
-        publicKeyMultibase: `z${enrollment.publicKey}`,
+        publicKeyMultibase,
       },
     ],
-    authentication: [`${did}#${enrollment.publicKey.slice(0, 16)}`],
-    assertionMethod: [`${did}#${enrollment.publicKey.slice(0, 16)}`],
+    authentication: [`${did}#key-1`],
+    assertionMethod: [`${did}#key-1`],
     service: [
       {
         id: `${did}#profile`,

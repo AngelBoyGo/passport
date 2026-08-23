@@ -210,8 +210,13 @@ describe("Protocol Integrations", () => {
       expect(res.status).toBe(200);
       const doc = await res.json();
       expect(doc["@context"]).toContain("https://www.w3.org/ns/did/v1");
-      expect(doc.id).toBe(`did:key:z${pubkey.slice(0, 32)}`);
-      expect(doc.verificationMethod[0].publicKeyMultibase).toBe(`z${pubkey}`);
+      // did:key + Multikey must be valid base58btc multibase (starts with 'z'),
+      // and the did must NOT the truncated hex scraps of the old buggy format.
+      expect(doc.id.startsWith("did:key:z")).toBe(true);
+      expect(doc.id.length).toBeGreaterThan(50);
+      expect(doc.verificationMethod[0].type).toBe("Multikey");
+      expect(doc.verificationMethod[0].publicKeyMultibase.startsWith("z")).toBe(true);
+      expect(doc.verificationMethod[0].publicKeyMultibase).not.toBe(`z${pubkey}`);
       expect(doc.service.some((s: { type: string }) => s.type === "PassportAgentProfile")).toBe(true);
     });
   });

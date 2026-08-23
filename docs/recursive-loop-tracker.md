@@ -1,6 +1,18 @@
 # Recursive loop tracker — Passport + HostHub FFD
 
-Last updated: **2026-08-21** (Loop 32 Security Patch Batch 2 — 121 test files, 741 tests green)
+Last updated: **2026-08-21** (Loop 33 Deferred-Items Closure — 122 test files, 746 tests green)
+
+---
+
+## Loop 33: Closure of Deferred Audit Items
+
+| Finding | Severity | Patch | Status |
+|---|---|---|---|
+| Cross-instance PoW challenge store (in-memory Map was not shared) | HIGH | Added `ProvisionChallenge` model; challenge create/consume now DB-backed + atomically consumed (`updateMany`) | Fixed + tests |
+| M4 — datacenter evidence replay/inflation | HIGH | Semantic dedup (cluster+event+window) before persist; replays return `replayed:true`, never mint | Fixed + regression test |
+| H8 — settlement double-credit race | HIGH | New `ExternalSettlement` (unique `[rail,reference]`); insert-first inside transaction, P2002 → duplicate | Fixed + test |
+| L1 — salt rotation breaks dedup | MED | Salt-agnostic semantic dedup in `persistEvidence` (identity+type+source+window) — works across salt rotation | Fixed |
+| ANP `did:key` invalid multibase | MED | New `multibase.ts` (base58btc) → proper `did:key` (0xed01) + W3C Multikey (0x01+key) | Fixed + tests |
 
 ---
 

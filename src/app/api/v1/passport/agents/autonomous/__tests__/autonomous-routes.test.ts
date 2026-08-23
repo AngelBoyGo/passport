@@ -10,6 +10,7 @@ const { prismaMock } = vi.hoisted(() => ({
     apiKey: { create: vi.fn() },
     agent: { create: vi.fn() },
     agentEnrollment: { findUnique: vi.fn(), create: vi.fn(), upsert: vi.fn() },
+    provisionChallenge: { create: vi.fn(), updateMany: vi.fn(), deleteMany: vi.fn() },
   },
 }));
 
@@ -27,6 +28,8 @@ describe("Autonomous Agent Provisioning REST Endpoints", () => {
     process.env.INGESTION_COMMITMENT_SALT = "test-salt-123";
     process.env.AUTONOMOUS_POW_DIFFICULTY = "3";
     process.env.NEXT_PUBLIC_APP_URL = "https://passport.metis.gold";
+    prismaMock.provisionChallenge.create.mockResolvedValue({ id: "pc_1" });
+    prismaMock.provisionChallenge.deleteMany.mockResolvedValue({ count: 0 });
   });
 
   it("POST /api/v1/passport/agents/autonomous/challenge — issues nonce and difficulty", async () => {
@@ -66,6 +69,7 @@ describe("Autonomous Agent Provisioning REST Endpoints", () => {
     prismaMock.apiKey.create.mockResolvedValue({ id: "key_auto_1" });
     prismaMock.agent.create.mockResolvedValue({ id: "ag_auto_1" });
     prismaMock.agentEnrollment.upsert.mockResolvedValue({ id: "en_auto_1" });
+    prismaMock.provisionChallenge.updateMany.mockResolvedValue({ count: 1 });
 
     const { POST: provisionHandler } = await import(
       "@/app/api/v1/passport/agents/autonomous/provision/route"

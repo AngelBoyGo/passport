@@ -21,11 +21,12 @@ const SUBJECT_COMMITMENT = deriveAgentCommitment(
   DEFAULT_ENROLLMENT_CONTEXT
 );
 
-const { findUniqueEnrollmentMock, upsertEvidenceMock, markEngagementDeliveredMock } =
+const { findUniqueEnrollmentMock, upsertEvidenceMock, markEngagementDeliveredMock, findFirstEvidenceMock } =
   vi.hoisted(() => ({
     findUniqueEnrollmentMock: vi.fn(),
     upsertEvidenceMock: vi.fn(),
     markEngagementDeliveredMock: vi.fn(),
+    findFirstEvidenceMock: vi.fn(),
   }));
 
 vi.mock("@/lib/db", () => ({
@@ -35,6 +36,7 @@ vi.mock("@/lib/db", () => ({
     },
     agentEvidence: {
       upsert: upsertEvidenceMock,
+      findFirst: findFirstEvidenceMock,
     },
   },
 }));
@@ -58,6 +60,7 @@ async function signDigest(payload: unknown): Promise<string> {
 beforeEach(() => {
   vi.clearAllMocks();
   upsertEvidenceMock.mockResolvedValue({});
+  findFirstEvidenceMock.mockResolvedValue(null);
   markEngagementDeliveredMock.mockResolvedValue(null);
 });
 

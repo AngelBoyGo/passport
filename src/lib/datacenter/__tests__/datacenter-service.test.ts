@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
     agentEnrollment: { findUnique: vi.fn(), upsert: vi.fn() },
-    agentEvidence: { create: vi.fn(), findMany: vi.fn(), count: vi.fn() },
+    agentEvidence: { create: vi.fn(), findMany: vi.fn(), count: vi.fn(), findFirst: vi.fn() },
     receipt: { create: vi.fn(), findMany: vi.fn(), findUnique: vi.fn() },
     evidenceReceiptLink: { create: vi.fn() },
     operator: { findFirst: vi.fn() },
@@ -101,6 +101,7 @@ describe("DataCenter Energy & Infrastructure Governance Domain", () => {
         id: "ev_01",
         eventCommitmentHash: "hash123",
       });
+      prismaMock.agentEvidence.findFirst.mockResolvedValue(null);
       prismaMock.receipt.create.mockResolvedValue({
         id: "rcpt_01",
         receiptId: "rcpt_datacenter_01",
@@ -142,6 +143,35 @@ describe("DataCenter Energy & Infrastructure Governance Domain", () => {
         })
       );
     });
+
+    it("treats a semantically-duplicate event as a replay and does NOT mint (M4)", async () => {
+      // Existing evidence within the same cluster+event+window → replay.
+      prismaMock.agentEvidence.findFirst.mockResolvedValue({ id: "existing" });
+      prismaMock.operator.findFirst.mockResolvedValue({ id: "op_default", stripeCustomerId: "cus_default" });
+
+      const result = await ingestDataCenterTelemetry(payloadNow());
+
+      expect(result.verified).toBe(false);
+      expect(result.replayed).toBe(true);
+      expect(prismaMock.agentEvidence.create).not.toHaveBeenCalled();
+      expect(prismaMock.receipt.create).not.toHaveBeenCalled();
+    });
+
+    function payloadNow(): DataCenterTelemetryPayload {
+      return {
+        cluster_id: clusterId,
+        instance_id: "gpu-node-01",
+        event_type: "HARDWARE_POWER_VALIDATION",
+        timestamp_utc: new Date().toISOString(),
+        origin: "live-instrument",
+        sku: "NVIDIA_H100_SXM5",
+        telemetry_source: "nvml_v12.2",
+        baseline_nameplate_w: 700,
+        measured_power_avg_w: 630.0,
+        delta_power_pct: -10.0,
+        policy_setpoint_applied: "power_governor_v2",
+      };
+    }
   });
 
   describe("DataCenter Scorecard & Transparency Radar", () => {

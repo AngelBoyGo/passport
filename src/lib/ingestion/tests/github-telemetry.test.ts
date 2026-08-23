@@ -1,13 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { agentEvidenceUpsertMock } = vi.hoisted(() => ({
+const { agentEvidenceUpsertMock, agentEvidenceFindFirstMock } = vi.hoisted(() => ({
   agentEvidenceUpsertMock: vi.fn(),
+  agentEvidenceFindFirstMock: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
   prisma: {
     agentEvidence: {
       upsert: agentEvidenceUpsertMock,
+      findFirst: agentEvidenceFindFirstMock,
     },
   },
 }));
@@ -29,6 +31,7 @@ const TEST_SALT = "vitest-ingestion-commitment-salt";
 beforeEach(() => {
   vi.clearAllMocks();
   agentEvidenceUpsertMock.mockResolvedValue({});
+  agentEvidenceFindFirstMock.mockResolvedValue(null);
   process.env.INGESTION_COMMITMENT_SALT = TEST_SALT;
 });
 

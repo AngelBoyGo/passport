@@ -381,3 +381,38 @@ model PasswordResetToken {
   @@index([email])
   @@index([token])
 }
+
+/// DB-backed autonomous-provisioning Proof-of-Work challenge (cross-instance
+/// safe). Previously this lived in an in-process Map, so a provision request
+/// hitting a different instance than the challenge request would fail, and
+/// multi-instance deployments could not share challenge consumption state.
+model ProvisionChallenge {
+  id            String   @id @default(cuid())
+  nonce         String   @unique
+  publicKeyHex  String
+  expiresAt     DateTime
+  consumed      Boolean  @default(false)
+  consumedAt    DateTime?
+  createdAt     DateTime @default(now())
+
+  @@index([publicKeyHex])
+  @@index([expiresAt])
+}
+
+/// Idempotent record for inbound agentic-payment settlements from external
+/// rails (Stripe agent, Visa, x402, Mastercard). The (rail, reference) composite
+/// unique is the database-level guard against double-credit races that a
+/// find-then-insert check could not close.
+model ExternalSettlement {
+  id            String   @id @default(cuid())
+  rail          String
+  reference     String
+  operatorId    String
+  creditCredits Int
+  label         String?
+  createdAt     DateTime @default(now())
+
+  @@unique([rail, reference])
+  @@index([operatorId])
+  @@index([rail, reference])
+}

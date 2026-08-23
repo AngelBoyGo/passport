@@ -24,12 +24,14 @@ const {
   updateEnrollmentMock,
   findManyEvidenceMock,
   upsertEvidenceMock,
+  findFirstEvidenceMock,
 } = vi.hoisted(() => ({
   findUniqueEnrollmentMock: vi.fn(),
   upsertEnrollmentMock: vi.fn(),
   updateEnrollmentMock: vi.fn(),
   findManyEvidenceMock: vi.fn(),
   upsertEvidenceMock: vi.fn(),
+  findFirstEvidenceMock: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -42,6 +44,7 @@ vi.mock("@/lib/db", () => ({
     agentEvidence: {
       findMany: findManyEvidenceMock,
       upsert: upsertEvidenceMock,
+      findFirst: findFirstEvidenceMock,
     },
   },
 }));

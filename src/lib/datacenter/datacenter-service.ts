@@ -180,12 +180,45 @@ export async function ingestDataCenterTelemetry(
   signature: string;
   verified: boolean;
   origin: "live-instrument" | "synthetic";
+  replayed?: boolean;
 }> {
   validatePhysicalPlausibility(payload);
 
   const commitment = sha256Hex(payload.cluster_id);
   const eventCommitmentHash = sha256Hex(canonicalJson(payload as unknown as Record<string, unknown>));
   const isLive = payload.origin === "live-instrument";
+
+  // M4: anti-inflation idempotency. A semantically-equivalent event for the
+  // same cluster+event_type within the window is a replay and must not
+  // double-count energy/carbon totals or mint another receipt. Exact
+  // eventCommitmentHash replays are caught by the unique index; this catches
+  // near-duplicates that only differ in optional/non-material fields.
+  const windowStart = new Date(
+    new Date(payload.timestamp_utc || Date.now()).getTime() - 60_000
+  );
+  const windowEnd = new Date(
+    new Date(payload.timestamp_utc || Date.now()).getTime() + 60_000
+  );
+  const existing = await prisma.agentEvidence.findFirst({
+    where: {
+      agentIdentityCommitment: commitment,
+      sourceType: "datacenter_telemetry",
+      normalizedEventType: payload.event_type,
+      observedAt: { gte: windowStart, lte: windowEnd },
+    },
+    select: { id: true },
+  });
+  if (existing) {
+    return {
+      receipt_id: `replayed_${existing.id.slice(0, 16)}`,
+      event_commitment_hash: eventCommitmentHash,
+      content_hash: sha256Hex(existing.id),
+      signature: "",
+      verified: false,
+      origin: payload.origin,
+      replayed: true,
+    };
+  }
 
   // Find or use default operator
   const op = operatorId

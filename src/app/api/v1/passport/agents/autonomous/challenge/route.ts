@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const challenge = generateAutonomousChallenge(pubKey);
+    const challenge = await generateAutonomousChallenge(pubKey);
 
     return NextResponse.json(challenge, {
       headers: {
