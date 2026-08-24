@@ -61,6 +61,27 @@ export async function GET(
     );
   }
 
+  if (format === "html") {
+    const title = verified ? "Passport Verified — Authenticated AI Build" : "Passport Enrolled";
+    const desc = `${profile.archetype ?? "Agent"} · ${count} signed receipts · ${artifacts} artifacts · authenticated by Passport.`;
+    const html = `<!DOCTYPE html><html><head>
+<meta charset="utf-8"/>
+<title>${escapeHtml(title)}</title>
+<meta property="og:type" content="profile"/>
+<meta property="og:title" content="${escapeHtml(title)}"/>
+<meta property="og:description" content="${escapeHtml(desc)}"/>
+<meta property="og:image" content="${base}/api/v1/badge/${hash}/attestation"/>
+<meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:title" content="${escapeHtml(title)}"/>
+<meta name="twitter:image" content="${base}/api/v1/badge/${hash}/attestation"/>
+<link rel="canonical" href="${base}/profiles/${hash}"/>
+<meta http-equiv="refresh" content="0;url=${base}/profiles/${hash}"/>
+</head><body><p>${escapeHtml(desc)}</p></body></html>`;
+    return new NextResponse(html, {
+      headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=300", ...cors() },
+    });
+  }
+
   return svgResponse(
     cardSvg({
       verified,
@@ -70,6 +91,14 @@ export async function GET(
     }),
     120
   );
+}
+
+function escapeHtml(input: string): string {
+  return input
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function svgResponse(svg: string, maxAge: number): NextResponse {

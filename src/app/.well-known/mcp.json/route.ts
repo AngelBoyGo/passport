@@ -313,6 +313,21 @@ export async function GET(request: NextRequest) {
         endpoint: `${baseUrl}/api/v1/badge/{commitment}/attestation`,
         method: "GET",
       },
+      {
+        name: "passport_verify_artifact",
+        description: "Authenticate a SPECIFIC artifact (commit SHA or evidence hash) to its agent — the per-artifact 'legitimate vs fake' assertion.",
+        parameters: {
+          type: "object",
+          required: ["commitment", "artifact"],
+          properties: {
+            commitment: { type: "string", description: "64-hex agent identity commitment" },
+            artifact: { type: "string", description: "40-hex commit SHA or 64-hex evidence event hash" },
+            format: { type: "string", enum: ["svg", "json"], description: "svg (default) or json" },
+          },
+        },
+        endpoint: `${baseUrl}/api/v1/artifacts/{commitment}/{artifact}/attestation`,
+        method: "GET",
+      },
     ],
   };
 

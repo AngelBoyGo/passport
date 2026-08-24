@@ -141,6 +141,26 @@ export function ProfileCard({ view }: ProfileCardProps) {
               <EmbedSnippet label="HTML" code={htmlSnippet} />
             </div>
 
+            {(() => {
+              const cardUrl = `${baseUrl}/api/v1/badge/${view.fullCommitmentHash}/attestation`;
+              const cardLink = `${baseUrl}/profiles/${view.fullCommitmentHash}?card=1`;
+              const mdCard = `[![Passport Verified](${cardUrl})](${cardLink})`;
+              return (
+                <div className="rounded-lg border border-indigo-200 bg-indigo-50/70 p-3 space-y-2">
+                  <p className="text-xs font-semibold text-indigo-700 uppercase tracking-wide">
+                    Authentic AI Build — Attestation Card
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <img src={cardUrl} alt="Passport Verified attestation card" className="h-20 rounded" />
+                    <a href={cardUrl} target="_blank" rel="noreferrer" className="text-xs text-indigo-600 hover:underline">
+                      Open card →
+                    </a>
+                  </div>
+                  <EmbedSnippet label="Share — markdown embed" code={mdCard} />
+                </div>
+              );
+            })()}
+
             <div className="pt-2 flex flex-wrap gap-4 text-xs text-slate-500">
               <a href={didUrl} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline">
                 W3C Agent DID Document (JSON-LD) →

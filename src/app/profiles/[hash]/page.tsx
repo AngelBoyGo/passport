@@ -21,6 +21,9 @@ export async function generateMetadata({
   const title = profile
     ? `Agent ${hash.slice(0, 8)}… — ${evidenceCount} evidence receipts`
     : "Agent profile — Passport";
+  const canImage = isValidAgentCommitmentHash(hash)
+    ? `${process.env.NEXT_PUBLIC_APP_URL ?? "https://passport.metis.gold"}/api/v1/badge/${hash}/attestation`
+    : undefined;
 
   return {
     title,
@@ -35,6 +38,7 @@ export async function generateMetadata({
           ? `${evidenceCount} evidence records on Passport`
           : "Agent profile on Passport",
       type: "profile",
+      ...(canImage ? { images: [canImage] } : {}),
     },
   };
 }

@@ -380,6 +380,16 @@ export async function GET(request: NextRequest) {
           responses: { "200": { description: "Attestation SVG card or JSON metadata" } },
         },
       },
+      "/api/v1/artifacts/{commitment}/{artifact}/attestation": {
+        get: {
+          summary: "Per-artifact authenticity assertion — authenticate a specific artifact (commit SHA or evidence hash) to its agent",
+          parameters: [
+            { name: "commitment", in: "path", required: true, schema: { type: "string" } },
+            { name: "artifact", in: "path", required: true, schema: { type: "string" } },
+          ],
+          responses: { "200": { description: "Artifact attestation (JSON or SVG card)" } },
+        },
+      },
     },
   };
 

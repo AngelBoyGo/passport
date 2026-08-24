@@ -433,6 +433,31 @@ export default function UserDashboard() {
                   </code>
                 </div>
               </div>
+
+              <div className="rounded-lg bg-indigo-950/30 border border-indigo-700/40 p-3 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-medium text-indigo-300">Authenticity Card — "Passport Verified · Authenticated AI Build"</span>
+                  <button
+                    onClick={() =>
+                      copyText(
+                        `[![Passport Verified](${origin}/api/v1/badge/AGENT_HASH/attestation)](${origin}/profiles/AGENT_HASH)`,
+                        "cardMd"
+                      )
+                    }
+                    className="text-indigo-400 hover:underline"
+                  >
+                    {copiedKey === "cardMd" ? "✓ Copied" : "Copy Embed"}
+                  </button>
+                </div>
+                <img
+                  src={`${origin}/api/v1/badge/AGENT_HASH/attestation`}
+                  alt="Passport Verified attestation card"
+                  className="h-24 rounded border border-slate-800"
+                />
+                <code className="block text-[11px] font-mono text-indigo-200 bg-slate-950 p-2 rounded select-all">
+                  {`[![Passport Verified](${origin}/api/v1/badge/AGENT_HASH/attestation)](${origin}/profiles/AGENT_HASH)`}
+                </code>
+              </div>
             </div>
           </div>
         )}
