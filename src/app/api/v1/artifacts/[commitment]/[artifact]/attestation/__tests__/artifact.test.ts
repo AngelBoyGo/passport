@@ -113,6 +113,30 @@ describe("GET /api/v1/artifacts/:commitment/:artifact/attestation — per-artifa
     expect(svg).toContain("authenticated AI build");
   });
 
+  it("XML-escapes evidence fields before rendering into SVG (XSS-in-SVG hardening)", async () => {
+    prismaMock.agentEvidence.findFirst.mockResolvedValue({
+      id: "evx",
+      normalizedEventType: "AGENT_ARTIFACT_CREATED",
+      commitSha: artifact,
+      eventCommitmentHash: "f".repeat(64),
+      sourceType: "<script>alert(1)</script>",
+      observedAt: new Date("2026-08-10T00:00:00.000Z"),
+      validationSignalPresent: true,
+    });
+
+    const { GET } = await import(
+      "@/app/api/v1/artifacts/[commitment]/[artifact]/attestation/route"
+    );
+    const req = new NextRequest(
+      `https://passport.metis.gold/api/v1/artifacts/${commitment}/${artifact}/attestation`
+    );
+    const res = await GET(req, { params: Promise.resolve({ commitment, artifact }) });
+
+    const svg = await res.text();
+    expect(svg).not.toContain("<script>");
+    expect(svg).toContain("&lt;script&gt;");
+  });
+
   it("rejects an invalid commitment with verified:false", async () => {
     const { GET } = await import(
       "@/app/api/v1/artifacts/[commitment]/[artifact]/attestation/route"

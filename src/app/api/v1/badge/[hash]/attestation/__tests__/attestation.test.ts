@@ -140,4 +140,25 @@ describe("GET /api/v1/badge/:hash/attestation — 'Passport Verified' authentici
     expect(body.verified).toBe(false);
     expect(body.reason).toBe("invalid");
   });
+
+  it("never reflects an attacker-controlled Host header into output URLs (host-header hardening)", async () => {
+    prismaMock.agentEvidence.findMany.mockResolvedValue(seedEvidence({}));
+    prismaMock.agentEnrollment.findUnique.mockResolvedValue({
+      subjectCommitment: commitment,
+      publicKey: "b".repeat(64),
+      status: "ISSUED",
+      issuedAt: new Date("2026-08-01T00:00:00.000Z"),
+    });
+
+    const { GET } = await import("@/app/api/v1/badge/[hash]/attestation/route");
+    const req = new NextRequest(
+      `https://passport.metis.gold/api/v1/badge/${commitment}/attestation?format=json`,
+      { headers: { host: "evil.example" } }
+    );
+    const res = await GET(req, { params: Promise.resolve({ hash: commitment }) });
+    const body = await res.json();
+    expect(body.profile_url).not.toContain("evil.example");
+    expect(body.verify_url).not.toContain("evil.example");
+    expect(body.profile_url).toContain("passport.metis.gold");
+  });
 });

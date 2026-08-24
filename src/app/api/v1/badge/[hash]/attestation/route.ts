@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAgentProfile } from "@/lib/public-portal/portal-service";
+import { checkInMemoryRateLimit, clientIpFromRequest, rateLimitResponse } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -16,10 +17,18 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ hash: string }> }
 ) {
+  const ip = clientIpFromRequest(request.headers);
+  const rate = checkInMemoryRateLimit(`attestation:${ip}`, 30, 60_000);
+  if (!rate.allowed) {
+    return NextResponse.json({ error: "Rate limit exceeded" }, rateLimitResponse(rate, 30));
+  }
+
   const { hash } = await params;
   const { searchParams } = new URL(request.url);
   const format = searchParams.get("format") ?? "svg";
-  const base = process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin;
+  // Security: hard-code the public origin; never derive from the request Host
+  // header (host-header injection → open-redirect/Og:url poisoning).
+  const base = process.env.NEXT_PUBLIC_APP_URL ?? "https://passport.metis.gold";
 
   if (!/^[0-9a-f]{64}$/i.test(hash)) {
     if (format === "json") {
@@ -119,19 +128,28 @@ function cardSvg(opts: {
   const W = 420;
   const H = 160;
   const sub = opts.sub && opts.sub.length > 0 ? opts.sub : "—";
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${opts.label}: ${opts.message}">
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(opts.label)}: ${esc(opts.message)}">
   <rect width="${W}" height="${H}" rx="14" fill="#0f172a"/>
   <rect x="0" y="0" width="8" height="${H}" fill="${color}"/>
   <circle cx="38" cy="52" r="18" fill="${color}" fill-opacity="0.2"/>
   <path d="M30 52l5 5 10-11" stroke="${color}" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-  <text x="68" y="34" font-family="Verdana,DejaVu Sans,sans-serif" font-size="13" font-weight="bold" fill="#ffffff" letter-spacing="1.5">${opts.label}</text>
-  <text x="68" y="58" font-family="Verdana,DejaVu Sans,sans-serif" font-size="13" fill="#cbd5e1">${sub}</text>
+  <text x="68" y="34" font-family="Verdana,DejaVu Sans,sans-serif" font-size="13" font-weight="bold" fill="#ffffff" letter-spacing="1.5">${esc(opts.label)}</text>
+  <text x="68" y="58" font-family="Verdana,DejaVu Sans,sans-serif" font-size="13" fill="#cbd5e1">${esc(sub)}</text>
   <line x1="24" y1="78" x2="${W - 24}" y2="78" stroke="#334155" stroke-width="1"/>
-  <text x="28" y="104" font-family="Verdana,DejaVu Sans,sans-serif" font-size="20" font-weight="bold" fill="#38bdf8">${opts.message}</text>
+  <text x="28" y="104" font-family="Verdana,DejaVu Sans,sans-serif" font-size="20" font-weight="bold" fill="#38bdf8">${esc(opts.message)}</text>
   <text x="28" y="132" font-family="Verdana,DejaVu Sans,sans-serif" font-size="11" fill="#64748b">Authenticated AI Build — verify at passport.metis.gold</text>
   <rect x="${W - 120}" y="116" width="104" height="28" rx="6" fill="${color}" fill-opacity="0.15"/>
   <text x="${W - 68}" y="135" font-family="Verdana,DejaVu Sans,sans-serif" font-size="12" font-weight="bold" fill="${color}" text-anchor="middle">Verify →</text>
 </svg>`;
+}
+
+function esc(input: string): string {
+  return input
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
 }
 
 function cors(): Record<string, string> {
