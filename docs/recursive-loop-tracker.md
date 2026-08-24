@@ -1,6 +1,20 @@
 # Recursive loop tracker — Passport + HostHub FFD
 
-Last updated: **2026-08-21** (Loop 35 Known-Answer Webhook Verifier + Closing Remaining Audit Items — 126 test files, 769 tests green)
+Last updated: **2026-08-21** (Loop 36 Authenticity Attestation Card — 127 test files, 773 tests green)
+
+---
+
+## Loop 36: "Passport Verified — Authenticated AI Build" Attestation Card
+
+| Item | Type | Patch | Status |
+|---|---|---|---|
+| Attestation card endpoint | NEW | `GET /api/v1/badge/:commitment/attestation` returns a shareable SVG card + `?format=json` authenticity metadata framing "this AI build/artifact is authenticated by Passport — not an impostor" | Complete + 4 tests |
+| OpenAPI + MCP | NEW | Registered `passport_get_attestation_card` (18 MCP tools) | Complete |
+| Docs | NEW | `/docs/verification` attesting authenticity marker | Complete |
+
+---
+
+## Loop 35: Known-Answer Webhook Verifier + Closing Remaining Audit Items
 
 ---
 

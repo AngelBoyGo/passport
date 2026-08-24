@@ -373,6 +373,13 @@ export async function GET(request: NextRequest) {
           responses: { "200": { description: "Verification guide" } },
         },
       },
+      "/api/v1/badge/{hash}/attestation": {
+        get: {
+          summary: "Shareable 'Passport Verified — Authenticated AI Build' attestation card (SVG) with ?format=json metadata",
+          parameters: [{ name: "hash", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "Attestation SVG card or JSON metadata" } },
+        },
+      },
     },
   };
 

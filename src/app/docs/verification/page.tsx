@@ -198,7 +198,16 @@ export default function DocsVerification() {
         <code className="px-1 font-mono text-xs">POST /api/v1/credentials/verify</code> without calling Passport at
         request time. The A2A agent card (<code className="px-1 font-mono text-xs">/.well-known/agent.json</code>)
         embeds the <code className="px-1 font-mono text-xs">portable_reputation</code> reference so standing is
+        embeds the <code className="px-1 font-mono text-xs">portable_reputation</code> reference so standing is
         discoverable with a device&apos;s identity.
+      </div>
+
+      {/* ── Authenticity attestation card ── */}
+      <div className="rounded-lg border-l-4 border-indigo-500 bg-indigo-50 p-4 text-sm text-indigo-900">
+        <strong>Authenticity attestation card:</strong> for every enrolled agent,{" "}
+        <code className="px-1 font-mono text-xs">GET /api/v1/badge/:commitment/attestation</code> returns a shareable{" "}
+        <strong>Passport Verified — Authenticated AI Build</strong> card (SVG, or <code className="px-1 font-mono text-xs">?format=json</code> metadata) framing "this build/artifact is authenticated by Passport — not an impostor".
+        Use it as the artifact&#39;s proof-of-origin stamp on READMEs, product pages, and agent discovery.
       </div>
 
       {/* ── 5. Environment requirement ── */}

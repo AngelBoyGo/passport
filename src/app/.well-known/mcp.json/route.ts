@@ -299,6 +299,20 @@ export async function GET(request: NextRequest) {
         endpoint: `${baseUrl}/api/v1/datacenter/documentation`,
         method: "GET",
       },
+      {
+        name: "passport_get_attestation_card",
+        description: "Fetch the shareable 'Passport Verified — Authenticated AI Build' attestation card (SVG) and its JSON authenticity metadata for an agent.",
+        parameters: {
+          type: "object",
+          required: ["commitment"],
+          properties: {
+            commitment: { type: "string", description: "64-hex agent identity commitment" },
+            format: { type: "string", enum: ["svg", "json"], description: "svg (default) or json metadata" },
+          },
+        },
+        endpoint: `${baseUrl}/api/v1/badge/{commitment}/attestation`,
+        method: "GET",
+      },
     ],
   };
 
