@@ -55,6 +55,7 @@ On the **Passport app service** → **Variables**, set:
 |----------|--------|
 | `DATABASE_URL` | From Postgres plugin (internal URL is fine) |
 | `SIGNING_PRIVATE_KEY` | 64-hex from Section 1 (handoff) |
+| `SIGNING_PRIVATE_KEY_PREVIOUS` | Optional: previous 64-hex signing key during a rotation window. Enables a transition period where artifacts signed under the old key still verify; persisted into the key transparency log. Remove after the rotation window. |
 | `INGESTION_COMMITMENT_SALT` | Long random string (same value across all app instances; never commit to git) |
 | `EVIDENCE_BRIDGE_OPERATOR_ID` | Optional: dedicated minter operator id for the evidence→receipt auto-bridge (its credit balance funds receipt minting) |
 | `EVIDENCE_BRIDGE_AUTO_ENABLED` | Optional (`true`): auto-mint a signed custody receipt for every accepted enrolled-evidence event |

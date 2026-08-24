@@ -416,3 +416,22 @@ model ExternalSettlement {
   @@index([operatorId])
   @@index([rail, reference])
 }
+
+/// Append-only public key transparency log. Each signing key Passport has used
+/// is persisted so verifiers can select the correct key for an artifact created
+/// under any era. Seeded at startup from the current SIGNING_PRIVATE_KEY;
+/// rotated keys are appended with a valid_until so old VCs/checkpoints verify
+/// instead of hard-failing. This makes the "append-only audit trail" claim real.
+model KeyLogEntry {
+  id           String   @id @default(cuid())
+  kid          String   @unique
+  publicKeyHex String
+  algorithm    String   @default("ed25519")
+  status       String   @default("active")
+  validFrom    DateTime
+  validUntil   DateTime?
+  seededAt     DateTime @default(now())
+
+  @@index([status])
+  @@index([publicKeyHex])
+}

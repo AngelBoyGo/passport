@@ -1,0 +1,9 @@
+{
+  "event": "reputation.degraded",
+  "data": {
+    "agent_commitment": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "current_failure_rate": 0.35,
+    "reason": "failure_rate_exceeded_threshold"
+  },
+  "timestamp": "2026-08-21T12:00:00.000Z"
+}

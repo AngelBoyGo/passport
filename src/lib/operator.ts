@@ -94,7 +94,14 @@ export async function authenticateApiKey(authHeader: string | null) {
 
   // C4: role comes from the PERSISTED row, never inferred from the presented
   // key prefix (an attacker could self-label a fabricated pp_ent_ prefix).
-  const role: "ISSUER" | "HOLDER" = apiKey.role === "HOLDER" ? "HOLDER" : "ISSUER";
+  // F7 backfill guard: keys minted BEFORE the role column existed default to
+  // ISSUER in the DB. A `pp_usr_`-prefixed presented key is DOWNGRADED to
+  // HOLDER regardless of the stored column, so a legacy Holder key can never
+  // escalate to Issuer privileges. Downgrade-only: a minted ISSUER key never
+  // carries a pp_usr_ prefix, so this can't wrongly downgrade a legit Issuer.
+  const storedRole: "ISSUER" | "HOLDER" = apiKey.role === "HOLDER" ? "HOLDER" : "ISSUER";
+  const prefixHolder = key.startsWith("pp_usr_");
+  const role: "ISSUER" | "HOLDER" = storedRole === "HOLDER" || prefixHolder ? "HOLDER" : "ISSUER";
   return {
     ...apiKey.operator,
     apiKeyRole: role,

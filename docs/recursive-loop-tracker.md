@@ -1,6 +1,17 @@
 # Recursive loop tracker — Passport + HostHub FFD
 
-Last updated: **2026-08-21** (Loop 34 Re-Audit Validation + Capability/Receiver-Kit TDD — 123 test files, 755 tests green)
+Last updated: **2026-08-21** (Loop 35 Known-Answer Webhook Verifier + Closing Remaining Audit Items — 126 test files, 769 tests green)
+
+---
+
+## Loop 35: Known-Answer Webhook Verifier + Closing Remaining Audit Items
+
+| Item | Severity | Patch | Status |
+|---|---|---|---|
+| Key transparency log was fabricated (no rotated keys persisted) | MED | Persisted `KeyLogEntry` (DB) + `SIGNING_PRIVATE_KEY_PREVIOUS` rotation-window key + `findKeyInTransparencyLog` DB lookup + `syncKeyTransparencyLog` wiring | Fixed + tests |
+| Legacy `pp_usr_` keys default to ISSUER on backfill | INFO | Downgrade-only prefix guard: a presented `pp_usr_` key resolves to HOLDER regardless of stored row | Fixed + tests |
+| Body-limit fallback buffered unbounded | LOW | content-length pre-check + bounded `arrayBuffer()` fallback in `readJsonBody` | Fixed |
+| **Known-Answer Webhook Verifier** | NEW | `examples/webhook-verifier/` — committed KAT fixture (payload/secret/signature), runnable CLI importing the public `verifyWebhookSignature`, README with exact `npx tsx` command, Vitest coverage | Complete + 4 tests |
 
 ---
 

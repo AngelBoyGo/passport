@@ -164,7 +164,11 @@ export default function DocsVerification() {
             <code className="px-1 font-mono text-xs">timestamp</code> is within ~5 minutes to block replays.
             Passport ships <code className="px-1 font-mono text-xs">verifyWebhookSignature</code> (constant-time +
             optional freshness) in <code className="px-1 font-mono text-xs">src/lib/webhooks/webhook-service.ts</code>.
-            Reference guide: <code className="px-1 font-mono text-xs">GET /api/v1/webhooks/verify-guide</code>.
+            Reference guide: <code className="px-1 font-mono text-xs">GET /api/v1/webhooks/verify-guide</code>. A
+            runnable <strong>known-answer fixture + example verifier</strong> lives in{" "}
+            <code className="px-1 font-mono text-xs">examples/webhook-verifier/</code> (see its{" "}
+            <code className="px-1 font-mono text-xs">README.md</code>) — run it to mechanically confirm the
+            rule end-to-end.
           </p>
         </div>
       </Section>
