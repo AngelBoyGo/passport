@@ -72,6 +72,51 @@ export async function createCheckoutSession(
   return { mock: false, url: session.url };
 }
 
+/** 1 credit = $0.01; stablecoin topups use micro-fidelity. */
+export const CREDITS_PER_DOLLAR = 100;
+export const MICROS_PER_CREDIT = 100_000;
+
+/** Convert a USD-cents amount into whole credits (float-free). */
+export function creditsFromUsdCents(cents: number): number {
+  if (!Number.isFinite(cents) || cents < 0) return 0;
+  return Math.floor((cents * CREDITS_PER_DOLLAR) / 100);
+}
+
+/**
+ * Creates a one-time Stripe Checkout session that accepts USDC (stablecoin
+ * payments) and credits the operator's account by the order amount.
+ */
+export async function createUsdcTopupCheckout(
+  stripeCustomerId: string,
+  usdCents: number
+): Promise<{ mock: boolean; url?: string; clientSecret?: string }> {
+  const stripe = getStripe();
+  if (!stripe) {
+    // Dev/mock path (no STRIPE_SECRET_KEY).
+    return { mock: true, url: "/?checkout=mock", clientSecret: "mock_secret" };
+  }
+  const amount = Math.max(usdCents, 50); // Stripe min for payments
+  const session = await stripe.checkout.sessions.create({
+    customer: stripeCustomerId,
+    mode: "payment",
+    line_items: [
+      {
+        price_data: {
+          currency: "usd",
+          product_data: { name: "AngelCoin credit top-up" },
+          unit_amount: amount,
+        },
+        quantity: 1,
+      },
+    ],
+    payment_method_types: ["usdc" as Stripe.Checkout.SessionCreateParams.PaymentMethodType],
+    success_url: `${process.env.NEXT_PUBLIC_APP_URL}/?success=1`,
+    cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/?canceled=1`,
+    metadata: { product: "credits_topup", usd_cents: String(amount) },
+  });
+  return { mock: false, url: session.url ?? undefined, clientSecret: session.client_secret ?? undefined };
+}
+
 type WebhookResult = {
   mock: boolean;
   handled: boolean;
@@ -179,6 +224,32 @@ export async function handleStripeWebhook(
         const duplicate = await claimStripeEvent(tx, event.id, event.type);
         if (duplicate) {
           return { handled: false, duplicate: true as const };
+        }
+
+        // USDC/stablecoin credit top-up: credit by the exact order amount and
+        // record an append-only operator ledger entry.
+        if (session.metadata?.product === "credits_topup") {
+          const { ensureOperator } = await import("./operator");
+          const operator = await ensureOperator(customerId, session.customer_email, tx);
+          const amountTotal = session.amount_total ?? 0;
+          const credits = creditsFromUsdCents(amountTotal);
+          await tx.operator.update({
+            where: { id: operator.id },
+            data: { credits: { increment: credits } },
+          });
+          await tx.operatorLedgerEntry.create({
+            data: {
+              operatorId: operator.id,
+              deltaMicros: amountTotal * 10_000, // cents -> micro-dollars
+              kind: "stablecoin_topup",
+              metadata: JSON.stringify({ session_id: session.id, usd_cents: amountTotal, credits }),
+            },
+          });
+          return {
+            handled: true,
+            duplicate: false as const,
+            operatorId: operatorIdFromStripe(customerId),
+          };
         }
 
         await provisionOperatorPayment(

@@ -435,3 +435,15 @@ model KeyLogEntry {
   @@index([status])
   @@index([publicKeyHex])
 }
+
+/// Append-only ledger of operator billing/topup events (fiat, USDC, refunds).
+model OperatorLedgerEntry {
+  id          String   @id @default(cuid())
+  operatorId  String
+  deltaMicros Int
+  kind        String // 'fiat_topup' | 'stablecoin_topup' | 'refund' | 'burn'
+  metadata    String?
+  createdAt   DateTime @default(now())
+
+  @@index([operatorId, createdAt])
+}
