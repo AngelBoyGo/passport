@@ -1,6 +1,38 @@
 # Recursive loop tracker — Passport + HostHub FFD
 
-Last updated: **2026-08-21** (Loop 36 Authenticity Attestation Card — 127 test files, 773 tests green)
+Last updated: **2026-08-21** (Loop 37 Full Platform Audit — 13 layers, 2 parallel audit agents, critical fixes — 130 test files, 794 tests green)
+
+---
+
+## Loop 37: Full 13-Layer Platform Audit (2 parallel agents) + Critical Fixes
+
+**Method:** Two parallel read-only audit agents (Agent A: frontend/hosting/compute/CI/logs/DR; Agent B: API/security/data/auth/rate-limit/caching) produced evidence-backed findings; the highest-severity items were then fixed FDD-style (failing test first → minimal fix → green).
+
+### Fixed this loop (FDD: failing test → patch)
+| # | Finding | Severity | Layer | Fix | Tests |
+|---|---|---|---|---|---|
+| 1 | **Escrow accept/cancel had NO ownership authorization** — any valid API key could release anyone's locked AngelCoin escrow | CRITICAL | 2 | Participant binding on both routes: caller must own an Agent row matching hirer/worker commitment; exec-admin fallback removed from participant gates | `escrow-ownership.test.ts` (6) |
+| 2 | **AngelCoin ownership claim was a no-op** (`update:{}`) and null-owner accounts were drainable by anyone | HIGH | 3/8 | Conditional bind (`updateMany WHERE ownerOperatorId IS NULL`) on first touch; `assertCanTransferFrom` now FAILS CLOSED on unowned accounts | `ownership-binding.test.ts` (7) |
+| 3 | **A2A cross-tenant disclosure**: `tasks/get` leaked deliverable digest/receipt id to any key; cancel predicate was dead code (cuid vs salted hash could never match) | HIGH | 2 | `isTaskParticipant` Agent-row check; non-participants get status-only view; dead predicate deleted | protocols.test.ts (+2) |
+| 4 | Autonomous provisioning minted DB-role-ISSUER keys (column default) | HIGH | 4 | Explicit `role: "HOLDER"` persisted at mint | covered by autonomous tests |
+| 5 | Webhook signing secrets re-exposed in list responses (permanent forgery capability if captured) | MED | 8 | List endpoints now select only id/url/events/active/timestamps (secret still shown once at creation) | manual verify |
+
+### Audit findings logged as REMAINING work (not yet fixed)
+| Finding | Severity | Layer |
+|---|---|---|
+| Migration drift: `PasswordResetToken`, `ApiKeyRole`+`role`, `ownerOperatorId`, `ProvisionChallenge`, `ExternalSettlement`, `KeyLogEntry`, `[operatorId, issuedAt]` index have **no SQL migrations** — fresh deploys fail / prod diverges | CRITICAL | 3 |
+| No scheduler/cron exists anywhere: checkpoints not chained/persisted on public path, notary anchoring lazy, backups never automated (`uploadBackupToR2` referenced only by its own test), StripeEvent rows grow unbounded | CRITICAL | 6/13 |
+| `restore-verify` is a stub ("destructive restore not implemented") — backups are unproven hypotheses | HIGH | 13 |
+| Boot env validation bypassed in production (Dockerfile runs `node server.js` directly; `prestart` never fires) | HIGH | 5 |
+| Distributed Upstash rate limiter is dead code — 31 routes call the in-memory limiter directly; middleware sets advisory headers but NEVER returns 429 | HIGH | 9 |
+| ~89 of 96 API routes emit no structured logs; no error-tracking service; request_id not echoed to clients | HIGH | 12 |
+| `isExecutiveAdmin` returns TRUE for everyone when allowlist empty outside production | MEDIUM→HIGH | 4 |
+| Deployment docs self-contradict (Railway vs Coolify vs Render; no render.yaml) | MED | 5 |
+| Reset tokens stored raw in DB; session/OAuth-state/rail-HMAC comparisons not timing-safe | MED | 4 |
+| Leaderboard: no HTTP caching, N+1 (~400 queries cold), instance-local invalidation | MED | 10/6 |
+| Dashboard fetch errors never rendered to users; receipt modal lacks dialog semantics/focus trap; zero loading.tsx segments | MED | 1 |
+| Public pages crash to root error boundary on DB outage | MED | 13 |
+| CSP allows `unsafe-inline`; no RLS (isolation is 100% app-layer) | MED | 8 |
 
 ---
 

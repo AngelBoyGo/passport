@@ -17,6 +17,9 @@ export async function GET(request: NextRequest) {
   const subs = await prisma.webhookSubscription.findMany({
     where: { operatorId: operator.id },
     orderBy: { createdAt: "desc" },
+    // Loop 37: signing secrets must never be re-exposed after creation — one
+    // captured list response otherwise grants permanent forgery capability.
+    select: { id: true, url: true, events: true, active: true, createdAt: true, updatedAt: true },
   });
 
   return NextResponse.json(subs);

@@ -16,6 +16,27 @@ function jsonRpcError(id: string | number | null, code: number, message: string,
 }
 
 /**
+ * Loop 37: true when the operator provably participates in the engagement —
+ * i.e. it owns an Agent row whose agentId equals the hirer or worker
+ * commitment. Deliberately NO admin bypass: escrow visibility and payout are
+ * strictly participant-scoped.
+ */
+async function isTaskParticipant(
+  operator: { id: string },
+  engagement: { hirerCommitment: string; workerCommitment: string }
+): Promise<boolean> {
+  const { prisma } = await import("@/lib/db");
+  const owned = await prisma.agent.findFirst({
+    where: {
+      operatorId: operator.id,
+      agentId: { in: [engagement.hirerCommitment, engagement.workerCommitment] },
+    },
+    select: { id: true },
+  });
+  return !!owned;
+}
+
+/**
  * A2A (Agent2Agent) Protocol Endpoint
  * Implements JSON-RPC 2.0 task delegation over HTTP(S).
  *
@@ -100,6 +121,22 @@ export async function POST(request: NextRequest) {
           return jsonRpcError(id, -32004, "Task not found");
         }
 
+        // Loop 37 fix: delivery proof (deliverable_digest/receipt_id) is now
+        // disclosed only to task participants. Non-participants receive a
+        // status-only view with no payout evidence.
+        const isParticipant = await isTaskParticipant(operator, engagement);
+        if (!isParticipant) {
+          return NextResponse.json({
+            jsonrpc: "2.0",
+            id,
+            result: {
+              task_id: engagement.taskId,
+              status: engagement.status.toLowerCase(),
+              // No amount / digest / receipt for non-participants.
+            },
+          });
+        }
+
         return NextResponse.json({
           jsonrpc: "2.0",
           id,
@@ -121,14 +158,10 @@ export async function POST(request: NextRequest) {
           return jsonRpcError(id, -32004, "Task not found");
         }
 
-        // Authorization (C3): only the hirer or worker of the task may cancel it.
-        if (
-          operator.id &&
-          !(
-            engagement.hirerCommitment.includes(operator.id) ||
-            engagement.workerCommitment.includes(operator.id)
-          )
-        ) {
+        // Authorization (C3/Loop 37): only the hirer or worker of the task may
+        // cancel it. The previous `.includes(operator.id)` predicate compared a
+        // cuid against salted commitments and could never match — dead code.
+        if (!(await isTaskParticipant(operator, engagement))) {
           return jsonRpcError(id, -32003, "Forbidden: only the hirer or worker may cancel this task", 403);
         }
 

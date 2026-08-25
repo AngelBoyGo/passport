@@ -202,6 +202,7 @@ export async function provisionAutonomousAgent(
       operatorId: operator.id,
       keyHash,
       name: agentName,
+      role: "HOLDER", // Loop 37: persist Holder explicitly — never rely on column default (ISSUER)
     },
   });
 

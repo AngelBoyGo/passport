@@ -81,20 +81,37 @@ export async function loadJournalEntries(
 export async function getOrCreateAccount(subjectCommitment: string, ownerOperatorId?: string) {
   assertValidSubjectCommitment(subjectCommitment);
 
-  return prisma.angelCoinAccount.upsert({
+  const account = await prisma.angelCoinAccount.upsert({
     where: { subjectCommitment },
     create: {
       subjectCommitment,
       creditState: AngelCoinCreditState.ACTIVE,
       ownerOperatorId: ownerOperatorId ?? null,
     },
+    // Loop 37 fix: previously `update: {}` meant an EXISTING null-owner account
+    // was never claimed, leaving it permanently drainable by anyone. We now
+    // bind unowned accounts with a conditional update that can only match
+    // rows whose owner is still NULL — so a first-touch claim sticks, and a
+    // claim attempt can never steal an account another operator already owns.
     update: {},
   });
+
+  if (ownerOperatorId && !account.ownerOperatorId) {
+    await prisma.angelCoinAccount.updateMany({
+      where: { subjectCommitment, ownerOperatorId: null },
+      data: { ownerOperatorId },
+    });
+    return { ...account, ownerOperatorId };
+  }
+
+  return account;
 }
 
 /**
- * H5: verifies the authenticated operator owns (created) the subject account.
- * Executive admins may act on the system account. Returns true when allowed.
+ * H5/Loop 37: verifies the authenticated operator owns (or has just claimed)
+ * the source account before funds may leave it. Executive admins bypass.
+ * FAILS CLOSED on still-unowned accounts — an unclaimed ledger must not be
+ * drainable by whichever key-holder arrives first.
  */
 export async function assertCanTransferFrom(
   operatorId: string,
@@ -106,13 +123,8 @@ export async function assertCanTransferFrom(
     where: { subjectCommitment: fromCommitment },
     select: { ownerOperatorId: true },
   });
-  // Legit path: the route claims ownership (binding ownerOperatorId) before
-  // this gate, so an account will exist owned by the operator. Allow null-owner
-  // (legacy/first-touch backfill) so peer transfers aren't dead; only block
-  // when a DIFFERENT operator already owns it.
-  if (!account) return true; // no existing claim → route will bind it
-  if (account.ownerOperatorId && account.ownerOperatorId !== operatorId) return false;
-  return true;
+  if (!account) return false; // nothing to transfer from / not yet claimed
+  return account.ownerOperatorId === operatorId;
 }
 
 /**

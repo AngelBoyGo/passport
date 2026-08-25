@@ -7,9 +7,13 @@ const { prismaMock } = vi.hoisted(() => ({
       findUnique: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      findMany: vi.fn(),
     },
     agentEnrollment: {
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
+    },
+    agent: {
       findFirst: vi.fn(),
     },
     capabilityLedgerEntry: {
@@ -83,6 +87,7 @@ describe("Protocol Integrations", () => {
     });
 
     it("handles tasks/get JSON-RPC method", async () => {
+      prismaMock.agent.findFirst.mockResolvedValue({ id: "agent_row" }); // caller is a participant
       prismaMock.engagement.findUnique.mockResolvedValue({
         taskId: "a2a-task-001",
         status: "DELIVERED",
@@ -110,6 +115,39 @@ describe("Protocol Integrations", () => {
       const data = await res.json();
       expect(data.result.status).toBe("delivered");
       expect(data.result.receipt_id).toBe("rcpt_999");
+    });
+
+    it("hides delivery proof from non-participants (Loop 37)", async () => {
+      prismaMock.agent.findFirst.mockResolvedValue(null); // caller owns no party
+      prismaMock.engagement.findUnique.mockResolvedValue({
+        taskId: "a2a-task-002",
+        status: "DELIVERED",
+        amount: 500,
+        deliverableDigest: "d".repeat(64),
+        receiptId: "rcpt_secret",
+      });
+
+      const { POST } = await import("@/app/api/v1/a2a/tasks/route");
+      const req = new NextRequest("https://passport.metis.gold/api/v1/a2a/tasks", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer pp_valid_key",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: "req-3",
+          method: "tasks/get",
+          params: { task_id: "a2a-task-002" },
+        }),
+      });
+
+      const res = await POST(req);
+      const data = await res.json();
+      expect(data.result.status).toBe("delivered");
+      expect(data.result.receipt_id).toBeUndefined();
+      expect(data.result.deliverable_digest).toBeUndefined();
+      expect(data.result.amount).toBeUndefined();
     });
 
     it("rejects unauthenticated A2A requests (C3)", async () => {
