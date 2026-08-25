@@ -109,10 +109,12 @@ export function ProfileCard({ view }: ProfileCardProps) {
             )}
             <div className="mt-4 flex flex-wrap gap-2">
               <a
-                href={`/post-evidence?commitment=${view.fullCommitmentHash}`}
+                href={`/api/v1/badge/${view.fullCommitmentHash}/attestation`}
+                target="_blank"
+                rel="noreferrer"
                 className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-medium text-white hover:bg-indigo-700 transition-colors"
               >
-                Post evidence
+                Verified card
               </a>
               <button
                 type="button"

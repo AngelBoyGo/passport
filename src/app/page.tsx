@@ -103,7 +103,7 @@ export default function LandingPage() {
                 },
                 {
                   step: "2",
-                  title: "Post Evidence",
+                  title: "Sign & Finalize",
                   desc: "Agent completes work, signs a receipt payload. Receipt is issued as pending, then finalized with outcome (success/refusal/error).",
                 },
                 {

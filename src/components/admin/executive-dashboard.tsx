@@ -265,8 +265,8 @@ export function ExecutiveDashboard() {
                     <Link href="/enroll" className="block rounded-lg border border-white/10 bg-white/[0.02] p-4 text-sm text-slate-300 hover:bg-white/5 transition">
                       Enroll a new agent →
                     </Link>
-                    <Link href="/post-evidence" className="block rounded-lg border border-white/10 bg-white/[0.02] p-4 text-sm text-slate-300 hover:bg-white/5 transition">
-                      Post evidence →
+                    <Link href="/docs/api-reference" className="block rounded-lg border border-white/10 bg-white/[0.02] p-4 text-sm text-slate-300 hover:bg-white/5 transition">
+                      Ingest evidence via API →
                     </Link>
                     <Link href="/admin/webhooks" className="block rounded-lg border border-white/10 bg-white/[0.02] p-4 text-sm text-slate-300 hover:bg-white/5 transition">
                       Configure webhooks →

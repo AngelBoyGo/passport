@@ -197,13 +197,6 @@ export default function EnrollPage() {
                   <a href={`/profiles/${commitment}`} className="rounded-lg bg-indigo-600 px-6 py-3 text-sm font-medium text-white hover:bg-indigo-700 text-center">
                     View profile
                   </a>
-                  <a
-                    href={`/post-evidence?commitment=${commitment}`}
-                    onClick={() => { sessionStorage.setItem("passport_agent_key", privateKey); }}
-                    className="rounded-lg border bg-white px-6 py-3 text-sm font-medium hover:bg-slate-50 text-center"
-                  >
-                    Post evidence now
-                  </a>
                   <a href="/docs/integrate" className="rounded-lg border bg-white px-6 py-3 text-sm font-medium hover:bg-slate-50 text-center">
                     Integration guide
                   </a>

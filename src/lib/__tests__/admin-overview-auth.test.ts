@@ -83,6 +83,17 @@ describe("GET /api/admin/overview (operator-scoped)", () => {
     expect(body.executiveAdmin).toBe(false);
     expect(body.metrics.receipts).toBe(3);
     expect(body.operator.email).toBe("regular@example.com");
+    // Command Center must render: full shape (health + activity) present, and
+    // sensitive global/cross-tenant fields + config-presence flags masked.
+    expect(body.health).toBeDefined();
+    expect(body.health.overall).toBeDefined();
+    expect(Array.isArray(body.health.components)).toBe(true);
+    expect(Array.isArray(body.activity)).toBe(true);
+    expect(body.metrics.issuedAgents).toBeNull();
+    expect(body.metrics.evidence).toBeNull();
+    expect(body.health.components.find((c: { id: string }) => c.id === "signing").detail).not.toContain(
+      "SIGNING_PRIVATE_KEY"
+    );
   });
 
   it("flags executive admins in the response", async () => {

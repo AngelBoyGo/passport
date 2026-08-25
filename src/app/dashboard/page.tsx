@@ -193,12 +193,6 @@ export default function UserDashboard() {
 
           <div className="flex flex-wrap items-center gap-2">
             <Link
-              href="/post-evidence"
-              className="rounded-lg bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white shadow hover:bg-indigo-500 transition"
-            >
-              + Post Evidence
-            </Link>
-            <Link
               href="/admin"
               className="rounded-lg border border-slate-700 bg-slate-800 px-3.5 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-700 transition"
             >

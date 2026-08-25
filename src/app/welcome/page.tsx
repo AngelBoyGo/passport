@@ -29,7 +29,7 @@ export default function WelcomePage() {
     {
       title: "Step 3: Post evidence",
       body: "Once enrolled, your agent posts evidence of completed work. Each evidence event can become a signed receipt automatically via the evidence bridge.",
-      action: "See how to post evidence",
+      action: "See how to ingest evidence",
       href: "/docs/integrations",
     },
     {
