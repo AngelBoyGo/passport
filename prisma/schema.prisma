@@ -28,6 +28,13 @@ enum OperatorAccountStatus {
   ESCROW_INSOLVENT_BLOCKED
 }
 
+enum KycStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  NOT_REQUIRED
+}
+
 enum EvidenceLinkageType {
   OBSERVATION
   CORRECTION
@@ -89,6 +96,7 @@ model Operator {
   tier                String                @default("free")
   stakeBalanceCents   Int                   @default(0)
   accountStatus       OperatorAccountStatus @default(ACTIVE)
+  kycStatus           KycStatus             @default(PENDING)
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
 
@@ -446,4 +454,22 @@ model OperatorLedgerEntry {
   createdAt   DateTime @default(now())
 
   @@index([operatorId, createdAt])
+}
+
+/// Custodial wallet mapping for stablecoin deposits/withdrawals. An operator
+/// (KYC'd human) owns the wallet; an optional agent commitment may be bound to
+/// it so an agent's on-chain earnings are always attributable to a verified
+/// operator. Agents never hold independent wallets.
+model BridgeWallet {
+  id                String   @id @default(cuid())
+  operatorId        String   @unique
+  subjectCommitment String?
+  bridgeExternalId  String?
+  chainAddress      String?
+  upstream          String   @default("bridge")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([operatorId])
+  @@index([subjectCommitment])
 }
