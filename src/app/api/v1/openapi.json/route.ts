@@ -354,6 +354,13 @@ export async function GET(request: NextRequest) {
           responses: { "201": { description: "Settlement credited to wallet" } },
         },
       },
+      "/api/v1/agent-pay/withdraw": {
+        post: {
+          summary: "Burn ANGL and queue an on-chain payout to the commitment's custodial wallet (proof-of-payout receipt returned)",
+          security: [{ ApiKeyAuth: [] }],
+          responses: { "201": { description: "Withdrawal applied + receipt id" }, "403": { description: "Not owner of wallet" } },
+        },
+      },
       "/api/v1/datacenter/documentation": {
         get: {
           summary: "Facility documentation manifest — what Passport documents for a data center",

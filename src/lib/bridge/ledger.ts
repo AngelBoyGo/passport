@@ -15,6 +15,11 @@ function ref(prefix: string, bridgeTransferId: string): string {
   return `${prefix}_${bridgeTransferId}`;
 }
 
+/** External reference for a withdrawal/burn (rail bridge_transfer). */
+export function withdrawalRef(prefix: string, id: string): string {
+  return `${prefix}_${id}`;
+}
+
 /** A5: idempotently apply a confirmed deposit → mint ANGL credits. */
 export async function applyBridgeDeposit(opts: {
   operatorId: string;
