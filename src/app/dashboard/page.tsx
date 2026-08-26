@@ -598,6 +598,82 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
           </div>
         )}
 
+        {/* Agent Payments (API) — programmatic actions for operators */}
+        <div className="rounded-xl border border-emerald-500/25 bg-emerald-950/10 p-6 shadow-sm space-y-4">
+          <div>
+            <h2 className="text-base font-bold text-white flex items-center gap-2">
+              <span>🤖</span> Agent Payments
+            </h2>
+            <p className="text-xs text-slate-400">
+              Programmatic actions an operator (or agent) can take against the payment rail with a Bearer API key.
+              Start with <code className="text-emerald-300">spend</code> to authorize a scoped attestation payment.
+            </p>
+          </div>
+
+          <div className="grid gap-3 text-xs sm:grid-cols-3">
+            <div className="rounded-lg bg-slate-900 border border-slate-800 p-3 space-y-2">
+              <span className="font-semibold text-emerald-300">Spend (scoped)</span>
+              <p className="text-slate-400">POST /api/v1/agent-pay/spend — authorize a product (e.g. portable_credential_issuance) within a spend ceiling.</p>
+              <button
+                onClick={() =>
+                  copyText(
+                    `curl -X POST "${origin}/api/v1/agent-pay/spend" \\
+  -H "Authorization: Bearer pp_YOUR_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"product":"portable_credential_issuance","max_credits":1}'`,
+                    "paySpend"
+                  )
+                }
+                className="text-emerald-400 hover:underline"
+              >
+                {copiedKey === "paySpend" ? "✓ Copied" : "Copy cURL"}
+              </button>
+            </div>
+
+            <div className="rounded-lg bg-slate-900 border border-slate-800 p-3 space-y-2">
+              <span className="font-semibold text-emerald-300">Settlement (inbound)</span>
+              <p className="text-slate-400">POST /api/v1/agent-pay/settlement — HMAC-authenticated credit from a rail (Stripe, x402, Visa).</p>
+              <button
+                onClick={() =>
+                  copyText(
+                    `curl -X POST "${origin}/api/v1/agent-pay/settlement" \\
+  -H "Authorization: Bearer pp_YOUR_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"rail":"x402","reference":"tx_abc","credit_credits":5,"signature":"<HMAC>"}'`,
+                    "paySettle"
+                  )
+                }
+                className="text-emerald-400 hover:underline"
+              >
+                {copiedKey === "paySettle" ? "✓ Copied" : "Copy cURL"}
+              </button>
+            </div>
+
+            <div className="rounded-lg bg-slate-900 border border-slate-800 p-3 space-y-2">
+              <span className="font-semibold text-emerald-300">Withdraw (on-chain)</span>
+              <p className="text-slate-400">POST /api/v1/agent-pay/withdraw — burn ANGL to the custodial wallet (KYC-gated in live).</p>
+              <button
+                onClick={() =>
+                  copyText(
+                    `curl -X POST "${origin}/api/v1/agent-pay/withdraw" \\
+  -H "Authorization: Bearer pp_YOUR_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"subject_commitment":"<64-hex>","amount":100,"reference":"wd_1"}'`,
+                    "payWithdraw"
+                  )
+                }
+                className="text-emerald-400 hover:underline"
+              >
+                {copiedKey === "payWithdraw" ? "✓ Copied" : "Copy cURL"}
+              </button>
+            </div>
+          </div>
+
+          <a href="/docs/api-reference" className="text-xs text-indigo-400 hover:underline inline-block">
+            Full API reference →
+          </a>
+        </div>
+
         {/* 2. DATACENTER LENS */}
         {lens === "datacenter" && (
           <div className="space-y-6">

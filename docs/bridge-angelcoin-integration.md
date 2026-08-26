@@ -161,7 +161,6 @@ New `POST /api/v1/agent-pay/withdraw` (Bearer + agent Ed25519 proof): burn credi
 | `BRIDGE_CLIENT_ID` / `BRIDGE_CLIENT_SECRET` | Bridge platform/issuance credentials |
 | `BRIDGE_ENV` | `sandbox` \| `live` |
 | `BRIDGE_WEBHOOK_SECRET` | HMAC for Bridge webhooks |
-| `STRIPE_USDC_PRICE` | unit price (1 USD) for stablecoin Checkout sessions |
 | `ANGL_RESERVE_POLICY` | `1:1` |
 | `ANGL_WITHDRAW_KYC_ONLY` | `true` in live, `false` in sandbox |
 

@@ -85,7 +85,6 @@ If `STRIPE_SECRET_KEY` is unset, the app runs in dev/mock billing mode.
 | `PASSPORT_SERVICE_TOKEN` | Service token for `task_deliverable` evidence ingestion (when `EVIDENCE_SERVICE_AUTH_REQUIRED=true`) |
 | `EVIDENCE_SERVICE_AUTH_REQUIRED` | `"true"` to gate `task_deliverable` evidence on the service token |
 | `ADMIN_OPERATOR_EMAILS` | Comma-separated executive-admin allowlist |
-| `STRIPE_USDC_PRICE` | Optional unit price for the USDC credit top-up Checkout (note: checkout uses dynamic price_data) |
 
 ### Stablecoin (USDC) + Bridge (Open Issuance) + AngelCoin compliance
 
