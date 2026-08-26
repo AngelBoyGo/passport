@@ -70,7 +70,7 @@ describe("Escrow payout ownership authorization (Loop 37 — CRITICAL)", () => {
       const res = await POST(req, { params: Promise.resolve({ taskId }) });
 
       expect(res.status).toBe(200);
-      expect(acceptEngagementMock).toHaveBeenCalledWith(taskId);
+      expect(acceptEngagementMock).toHaveBeenCalledWith(taskId, { settleOnChain: false });
     });
 
     it("allows an executive admin to accept on behalf of parties", async () => {

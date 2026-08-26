@@ -6,6 +6,7 @@ import {
   unlockCredits,
 } from "@/lib/angelcoin/ledger-service";
 import { bridgeEvidenceToReceipt } from "@/lib/evidence-bridge/evidence-receipt-bridge";
+import { enqueueWorkerTransfer } from "@/lib/bridge/escrow-settle";
 import { requireEnrolled } from "@/lib/enrollment/enrollment-service";
 import {
   DuplicateEngagementError,
@@ -173,7 +174,10 @@ export async function findDeliverableEvidence(taskId: string) {
 /**
  * Accepts a delivered engagement: evidence is a hard gate before escrow payout.
  */
-export async function acceptEngagement(taskId: string): Promise<{
+export async function acceptEngagement(
+  taskId: string,
+  opts?: { settleOnChain?: boolean }
+): Promise<{
   engagement: EngagementRecord;
   payout: Awaited<ReturnType<typeof releaseEscrowToWorker>> | null;
   receipt_id: string | null;
@@ -215,6 +219,18 @@ export async function acceptEngagement(taskId: string): Promise<{
     row.amount,
     JSON.stringify({ task_id: normalizedTaskId, phase: "accept_payout" })
   );
+
+  // D1-D4: OPTIONAL on-chain settlement. The internal custodial payout above
+  // always runs and stays instantaneous; when requested, we enqueue an ANGL
+  // transfer to the worker's wallet — non-blocking (fire-and-forget) so the
+  // acceptance never stalls and never double-pays (exactly-once on taskId).
+  if (opts?.settleOnChain) {
+    enqueueWorkerTransfer({
+      taskId: normalizedTaskId,
+      workerCommitment: row.workerCommitment,
+      amount: row.amount,
+    }).catch((err) => console.warn("on-chain worker transfer enqueue failed:", err));
+  }
 
   let receiptId: string | null = row.receiptId;
   if (!receiptId) {

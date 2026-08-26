@@ -66,7 +66,11 @@ export async function POST(
   }
 
   try {
-    const result = await acceptEngagement(taskId);
+    let settleOnChain = false;
+    const raw = await request.json().catch(() => ({}));
+    if (raw && typeof raw.settleOnChain === "boolean") settleOnChain = raw.settleOnChain;
+
+    const result = await acceptEngagement(taskId, { settleOnChain });
     return NextResponse.json(result);
   } catch (err) {
     const mapped = engagementErrorResponse(err);

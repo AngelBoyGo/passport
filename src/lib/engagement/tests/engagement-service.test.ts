@@ -15,6 +15,7 @@ const {
   unlockCreditsMock,
   releaseEscrowToWorkerMock,
   bridgeEvidenceToReceiptMock,
+  enqueueWorkerTransferMock,
 } = vi.hoisted(() => ({
   engagementFindUniqueMock: vi.fn(),
   engagementCreateMock: vi.fn(),
@@ -25,6 +26,7 @@ const {
   unlockCreditsMock: vi.fn(),
   releaseEscrowToWorkerMock: vi.fn(),
   bridgeEvidenceToReceiptMock: vi.fn(),
+  enqueueWorkerTransferMock: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -52,6 +54,10 @@ vi.mock("@/lib/angelcoin/ledger-service", () => ({
 
 vi.mock("@/lib/evidence-bridge/evidence-receipt-bridge", () => ({
   bridgeEvidenceToReceipt: bridgeEvidenceToReceiptMock,
+}));
+
+vi.mock("@/lib/bridge/escrow-settle", () => ({
+  enqueueWorkerTransfer: (...args: unknown[]) => enqueueWorkerTransferMock(...args),
 }));
 
 import {
@@ -204,6 +210,44 @@ describe("acceptEngagement", () => {
     );
     expect(result.engagement.status).toBe("PAID");
     expect(result.receipt_id).toBe("rcpt_1");
+  });
+
+  it("D1: enqueues an on-chain worker transfer when settleOnChain is set (non-blocking)", async () => {
+    const delivered = {
+      ...heldEngagement(),
+      status: EngagementStatus.DELIVERED,
+      deliverableDigest: "d".repeat(64),
+      evidenceEventHash: "e".repeat(64),
+    };
+    engagementFindUniqueMock.mockResolvedValue(delivered);
+    evidenceFindFirstMock.mockResolvedValue({
+      id: "ev_1",
+      sourceType: "task_deliverable",
+      agentIdentityCommitment: WORKER,
+      eventCommitmentHash: "e".repeat(64),
+      normalizedEventType: "AGENT_ARTIFACT_CREATED",
+      rawErrorClassification: "UNKNOWN",
+      validationSignalPresent: true,
+      observedAt: new Date(),
+    });
+    releaseEscrowToWorkerMock.mockResolvedValue({ paymentEntry: { id: "pay_1" } });
+    bridgeEvidenceToReceiptMock.mockResolvedValue({ receiptId: "rcpt_2" });
+    engagementUpdateMock.mockResolvedValue({
+      ...delivered,
+      status: EngagementStatus.PAID,
+      receiptId: "rcpt_2",
+      paidAt: new Date(),
+    });
+    enqueueWorkerTransferMock.mockResolvedValue({ enqueued: true, workerId: "op_w", workerChainAddress: "0xw" });
+
+    const result = await acceptEngagement(TASK_ID, { settleOnChain: true });
+
+    // Internal payout still happened + optional on-chain enqueue fired.
+    expect(releaseEscrowToWorkerMock).toHaveBeenCalled();
+    expect(enqueueWorkerTransferMock).toHaveBeenCalledWith(
+      expect.objectContaining({ taskId: TASK_ID, workerCommitment: WORKER, amount: 500 })
+    );
+    expect(result.engagement.status).toBe("PAID");
   });
 });
 
