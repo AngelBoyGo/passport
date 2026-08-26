@@ -13,6 +13,7 @@
     "smoke": "npx tsx scripts/smoke-test.ts",
     "smoke:github": "tsx scripts/smoke-passport-github.ts",
     "smoke:angelcoin": "tsx scripts/smoke-passport-angelcoin.ts",
+    "smoke:angelcoin-loop": "tsx scripts/smoke-angelcoin-closed-loop.ts",
     "smoke:agent-enrollment": "tsx scripts/smoke-passport-enrollment.ts",
     "smoke:presentation": "tsx scripts/smoke-presentation.ts",
     "check:env": "tsx scripts/check-env.ts",

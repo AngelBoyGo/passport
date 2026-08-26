@@ -195,4 +195,27 @@ Each step ships green; no feature advances with failing acceptance tests.
 
 **Ship the onboarding test bank A + B with mocked Bridge**, and in parallel start **Bridge KYB** (long lead time). Phase B (Stripe USDC topup ✓ for `Operator.credits`) is the smallest motion that gives AngelCoin real settlement value today, and it exercises the stripes of the same `ExternalSettlement` idempotency we’ll rely on for Bridge later.
 
+---
+
+## 8. Closed-loop smoke harness (immediate, zero-KYB proof)
+
+A repeatable, DB-driven smoke harness drives the REAL ledger services end-to-end
+(deposit→mint, wallet binding, escrow lock/unlock→worker, burn + proof receipt,
+reserve-guard refusal) and asserts a deterministic invariant ledger against an
+optional golden snapshot.
+
+```bash
+# Non-production DB only. Wipes nothing unless --reset.
+PASSPORT_SMOKE_ALLOW=1 npx tsx scripts/smoke-angelcoin-closed-loop.ts --reset
+# Write a fresh golden snapshot once:
+PASSPORT_SMOKE_ALLOW=1 npx tsx scripts/smoke-angelcoin-closed-loop.ts --reset --write-golden
+# CI-negative proof (passes only when the harness detects an invariant failure):
+PASSPORT_SMOKE_ALLOW=1 npx tsx scripts/smoke-angelcoin-closed-loop.ts --expect-fail
+```
+
+- Hard-guarded: refuses to run when `NODE_ENV=production` or `PASSPORT_SMOKE_ALLOW != 1`.
+- Golden file: `scripts/fixtures/angelcoin-closed-loop.golden.json` (drift detection).
+- The invariant-reconcile logic is pure (`src/lib/release/angelcoin-closed-loop.ts`) and
+  covered by unit tests in CI — no database required.
+
 _Next doc:_ add a short `docs/bridge-angelcoin-README.md` with a "do this with the API" quickstart once the first wave of tests is green.
