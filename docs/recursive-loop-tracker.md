@@ -1,6 +1,23 @@
 # Recursive loop tracker — Passport + HostHub FFD
 
-Last updated: **2026-08-21** (Loop 37 Full Platform Audit — 13 layers, 2 parallel audit agents, critical fixes — 130 test files, 794 tests green)
+Last updated: **2026-08-21** (Loop 38 Closed-Loop Settlement + Re-Audit Patch Batch — 139 test files, 848 tests green)
+
+---
+
+## Loop 38: Closed-Loop Settlement Smoke Harness + Re-Audit Patch Batch
+
+| Area | Result | Status |
+|---|---|---|
+| Closed-loop AngelCoin settlement harness (`scripts/smoke-angelcoin-closed-loop.ts`) | Drives real ledger services end-to-end (deposit→mint, wallet bind, escrow unlock→worker, burn+proof, reserve-guard refusal); `--reset`/`--expect-fail`/`--write-golden`; hard guards (NODE_ENV + PASSPORT_SMOKE_ALLOW) | Complete (6 tests) |
+| Pure invariant lib (`src/lib/release/angelcoin-closed-loop.ts`, DB-free) | Deterministic ledger invariants + golden projection, CI-runnable | Complete |
+| Re-audit H1/H2 (ACP/A2A auth+escrow bypass) | Closed via createEngagement/acceptEngagement | Complete |
+| Re-audit M1/M2/L1/L2 (reserve guard, operator-scoped idempotency, timing-safe HMAC, AGORA auth) | Fixed | Complete |
+| Docs/UX fixes (datacenter VC 404, compliance dropdown, env sync, attestation comment) | Fixed | Complete |
+| Env docs (AGENTIC_PAY_RAIL_SECRET, NOTARY_ANCHOR_URL, ALLOW_DEV_PROVISION) | Documented | Complete |
+
+---
+
+## Loop 37: Full Platform Audit — 13 layers, 2 parallel audit agents, critical fixes
 
 ---
 

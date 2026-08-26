@@ -67,4 +67,32 @@ describe("AngelCoin closed-loop invariants (pure)", () => {
     expect(parseClosedLoopArgs(["--expect-fail"])).toMatchObject({ expectFail: true });
     expect(parseClosedLoopArgs(["-h"])).toMatchObject({ help: true });
   });
+
+  it("committed golden file matches the deterministic snapshotToGolden projection", async () => {
+    // The harness golden (scripts/fixtures/angelcoin-closed-loop.golden.json) is
+    // produced from THIS pure projection with the harness's commitment inputs.
+    // If the harness ever changes balances/proof inputs, this fails in CI without
+    // needing a database.
+    const fs = await import("node:fs");
+    const raw = fs.readFileSync(
+      "scripts/fixtures/angelcoin-closed-loop.golden.json",
+      "utf8"
+    );
+    const golden = JSON.parse(raw) as ReturnType<typeof snapshotToGolden>;
+
+    const snapshot: ClosedLoopSnapshot = {
+      operatorCommitment: "3c4d5367d4f327bdb07ba60302d3de036725b20faf0c1bb373ad782c6d708265",
+      workerCommitment: "f842ebf7a74a453b77da5cdb93cc2127f0e8742126cdb892b4563d25ecc511f6",
+      depositAmount: 1000,
+      escrowAmount: 500,
+      burnAmount: 500,
+      withdrawReference: "smoke_wd_1",
+      proofId: "77ca4f5972be9c03024696bd769c21746c7a6245c1140aa0bbc7cdef17044dc8",
+      hirer: { granted: 1000, earned: 0, spent: 500, locked: 0, available: 500 },
+      worker: { granted: 0, earned: 500, spent: 500, locked: 0, available: 0 },
+      overWithdrawRejected: true,
+    };
+    expect(assertClosedLoopInvariants(snapshot)).toEqual([]);
+    expect(snapshotToGolden(snapshot)).toEqual(golden);
+  });
 });

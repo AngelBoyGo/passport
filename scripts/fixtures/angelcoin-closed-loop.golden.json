@@ -1,0 +1,24 @@
+{
+  "operatorCommitment": "3c4d5367d4f327bdb07ba60302d3de036725b20faf0c1bb373ad782c6d708265",
+  "workerCommitment": "f842ebf7a74a453b77da5cdb93cc2127f0e8742126cdb892b4563d25ecc511f6",
+  "depositAmount": 1000,
+  "escrowAmount": 500,
+  "burnAmount": 500,
+  "withdrawReference": "smoke_wd_1",
+  "proofId": "77ca4f5972be9c03024696bd769c21746c7a6245c1140aa0bbc7cdef17044dc8",
+  "overWithdrawRejected": true,
+  "hirerBalances": {
+    "granted": 1000,
+    "earned": 0,
+    "spent": 500,
+    "locked": 0,
+    "available": 500
+  },
+  "workerBalances": {
+    "granted": 0,
+    "earned": 500,
+    "spent": 500,
+    "locked": 0,
+    "available": 0
+  }
+}
