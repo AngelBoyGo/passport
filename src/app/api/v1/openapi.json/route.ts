@@ -187,7 +187,8 @@ export async function GET(request: NextRequest) {
       },
       "/api/v1/a2a/tasks": {
         post: {
-          summary: "A2A JSON-RPC 2.0 Task Delegation",
+          summary: "A2A JSON-RPC 2.0 Task Delegation (send/get/cancel/list — requires a Bearer API key)",
+          security: [{ ApiKeyAuth: [] }],
           responses: { "200": { description: "JSON-RPC 2.0 Task Response" } },
         },
       },
@@ -213,7 +214,8 @@ export async function GET(request: NextRequest) {
       },
       "/api/v1/agora/negotiate": {
         post: {
-          summary: "AGORA Protocol Agreement Proposal",
+          summary: "AGORA Protocol Agreement Proposal (requires a Bearer API key)",
+          security: [{ ApiKeyAuth: [] }],
           responses: { "201": { description: "Proposal recorded on capability ledger" } },
         },
       },
@@ -359,6 +361,18 @@ export async function GET(request: NextRequest) {
           summary: "Burn ANGL and queue an on-chain payout to the commitment's custodial wallet (proof-of-payout receipt returned)",
           security: [{ ApiKeyAuth: [] }],
           responses: { "201": { description: "Withdrawal applied + receipt id" }, "403": { description: "Not owner of wallet" } },
+        },
+      },
+      "/api/v1/account/topup": {
+        post: {
+          summary: "Create a one-time Stripe Checkout session accepting USDC to credit Operator.credits",
+          responses: { "200": { description: "Checkout session (url / clientSecret)" }, "400": { description: "Invalid amount" } },
+        },
+      },
+      "/api/v1/account/wallet": {
+        get: {
+          summary: "Return (or create on first touch) the operator's custodial wallet",
+          responses: { "200": { description: "Operator wallet" } },
         },
       },
       "/api/v1/datacenter/documentation": {

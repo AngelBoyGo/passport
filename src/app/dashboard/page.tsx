@@ -227,7 +227,7 @@ export default function UserDashboard() {
               href="/admin"
               className="rounded-lg border border-slate-700 bg-slate-800 px-3.5 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-700 transition"
             >
-              Command Center ↗
+              Admin Console ↗
             </Link>
             <button
               onClick={handleLogout}
@@ -435,7 +435,7 @@ export default function UserDashboard() {
                   <button
                     onClick={() =>
                       copyText(
-                        `curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\\n  -H "Authorization: Bearer pp_YOUR_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d '{"source_type":"task_deliverable","artifact_type":"code_generation","validation_signal_present":true,"payload":{"task":"fix_bug","status":"completed"}}'`,
+                        `curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\\n  -H "Authorization: Bearer pp_YOUR_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d '{"source_type":"github_commit_payload","artifact_type":"commit","validation_signal_present":true,"payload":{"sha":"abc123","commit":{"message":"feat: add passport verification"}}}'`,
                         "curl"
                       )
                     }
@@ -445,10 +445,11 @@ export default function UserDashboard() {
                   </button>
                 </div>
                 <pre className="text-[11px] font-mono text-indigo-300 overflow-x-auto select-all">
-                  {`curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
+                  {`# GitHub commit evidence (works with your operator Bearer key)
+curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
   -H "Authorization: Bearer pp_YOUR_KEY" \\
   -H "Content-Type: application/json" \\
-  -d '{"source_type":"task_deliverable","artifact_type":"code_generation","validation_signal_present":true,"payload":{"task":"fix_bug","status":"completed"}}'`}
+  -d '{"source_type":"github_commit_payload","artifact_type":"commit","validation_signal_present":true,"payload":{"sha":"abc123","commit":{"message":"feat: add passport verification"}}}'`}
                 </pre>
               </div>
             </div>

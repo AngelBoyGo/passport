@@ -82,6 +82,25 @@ If `STRIPE_SECRET_KEY` is unset, the app runs in dev/mock billing mode.
 | `ENROLLMENT_RATE_LIMIT_WINDOW_MS` | Enrollment rate-limit window (ms) |
 | `UPSTASH_REDIS_REST_URL` | Upstash Redis REST URL for distributed multi-replica rate limiting |
 | `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis REST token for distributed rate limiting |
+| `PASSPORT_SERVICE_TOKEN` | Service token for `task_deliverable` evidence ingestion (when `EVIDENCE_SERVICE_AUTH_REQUIRED=true`) |
+| `EVIDENCE_SERVICE_AUTH_REQUIRED` | `"true"` to gate `task_deliverable` evidence on the service token |
+| `ADMIN_OPERATOR_EMAILS` | Comma-separated executive-admin allowlist |
+| `STRIPE_USDC_PRICE` | Optional unit price for the USDC credit top-up Checkout (note: checkout uses dynamic price_data) |
+
+### Stablecoin (USDC) + Bridge (Open Issuance) + AngelCoin compliance
+
+| Variable | Purpose |
+|----------|---------|
+| `BRIDGE_CLIENT_ID` | Bridge platform/issuance client id (set once KYB approved) |
+| `BRIDGE_CLIENT_SECRET` | Bridge platform/issuance secret |
+| `BRIDGE_ENV` | `sandbox` \| `live` |
+| `BRIDGE_WEBHOOK_SECRET` | HMAC secret for verifying Bridge webhooks |
+| `ANGL_RESERVE_POLICY` | Reserve invariant (`1:1`); do not change |
+| `ANGL_WITHDRAW_KYC_ONLY` | `"true"` to enforce KYC-APPROVED before AngelCoin withdrawals (auto-enforced in live) |
+| `ANGL_BLOCKED_ADDRESSES` | Comma-separated sanctioned withdrawal addresses (blocked) |
+| `ANGL_BLOCKED_COUNTRIES` | Comma-separated ISO-2 geofenced country codes (e.g. `CU,IR,KP,SY`) |
+
+Stripe USDC credit top-up requires `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` (see Stripe block above); on `checkout.session.completed` the webhook credits `Operator.credits` and writes an `OperatorLedgerEntry`.
 
 ### Runtime (set by platform)
 

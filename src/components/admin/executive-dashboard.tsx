@@ -123,6 +123,9 @@ export function ExecutiveDashboard() {
               <p className="text-slate-500">Signed in as</p>
               <p className="mt-1 truncate font-medium text-slate-200">{data.operator.email ?? "operator"}</p>
               <div className="mt-3 flex flex-col gap-2">
+                <Link href="/dashboard" className="text-indigo-300 hover:text-white transition">
+                  ← Back to Dashboard
+                </Link>
                 <Link href="/admin/webhooks" className="text-indigo-300 hover:text-white transition">
                   Webhooks →
                 </Link>
