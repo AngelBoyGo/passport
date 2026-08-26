@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { authenticateApiKey } from "@/lib/operator";
+import { createEngagement } from "@/lib/engagement/engagement-service";
 
 export const dynamic = "force-dynamic";
 
@@ -77,37 +78,39 @@ export async function POST(request: NextRequest) {
         const taskId = String(params.task_id || `a2a-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`);
         const hirerCommitment = String(params.hirer_commitment || "");
         const workerCommitment = String(params.worker_commitment || "");
-        const amount = Number(params.amount || 0);
+        const amount = Number(params.amount ?? 0);
 
         if (!hirerCommitment || !workerCommitment) {
           return jsonRpcError(id, -32602, "Invalid params: hirer_commitment and worker_commitment required");
         }
-        if (!Number.isFinite(amount) || amount < 0) {
-          return jsonRpcError(id, -32602, "Invalid params: amount must be a non-negative number");
+        if (!Number.isInteger(amount) || amount <= 0) {
+          return jsonRpcError(id, -32602, "Invalid params: amount must be a positive integer");
         }
 
-        const engagement = await prisma.engagement.create({
-          data: {
+        try {
+          const engagement = await createEngagement({
             taskId,
             hirerCommitment,
             workerCommitment,
             amount,
-            status: "HELD",
-          },
-        });
+          });
 
-        return NextResponse.json({
-          jsonrpc: "2.0",
-          id,
-          result: {
-            task_id: engagement.taskId,
-            status: "held",
-            hirer_commitment: engagement.hirerCommitment,
-            worker_commitment: engagement.workerCommitment,
-            amount: engagement.amount,
-            created_at: new Date().toISOString(),
-          },
-        });
+          return NextResponse.json({
+            jsonrpc: "2.0",
+            id,
+            result: {
+              task_id: engagement.taskId,
+              status: "held",
+              hirer_commitment: engagement.hirerCommitment,
+              worker_commitment: engagement.workerCommitment,
+              amount: engagement.amount,
+              created_at: new Date().toISOString(),
+            },
+          });
+        } catch (err) {
+          const message = err instanceof Error ? err.message : "Failed to create task";
+          return jsonRpcError(id, -32602, message);
+        }
       }
 
       case "tasks/get": {

@@ -3,8 +3,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
     externalSettlement: { create: vi.fn(), findFirst: vi.fn() },
-    angelCoinAccount: { upsert: vi.fn() },
-    angelCoinJournalEntry: { count: vi.fn(), create: vi.fn() },
+    angelCoinAccount: { upsert: vi.fn(), findUnique: vi.fn() },
+    angelCoinJournalEntry: { count: vi.fn(), create: vi.fn(), findMany: vi.fn() },
     capabilityLedgerEntry: { create: vi.fn() },
     $transaction: vi.fn(async (fn: (tx: any) => Promise<void>) => fn(prismaMock)),
   },
@@ -29,7 +29,11 @@ describe("Bridge (Open Issuance) adapter — test bank A", () => {
     process.env.BRIDGE_WEBHOOK_SECRET = "whsec_bridge_test";
     // defaults for happy-path ledger writes
     prismaMock.angelCoinAccount.upsert.mockResolvedValue({ id: "acc_default" });
+    prismaMock.angelCoinAccount.findUnique.mockResolvedValue({ id: "acc_default", ownerOperatorId: "op_1" });
     prismaMock.angelCoinJournalEntry.create.mockResolvedValue({ id: "je_default" });
+    prismaMock.angelCoinJournalEntry.findMany.mockResolvedValue([
+      { id: "j1", accountId: "acc_default", entryType: "OPERATOR_GRANT", amount: 10000, counterpartyCommitment: null, metadata: null, createdAt: new Date() },
+    ]);
     prismaMock.capabilityLedgerEntry.create.mockResolvedValue({ id: "ce_default" });
   });
 

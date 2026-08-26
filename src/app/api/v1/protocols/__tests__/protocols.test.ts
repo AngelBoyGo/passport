@@ -39,6 +39,29 @@ vi.mock("@/lib/operator", () => ({
 vi.mock("@/lib/receipt/signer", () => ({
   getPublicKeyHex: vi.fn(() => "54b38000c534187cfd5fc6d3a41a8614e7c59ef67d83078b5aa18d2374b4f081"),
 }));
+vi.mock("@/lib/admin/admin-auth", () => ({
+  isExecutiveAdmin: vi.fn(() => false),
+}));
+vi.mock("@/lib/engagement/engagement-service", () => ({
+  createEngagement: vi.fn(async (input: { taskId: string; hirerCommitment: string; workerCommitment: string; amount: number }) => ({
+    taskId: input.taskId,
+    hirerCommitment: input.hirerCommitment,
+    workerCommitment: input.workerCommitment,
+    amount: input.amount,
+    status: "HELD",
+    deliverableDigest: null,
+    evidenceEventHash: null,
+    receiptId: null,
+    paidAt: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  })),
+  acceptEngagement: vi.fn(async (taskId: string) => ({
+    engagement: { taskId, status: "PAID", paidAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    payout: null,
+    receipt_id: "rcpt_acp_1",
+  })),
+}));
 
 describe("Protocol Integrations", () => {
   beforeEach(() => {

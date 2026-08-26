@@ -420,7 +420,9 @@ model ExternalSettlement {
   label         String?
   createdAt     DateTime @default(now())
 
-  @@unique([rail, reference])
+  // M2: idempotency is per-OPERATOR — two unrelated operators can reuse the
+  // same reference on the same rail without cross-tenant collisions.
+  @@unique([operatorId, rail, reference])
   @@index([operatorId])
   @@index([rail, reference])
 }

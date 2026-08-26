@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/db";
 import { sha256Hex } from "@/lib/receipt/canonical";
+import { computeBalances } from "@/lib/angelcoin/balances";
+import { loadJournalEntries } from "@/lib/angelcoin/ledger-service";
 
 /**
  * Bridge <-> AngelCoin ledger support.
@@ -75,6 +77,25 @@ export async function burnAndPayout(opts: {
   reference: string;
   amount: number;
 }): Promise<{ applied: boolean; reason?: string }> {
+  if (!Number.isInteger(opts.amount) || opts.amount <= 0) {
+    return { applied: false, reason: "Amount must be a positive integer" };
+  }
+
+  // M1: reserve/backing guard — never burn more ANGL than the commitment's
+  // available balance (real deposited credits), so no mint-on-paper withdraws.
+  const account = await prisma.angelCoinAccount.findUnique({
+    where: { subjectCommitment: opts.subjectCommitment },
+    select: { id: true, ownerOperatorId: true },
+  });
+  if (!account) {
+    return { applied: false, reason: "No AngelCoin account backing this commitment" };
+  }
+  const entries = await loadJournalEntries(account.id);
+  const available = computeBalances(entries).availableBalance;
+  if (available < opts.amount) {
+    return { applied: false, reason: "Withdrawal exceeds available (backed) balance" };
+  }
+
   // Explicit duplicate guard (fast fail + used by the A6 test).
   const existing = await prisma.externalSettlement.findFirst({
     where: { rail: TRANSFER_RAIL, reference: opts.reference, operatorId: opts.operatorId },

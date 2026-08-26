@@ -1,6 +1,7 @@
 import { verify } from "@noble/ed25519";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
+import { timingSafeEqual } from "node:crypto";
 import { prisma } from "@/lib/db";
 import { recordCapabilityEvent } from "@/lib/operator";
 import {
@@ -175,7 +176,10 @@ export async function settleExternalRailPayment(opts: {
   }
 
   const expectedSig = computeRailHmac(opts.reference, opts.credit_credits, opts.rail, secret);
-  if (expectedSig !== opts.signature) {
+  // L1: constant-time comparison so the HMAC secret isn't leaked via timing.
+  const a = Buffer.from(expectedSig, "hex");
+  const b = Buffer.from(opts.signature, "hex");
+  if (a.length !== b.length || !timingSafeEqual(a, b)) {
     return { accepted: false, reason: "Invalid rail settlement signature" };
   }
 

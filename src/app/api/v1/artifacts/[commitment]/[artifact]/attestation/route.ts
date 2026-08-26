@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
  * stamp applied to a concrete object, not a generic profile marker.
  *
  * `artifact` may be: a 64-hex eventCommitmentHash, or a 40-hex commit SHA.
- * Returns JSON metadata (default) or an SVG card via ?format=svg.
+ * Returns an SVG card (default) or JSON metadata via ?format=json.
  */
 export async function GET(
   request: NextRequest,

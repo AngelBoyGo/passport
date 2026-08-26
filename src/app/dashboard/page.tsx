@@ -717,7 +717,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
 
               <div className="flex flex-wrap gap-2 pt-2">
                 <a
-                  href={`/api/v1/datacenter/clusters/${data?.agents[0]?.agentId || "cluster-01"}/credential`}
+                  href="/api/v1/datacenter/clusters/facility-cluster-01/credential"
                   target="_blank"
                   rel="noreferrer"
                   className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500 transition"
@@ -758,7 +758,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
                     <option value="EU_AI_ACT">EU AI Act (Article 51 / Annex IV)</option>
                     <option value="NIST_AI_RMF">NIST AI RMF 1.0 (GOVERN / MANAGE)</option>
                     <option value="SOC2_TYPE2">SOC 2 Type II (Trust Criteria)</option>
-                    <option value="ISO_14064_GHG">ISO 14064 Scope 2 GHG Avoidance</option>
+                    <option value="ISO_42001">ISO/IEC 42001 (AI Governance)</option>
                   </select>
 
                   <a
