@@ -67,6 +67,9 @@ export default function UserDashboard() {
   const [governance, setGovernance] = useState<any | null>(null);
   const [governanceAgent, setGovernanceAgent] = useState<string | null>(null);
   const [governanceLoading, setGovernanceLoading] = useState(false);
+  const [topUpAmount, setTopUpAmount] = useState<number>(5000);
+  const [walletCard, setWalletCard] = useState<any | null>(null);
+  const [toppingUp, setToppingUp] = useState(false);
 
   const loadDashboard = useCallback(async () => {
     try {
@@ -137,6 +140,34 @@ export default function UserDashboard() {
     } catch {} finally {
       setCreatingKey(false);
     }
+  }
+
+  async function handleTopUp() {
+    try {
+      setToppingUp(true);
+      const res = await fetch("/api/v1/account/topup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ usd_cents: topUpAmount }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.url) window.location.assign(data.url); // Stripe USDC Checkout
+        else if (data.mock) alert("Dev mode: credits top-up mocked (no Stripe key).");
+      }
+    } catch {
+      alert("Top-up failed");
+    } finally {
+      setToppingUp(false);
+    }
+  }
+
+  async function loadWalletCard() {
+    try {
+      const res = await fetch("/api/v1/account/wallet", { cache: "no-store", credentials: "same-origin" });
+      if (res.ok) setWalletCard(await res.json());
+    } catch {}
   }
 
   const loadGovernance = useCallback(async (commitment: string) => {
@@ -295,6 +326,49 @@ export default function UserDashboard() {
             <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wide">Merkle Checkpoint</span>
             <p className="mt-1 text-xs font-mono font-bold text-amber-300 break-all">{data?.merkle_root ? data.merkle_root.slice(0, 18) + "..." : "8f4b29c0..."}</p>
             <p className="mt-0.5 text-[11px] text-slate-400">Tamper-Proof Ledger State</p>
+          </div>
+        </div>
+
+        {/* ── Add credits (USDC) + custodial wallet ── */}
+        <div className="rounded-xl border border-slate-800 bg-slate-800/80 p-5 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <span>💵</span> Add Credits (USDC) · Stablecoin
+              </h2>
+              <p className="text-xs text-slate-400">Top up Operator.credits with USDC via Stripe — settlement is backed by real dollars.</p>
+            </div>
+            <button
+              type="button"
+              onClick={loadWalletCard}
+              className="text-xs text-indigo-400 hover:underline"
+            >
+              {walletCard ? (walletCard.chain_address ? `Wallet ${walletCard.chain_address.slice(0,8)}…` : "Refresh wallet") : "View wallet"}
+            </button>
+          </div>
+
+          <div className="flex flex-wrap items-end gap-3">
+            <div>
+              <label className="block text-[11px] uppercase tracking-wide text-slate-400 font-semibold">Amount (USD)</label>
+              <select
+                value={topUpAmount}
+                onChange={(e) => setTopUpAmount(Number(e.target.value))}
+                className="mt-1 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200"
+              >
+                <option value={1000}>$10 — 1,000 credits</option>
+                <option value={5000}>$50 — 5,000 credits</option>
+                <option value={10000}>$100 — 10,000 credits</option>
+                <option value={50000}>$500 — 50,000 credits</option>
+              </select>
+            </div>
+            <button
+              type="button"
+              onClick={handleTopUp}
+              disabled={toppingUp}
+              className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-500 transition disabled:opacity-50"
+            >
+              {toppingUp ? "Starting…" : "Top up with USDC →"}
+            </button>
           </div>
         </div>
 
