@@ -60,6 +60,9 @@ On the **Passport app service** → **Variables**, set:
 | `EVIDENCE_BRIDGE_OPERATOR_ID` | Optional: dedicated minter operator id for the evidence→receipt auto-bridge (its credit balance funds receipt minting) |
 | `EVIDENCE_BRIDGE_AUTO_ENABLED` | Optional (`true`): auto-mint a signed custody receipt for every accepted enrolled-evidence event |
 | `NOTARY_ANCHOR_URL` | Optional: independent append-only notary endpoint (e.g. a hardened audit sink). When set, each `/api/v1/receipts/checkpoints/latest` call publishes the signed Merkle chain head to it for external anchoring |
+| `ANGL_BLOCKED_ADDRESSES` | Optional: comma-separated list of sanctioned withdrawal addresses (case-insensitive) blocked from AngelCoin payouts |
+| `ANGL_BLOCKED_COUNTRIES` | Optional: comma-separated ISO-2 geofenced country codes (e.g. `CU,IR,KP,SY`) blocked from withdrawals |
+| `ANGL_WITHDRAW_KYC_ONLY` | Optional (`true`): enforce KYC-APPROVED before AngelCoin withdrawals even outside live |
 | `SESSION_SECRET` | 64-hex random string (generate with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`) |
 | `UPSTASH_REDIS_REST_URL` | Optional: Upstash Redis REST URL for multi-replica distributed rate-limiting |
 | `UPSTASH_REDIS_REST_TOKEN` | Optional: Upstash Redis REST token |

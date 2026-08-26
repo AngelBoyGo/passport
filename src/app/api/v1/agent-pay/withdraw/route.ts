@@ -35,6 +35,9 @@ export async function POST(request: NextRequest) {
       operatorId: operator.id,
       amount,
       reference,
+      targetAddress: String(body.address ?? "").trim() || undefined,
+      countryCode: String(body.country_code ?? "").trim().toUpperCase() || undefined,
+      operatorKycStatus: (operator as { kycStatus?: string }).kycStatus,
     });
     if (!result.applied) {
       return NextResponse.json({ applied: false, reason: result.reason }, { status: 409, headers: { ...NO_STORE, ...CORS } });
