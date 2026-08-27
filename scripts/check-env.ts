@@ -60,6 +60,26 @@ function printReport(): void {
     console.log(`  ${name}: ${report.presence[name] ? "set" : "unset"}`);
   }
 
+  console.log("\nOptional / shipped integrations:");
+  for (const name of [
+    "BRIDGE_CLIENT_ID",
+    "BRIDGE_CLIENT_SECRET",
+    "BRIDGE_ENV",
+    "BRIDGE_WEBHOOK_SECRET",
+    "BRIDGE_CLIENT_ENGAGEMENT_PUBLIC_KEY",
+    "BRIDGE_USDC_CONTRACT_ADDRESS",
+    "BRIDGE_CHAIN_RPC_URL",
+    "BRIDGE_ATTESTOR_ED25519_PUBLIC_KEY",
+    "ANGL_TOKEN_CONTRACT_ADDRESS",
+    "ANGL_CHAIN_RPC_URL",
+    "ANGL_COMBINED_PUBLIC_KEY",
+    "AGENTIC_PAY_RAIL_SECRET",
+    "NOTARY_ANCHOR_URL",
+    "ALLOW_DEV_PROVISION",
+  ]) {
+    console.log(`  ${name}: ${report.presence[name] ? "set" : "unset"}`);
+  }
+
   console.log("\nStripe (conditional group when STRIPE_SECRET_KEY is set):");
   for (const name of [
     "STRIPE_SECRET_KEY",
