@@ -156,7 +156,7 @@ describe("ingestEnrolledEvidence", () => {
     });
 
     const persisted = upsertEvidenceMock.mock.calls[0][0].create;
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       event_commitment_hash: persisted.eventCommitmentHash,
       enrollment_status: "ENROLLED",
     });

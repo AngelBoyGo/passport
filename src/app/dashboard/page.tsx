@@ -70,6 +70,9 @@ export default function UserDashboard() {
   const [topUpAmount, setTopUpAmount] = useState<number>(5000);
   const [walletCard, setWalletCard] = useState<any | null>(null);
   const [toppingUp, setToppingUp] = useState(false);
+  const [activityFeed, setActivityFeed] = useState<any[] | null>(null);
+  const [referralCode, setReferralCode] = useState<string | null>(null);
+  const [copiedRef, setCopiedRef] = useState(false);
 
   const loadDashboard = useCallback(async () => {
     try {
@@ -98,6 +101,9 @@ export default function UserDashboard() {
 
   useEffect(() => {
     loadDashboard();
+    loadActivityFeed();
+    loadReferralCode();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadDashboard]);
 
   // Auto-load the first agent's governance snapshot (wallet/access/live) once
@@ -196,6 +202,26 @@ export default function UserDashboard() {
       setTimeout(() => setCopiedKey(null), 2500);
     }
   };
+
+  const loadActivityFeed = useCallback(async () => {
+    try {
+      const res = await fetch("/api/v1/activity", { cache: "no-store" });
+      if (res.ok) {
+        const json = await res.json();
+        setActivityFeed(json.events ?? []);
+      }
+    } catch {}
+  }, []);
+
+  const loadReferralCode = useCallback(async () => {
+    try {
+      const res = await fetch("/api/v1/referrals", { cache: "no-store", credentials: "same-origin" });
+      if (res.ok) {
+        const json = await res.json();
+        setReferralCode(json.code);
+      }
+    } catch {}
+  }, []);
 
   const origin = typeof window !== "undefined" ? window.location.origin : "https://passport.metis.gold";
 
@@ -328,6 +354,30 @@ export default function UserDashboard() {
             <p className="mt-0.5 text-[11px] text-slate-400">Tamper-Proof Ledger State</p>
           </div>
         </div>
+
+        {/* ── Reputation Score (from governance) ── */}
+        {governance && (
+          <div className="rounded-xl border border-slate-800 bg-slate-800/60 p-4 shadow-sm flex flex-col items-center text-center">
+            <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wide">Reputation Score</span>
+            <p className="mt-1 text-3xl font-bold text-white">{governance.reputation?.score ?? 0}</p>
+            {governance.reputation?.tier && (
+              <span
+                className="mt-1 inline-block rounded-full px-3 py-0.5 text-xs font-bold uppercase tracking-wider"
+                style={{
+                  backgroundColor: (governance.reputation?.tierColor ?? "#cd7f32") + "33",
+                  color: governance.reputation?.tierColor ?? "#cd7f32",
+                }}
+              >
+                {governance.reputation?.tierLabel ?? "Bronze"}
+              </span>
+            )}
+            {governance.reputation?.nextTier && (
+              <p className="mt-1 text-[10px] text-slate-400">
+                {governance.reputation.scoreToNextTier} pts to {governance.reputation.nextTier}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* ── Add credits (USDC) + custodial wallet ── */}
         <div className="rounded-xl border border-slate-800 bg-slate-800/80 p-5 shadow-sm space-y-4">
@@ -707,6 +757,77 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
           <a href="/docs/api-reference" className="text-xs text-indigo-400 hover:underline inline-block">
             Full API reference →
           </a>
+        </div>
+
+        {/* ── Live Activity Feed ── */}
+        <div className="rounded-xl border border-slate-800 bg-slate-800/80 p-5 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-bold text-white flex items-center gap-2">
+              <span>⚡</span> Live Activity Feed
+            </h2>
+            <Link href="/leaderboard" className="text-xs text-indigo-400 hover:underline">
+              View Leaderboard ↗
+            </Link>
+          </div>
+          {activityFeed && activityFeed.length > 0 ? (
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {activityFeed.slice(0, 10).map((event: any, i: number) => (
+                <div key={i} className="flex items-center justify-between text-xs border-b border-slate-800/60 pb-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                      event.type === "evidence" ? "bg-emerald-900/50 text-emerald-300" :
+                      event.type === "receipt" ? "bg-indigo-900/50 text-indigo-300" :
+                      "bg-amber-900/50 text-amber-300"
+                    }`}>
+                      {event.type === "evidence" ? "EV" : event.type === "receipt" ? "RC" : "EN"}
+                    </span>
+                    <span className="font-mono text-slate-400 truncate">{event.agent}</span>
+                    <span className="text-slate-300 truncate">{event.description}</span>
+                  </div>
+                  <a
+                    href={event.link || "#"}
+                    className="shrink-0 text-indigo-400 hover:underline ml-2"
+                  >
+                    View →
+                  </a>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-slate-400">Loading activity feed...</p>
+          )}
+        </div>
+
+        {/* ── Referral Code ── */}
+        <div className="rounded-xl border border-sky-500/30 bg-sky-950/20 p-5 shadow-sm space-y-4">
+          <h2 className="text-base font-bold text-white flex items-center gap-2">
+            <span>🔗</span> Invite Friends — Earn Credits
+          </h2>
+          <p className="text-xs text-slate-400">
+            Share your referral code. When a new operator signs up with it, you get bonus credits!
+          </p>
+          {referralCode ? (
+            <div className="flex items-center gap-3">
+              <code className="rounded-lg bg-slate-900 px-4 py-2 font-mono text-sm text-sky-300 border border-sky-700/50 select-all">
+                {referralCode}
+              </code>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(referralCode);
+                  setCopiedRef(true);
+                  setTimeout(() => setCopiedRef(false), 2500);
+                }}
+                className="rounded-lg bg-sky-600 px-4 py-2 text-xs font-semibold text-white hover:bg-sky-500 transition"
+              >
+                {copiedRef ? "✓ Copied!" : "Copy"}
+              </button>
+            </div>
+          ) : (
+            <p className="text-xs text-slate-400">Loading referral code...</p>
+          )}
+          <p className="text-xs text-slate-500">
+            Referral credits are awarded automatically when a new operator redeems your code.
+          </p>
         </div>
 
         {/* 2. DATACENTER LENS */}

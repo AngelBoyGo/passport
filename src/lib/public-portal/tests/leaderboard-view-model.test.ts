@@ -17,6 +17,9 @@ function baseRow(overrides: Partial<LeaderboardRow> = {}): LeaderboardRow {
     trace_visibility_rate_rolling_30d: 0.2,
     last_observed_at: "2026-06-02T00:00:00.000Z",
     trajectory_7d: "UP",
+    reputation_score: 350,
+    reputation_tier: "Gold",
+    reputation_tier_color: "#ffd700",
     ...overrides,
   };
 }

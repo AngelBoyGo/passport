@@ -7,6 +7,9 @@ const { prismaMock } = vi.hoisted(() => ({
       findMany: vi.fn(),
       count: vi.fn(),
     },
+    agentEnrollment: {
+      findUnique: vi.fn().mockResolvedValue({ status: "ISSUED" }),
+    },
   },
 }));
 

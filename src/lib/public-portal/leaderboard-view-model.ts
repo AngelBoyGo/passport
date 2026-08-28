@@ -8,6 +8,9 @@ export type LeaderboardRowViewModel = {
   successRateLabel: string;
   trajectoryLabel: string;
   profileHref: string;
+  reputationScore: number;
+  reputationTier: string;
+  reputationTierColor: string;
 };
 
 export type LeaderboardViewModel = {
@@ -47,6 +50,9 @@ export function mapLeaderboardRowsToViewModel(
       successRateLabel: formatLeaderboardRate(row.success_rate_rolling_30d),
       trajectoryLabel: TRAJECTORY_LABELS[row.trajectory_7d],
       profileHref: `/profiles/${row.agent_commitment_hash}`,
+      reputationScore: row.reputation_score,
+      reputationTier: row.reputation_tier,
+      reputationTierColor: row.reputation_tier_color,
     })),
   };
 }

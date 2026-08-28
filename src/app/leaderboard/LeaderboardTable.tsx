@@ -35,6 +35,12 @@ export function LeaderboardTable({ view }: LeaderboardTableProps) {
               Footprint
             </th>
             <th scope="col" className="px-4 py-3 text-right font-medium text-slate-600">
+              Score
+            </th>
+            <th scope="col" className="px-4 py-3 text-right font-medium text-slate-600">
+              Tier
+            </th>
+            <th scope="col" className="px-4 py-3 text-right font-medium text-slate-600">
               Evidence
             </th>
             <th scope="col" className="px-4 py-3 text-right font-medium text-slate-600">
@@ -60,6 +66,18 @@ export function LeaderboardTable({ view }: LeaderboardTableProps) {
                 >
                   {row.commitmentShort}
                 </Link>
+              </td>
+              <td className="px-4 py-3 text-right tabular-nums font-semibold">{row.reputationScore}</td>
+              <td className="px-4 py-3 text-right">
+                <span
+                  className="inline-block rounded-full px-2 py-0.5 text-xs font-bold"
+                  style={{
+                    backgroundColor: row.reputationTierColor + "22",
+                    color: row.reputationTierColor,
+                  }}
+                >
+                  {row.reputationTier}
+                </span>
               </td>
               <td className="px-4 py-3 text-right tabular-nums">{row.evidenceCount}</td>
               <td className="px-4 py-3 text-right tabular-nums">{row.artifactCount}</td>

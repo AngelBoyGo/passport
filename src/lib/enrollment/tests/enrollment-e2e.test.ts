@@ -22,6 +22,7 @@ const {
   findUniqueEnrollmentMock,
   upsertEnrollmentMock,
   updateEnrollmentMock,
+  findFirstEnrollmentMock,
   findManyEvidenceMock,
   upsertEvidenceMock,
   findFirstEvidenceMock,
@@ -29,6 +30,7 @@ const {
   findUniqueEnrollmentMock: vi.fn(),
   upsertEnrollmentMock: vi.fn(),
   updateEnrollmentMock: vi.fn(),
+  findFirstEnrollmentMock: vi.fn(),
   findManyEvidenceMock: vi.fn(),
   upsertEvidenceMock: vi.fn(),
   findFirstEvidenceMock: vi.fn(),
@@ -38,6 +40,7 @@ vi.mock("@/lib/db", () => ({
   prisma: {
     agentEnrollment: {
       findUnique: findUniqueEnrollmentMock,
+      findFirst: findFirstEnrollmentMock,
       upsert: upsertEnrollmentMock,
       update: updateEnrollmentMock,
     },

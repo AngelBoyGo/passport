@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { EnrollmentStatus } from "@prisma/client";
-import { getPublicKey, sign } from "@noble/ed25519";
+import { getPublicKey, sign, utils } from "@noble/ed25519";
 import { bytesToHex, hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
 import "@/lib/receipt/crypto";
 import {
@@ -26,16 +26,19 @@ const {
   findUniqueMock,
   upsertMock,
   updateMock,
+  findFirstMock,
 } = vi.hoisted(() => ({
   findUniqueMock: vi.fn(),
   upsertMock: vi.fn(),
   updateMock: vi.fn(),
+  findFirstMock: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
   prisma: {
     agentEnrollment: {
       findUnique: findUniqueMock,
+      findFirst: findFirstMock,
       upsert: upsertMock,
       update: updateMock,
     },
@@ -92,6 +95,15 @@ beforeEach(() => {
   findUniqueMock.mockImplementation(
     async (args: { where: { subjectCommitment: string } }) =>
       store.get(args.where.subjectCommitment) ?? null
+  );
+
+  findFirstMock.mockImplementation(
+    async (args: { where: { publicKey: string } }) => {
+      for (const row of store.values()) {
+        if (row.publicKey === args.where.publicKey) return row;
+      }
+      return null;
+    }
   );
 
   upsertMock.mockImplementation(
@@ -152,11 +164,16 @@ describe("startEnrollment", () => {
     );
   });
 
-  it("is idempotent for ISSUED enrollments", async () => {
+  it("rejects re-enrollment with same public key (A1 fix)", async () => {
+    const altKey = utils.randomSecretKey();
+    const altPub = bytesToHex(getPublicKey(altKey));
+    const altCommitment = deriveAgentCommitment(altPub);
     const issuedAt = new Date("2026-06-18T12:00:00Z");
     store.set(
-      SUBJECT_COMMITMENT,
+      altCommitment,
       makeRow({
+        subjectCommitment: altCommitment,
+        publicKey: altPub,
         status: EnrollmentStatus.ISSUED,
         challengeNonce: null,
         challengeExpiresAt: null,
@@ -164,11 +181,9 @@ describe("startEnrollment", () => {
       })
     );
 
-    const result = await startEnrollment(PUBLIC_KEY_HEX);
-    expect(result.status).toBe(EnrollmentStatus.ISSUED);
-    expect(result.challengeNonce).toBeUndefined();
-    expect(result.issuedAt).toBe(issuedAt.toISOString());
-    expect(upsertMock).not.toHaveBeenCalled();
+    await expect(startEnrollment(altPub)).rejects.toThrow(
+      "already enrolled"
+    );
   });
 });
 

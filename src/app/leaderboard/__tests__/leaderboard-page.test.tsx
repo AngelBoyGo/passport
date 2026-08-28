@@ -21,6 +21,9 @@ const singleRowView: LeaderboardViewModel = {
       successRateLabel: "50%",
       trajectoryLabel: "Up",
       profileHref: `/profiles/${AGENT_HASH}`,
+      reputationScore: 450,
+      reputationTier: "Gold",
+      reputationTierColor: "#ffd700",
     },
   ],
 };

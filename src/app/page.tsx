@@ -10,6 +10,7 @@ import { EconomyFeaturesSection } from "@/components/marketing/economy-features"
 import { MarketplaceFeaturesSection } from "@/components/marketing/marketplace-features";
 import { IntegrationFeaturesSection } from "@/components/marketing/integration-features";
 import { EnterpriseFeaturesSection } from "@/components/marketing/enterprise-features";
+import { ReputationTiersSection } from "@/components/marketing/reputation-tiers";
 
 export default function LandingPage() {
   return (
@@ -132,6 +133,7 @@ export default function LandingPage() {
         </section>
 
         <ReceiptFeaturesSection />
+        <ReputationTiersSection />
         <EconomyFeaturesSection />
         <MarketplaceFeaturesSection />
         <IntegrationFeaturesSection />

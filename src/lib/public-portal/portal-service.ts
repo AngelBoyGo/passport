@@ -6,6 +6,7 @@ import {
 import { verifyReceipt } from "@/lib/receipt/verify";
 import { operatorIdFromStripe } from "@/lib/operator";
 import { resolveEnrollmentStatus } from "@/lib/enrollment/evidence-binding";
+import { computeReputationScore, type ReputationTier, TIER_COLORS } from "@/lib/reputation/compute-score";
 import { getPresentation } from "@/lib/enrollment/presentation-service";
 import type { AgentPresentation } from "@/lib/enrollment/presentation";
 
@@ -188,6 +189,9 @@ export type LeaderboardRow = {
   trace_visibility_rate_rolling_30d: number | null;
   last_observed_at: string;
   trajectory_7d: "UP" | "FLAT" | "DOWN";
+  reputation_score: number;
+  reputation_tier: string;
+  reputation_tier_color: string;
 };
 
 const LEADERBOARD_CACHE_TTL_MS = 60_000;
@@ -269,6 +273,19 @@ export async function getLeaderboard(opts: {
         ]);
 
 const rates30d = computeRates(events30d);
+      const enrollStatus = await resolveEnrollmentStatus(hash);
+      const correctionCount = events30d.filter((e) => e.normalizedEventType === "HUMAN_CORRECTION_OBSERVED").length;
+      const failureCount = events30d.filter((e) => e.normalizedEventType === "EXECUTION_FAILURE_OBSERVED").length;
+
+      const rep = computeReputationScore({
+        evidenceCount: g._count._all,
+        artifactCount,
+        correctionCount: events30d.filter((e) => e.normalizedEventType === "HUMAN_CORRECTION_OBSERVED").length,
+        failureCount: events30d.filter((e) => e.normalizedEventType === "EXECUTION_FAILURE_OBSERVED").length,
+        successRate30d: rates30d.success_rate,
+        trajectory7d: computeTrajectory7d(events7d, eventsPrior7d),
+        isEnrolled: enrollStatus === "ENROLLED",
+      });
 
       return {
         agent_commitment_hash: hash,
@@ -283,9 +300,15 @@ const rates30d = computeRates(events30d);
         trace_visibility_rate_rolling_30d: rates30d.trace_visibility_rate,
         last_observed_at: g._max.observedAt!.toISOString(),
         trajectory_7d: computeTrajectory7d(events7d, eventsPrior7d),
+        reputation_score: rep.score,
+        reputation_tier: rep.tierLabel,
+        reputation_tier_color: rep.tierColor,
       };
     })
   );
+
+  // Sort by reputation score descending (higher score = better rank)
+  rows.sort((a, b) => b.reputation_score - a.reputation_score);
 
   leaderboardCache = { rows, limit, timestamp: now };
   return rows;

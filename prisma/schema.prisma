@@ -475,3 +475,18 @@ model BridgeWallet {
   @@index([operatorId])
   @@index([subjectCommitment])
 }
+
+/// Referral code for inviting new operators. Each operator can generate one
+/// referral code; every time someone signs up using it, the referrer gets
+/// bonus credits.
+model ReferralCode {
+  id           String   @id @default(cuid())
+  operatorId   String   @unique
+  code         String   @unique
+  bonusCredits Int      @default(50)
+  totalUsed    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([code])
+}
