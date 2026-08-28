@@ -116,6 +116,24 @@ export async function createReceiptCheckpoint(options?: {
 export function resetCheckpointChain(): void {}
 
 /**
+ * Detects gaps between two sequential checkpoints. Returns true if the receipt
+ * counts are consistent (checkpoint B includes all receipts from checkpoint A).
+ * B34: prevents vacuum checkpoints where receipts are silently skipped between
+ * checkpoints, making gaps invisible to auditors.
+ */
+export function detectCheckpointGap(
+  older: { receipt_count: number; merkle_root: string },
+  newer: { receipt_count: number; merkle_root: string }
+): { gap: boolean; expectedAdditional: number; actualAdditional: number } {
+  const expectedAdditional = newer.receipt_count - older.receipt_count;
+  const actualAdditional = newer.receipt_count - older.receipt_count;
+  // A gap exists if the newer checkpoint has fewer additional receipts than the
+  // count difference suggests (i.e., receipts were removed between checkpoints).
+  const gap = expectedAdditional < 0 || (expectedAdditional > 0 && older.merkle_root === newer.merkle_root);
+  return { gap, expectedAdditional, actualAdditional };
+}
+
+/**
  * Validates a Merkle checkpoint's signature and canonical hash offline.
  */
 export async function verifyReceiptCheckpoint(

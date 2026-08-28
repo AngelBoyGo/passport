@@ -599,6 +599,15 @@ export function normalizeGenAiTrace(payload: unknown): NormalizedEvidence[] {
     "gen_ai.usage.tools.total"
   );
 
+  // B30: cap token counts to prevent inflation attacks — no known model exceeds
+  // 1M input tokens or 1M output tokens; tool calls are capped at 10k.
+  const MAX_INPUT_TOKENS = 1_000_000;
+  const MAX_OUTPUT_TOKENS = 1_000_000;
+  const MAX_TOOL_CALLS = 10_000;
+  const boundedTokenInput = tokenInput !== null && tokenInput <= MAX_INPUT_TOKENS ? tokenInput : null;
+  const boundedTokenOutput = tokenOutput !== null && tokenOutput <= MAX_OUTPUT_TOKENS ? tokenOutput : null;
+  const boundedToolCallCount = toolCallCount !== null && toolCallCount <= MAX_TOOL_CALLS ? toolCallCount : null;
+
   const startedAt =
     parseUnixNano(span.startTimeUnixNano) ??
     parseIsoDate(span.start_time ?? undefined);
@@ -640,9 +649,9 @@ export function normalizeGenAiTrace(payload: unknown): NormalizedEvidence[] {
       session_log_url: null,
       execution_started_at: startedAt,
       execution_finished_at: finishedAt,
-      token_usage_input: tokenInput,
-      token_usage_output: tokenOutput,
-      tool_call_count: toolCallCount,
+      token_usage_input: boundedTokenInput,
+      token_usage_output: boundedTokenOutput,
+      tool_call_count: boundedToolCallCount,
       validation_signal_present,
       artifact_type: "trace",
       raw_error_classification,
@@ -879,6 +888,8 @@ export async function persistEvidence(
     // commitment differs because they were computed under the PREVIOUS salt
     // (INGESTION_COMMITMENT_SALT_PREVIOUS rotation) — same identity + type +
     // source + observedAt window means skip.
+    // B5: also check sourceDigest as secondary dedup key — two different payloads
+    // with different hashes but same eventCommitmentHash are treated as distinct.
     const skip = await prisma.agentEvidence.findFirst({
       where: {
         agentIdentityCommitment: record.agentIdentityCommitment,
@@ -888,6 +899,7 @@ export async function persistEvidence(
           gte: new Date(record.observedAt.getTime() - 1000),
           lte: new Date(record.observedAt.getTime() + 1000),
         },
+        ...(record.sourceDigest ? { sourceDigest: record.sourceDigest } : {}),
         ...(record.sourceUrl ? { sourceUrl: record.sourceUrl } : {}),
         ...(record.commitSha ? { commitSha: record.commitSha } : {}),
       },

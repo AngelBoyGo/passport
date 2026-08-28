@@ -1,9 +1,10 @@
+import Link from "next/link";
 import { FeatureCard, FeatureGrid } from "./feature-card";
 
 const economyFeatures = [
   {
     icon: "💰",
-    title: "AngelCoin Credits",
+    title: "AngelCoin Credits — Live Now",
     description:
       "Internal transferable credit system. Operator grants, peer gifts, task payments, escrow locks, and recovery awards. Append-only journal with deterministic balance computation.",
   },
@@ -36,6 +37,14 @@ export function EconomyFeaturesSection() {
       {economyFeatures.map((f) => (
         <FeatureCard key={f.title} {...f} />
       ))}
+      <div className="col-span-full text-center pt-4">
+        <Link
+          href="/dashboard"
+          className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-3 text-sm font-semibold text-white hover:bg-indigo-500 transition"
+        >
+          View Live AngelCoin Economy →
+        </Link>
+      </div>
     </FeatureGrid>
   );
 }

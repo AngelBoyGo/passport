@@ -1,5 +1,10 @@
 import { EnrollmentStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { sign } from "@noble/ed25519";
+import { bytesToHex, hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
+import { sha256Hex, canonicalJson } from "@/lib/receipt/canonical";
+import { getPublicKeyHex } from "@/lib/receipt/signer";
+import "@/lib/receipt/crypto";
 import {
   normalizeEvidence,
   persistEvidence,
@@ -29,6 +34,15 @@ export type IngestEnrolledEvidenceInput = {
 export type IngestEnrolledEvidenceResult = {
   event_commitment_hash: string;
   enrollment_status: EnrollmentStatusLabel;
+  server_proof?: {
+    event_commitment_hash: string;
+    subject_commitment: string;
+    server_received_at: string;
+    content_hash: string;
+    signature?: string;
+    algorithm: "ed25519";
+    public_key: string;
+  };
 };
 
 /**
@@ -175,8 +189,31 @@ export async function ingestEnrolledEvidence(
     }
   }
 
+  // B35: server non-repudiation proof — cryptographically signs the evidence
+  // receipt so the agent cannot later claim "I never received that evidence."
+  // The proof is verified offline with the Passport public key.
+  const proofPayload = {
+    event_commitment_hash: maskedRecords[0].eventCommitmentHash,
+    subject_commitment: input.subjectCommitment,
+    server_received_at: new Date().toISOString(),
+  };
+  const proofDigest = sha256Hex(canonicalJson(proofPayload));
+  const privateKeyHex = process.env.SIGNING_PRIVATE_KEY;
+  let serverProofSignature: string | undefined;
+  if (privateKeyHex) {
+    const pkBytes = hexToBytes(privateKeyHex.length === 128 ? privateKeyHex.slice(0, 64) : privateKeyHex);
+    serverProofSignature = bytesToHex(await sign(utf8ToBytes(proofDigest), pkBytes));
+  }
+
   return {
     event_commitment_hash: maskedRecords[0].eventCommitmentHash,
     enrollment_status: "ENROLLED",
+    server_proof: {
+      ...proofPayload,
+      content_hash: proofDigest,
+      signature: serverProofSignature,
+      algorithm: "ed25519",
+      public_key: getPublicKeyHex(),
+    },
   };
 }

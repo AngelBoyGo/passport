@@ -99,6 +99,18 @@ export async function startEnrollment(
     throw new InvalidEnrollmentInputError("context must be non-empty");
   }
 
+  // A1: global public key uniqueness — the same Ed25519 public key cannot be
+  // enrolled in multiple contexts. One keypair = one identity forever.
+  const existingKey = await prisma.agentEnrollment.findFirst({
+    where: { publicKey: publicKeyHex.toLowerCase() },
+    select: { subjectCommitment: true, context: true, status: true },
+  });
+  if (existingKey && existingKey.status === EnrollmentStatus.ISSUED) {
+    throw new InvalidEnrollmentInputError(
+      `This public key is already enrolled in context "${existingKey.context}". One keypair = one identity.`
+    );
+  }
+
   const subjectCommitment = deriveAgentCommitment(publicKeyHex, context);
   const existing = await prisma.agentEnrollment.findUnique({
     where: { subjectCommitment },

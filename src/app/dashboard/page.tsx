@@ -531,72 +531,107 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
           </div>
         )}
 
-        {/* Agent Wallet & Access Control panel (from governance endpoint) */}
-        {governanceAgent && (
-          <div className="rounded-xl border border-purple-500/30 bg-purple-950/20 p-6 shadow-sm space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-purple-900/60 pb-4">
-              <div>
-                <h2 className="text-base font-bold text-white flex items-center gap-2">
-                  <span>👛</span> Agent Wallet & Access Control
-                </h2>
-                <p className="text-xs text-slate-300 font-mono">commitment {governanceAgent.slice(0, 12)}…</p>
-              </div>
-              <button
-                onClick={() => loadGovernance(governanceAgent)}
-                disabled={governanceLoading}
-                className="rounded-lg border border-purple-700/50 bg-slate-900 px-3 py-1.5 text-xs font-medium text-purple-200 hover:bg-slate-800 transition"
-              >
-                {governanceLoading ? "Refreshing…" : "Refresh"}
-              </button>
-            </div>
-
-            {governance ? (
-              <div className="grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
-                <div className="rounded-lg bg-slate-900 border border-slate-800 p-4">
-                  <span className="text-[10px] font-semibold uppercase text-slate-400">Available Credits</span>
-                  <p className="mt-1 text-2xl font-bold text-purple-300">{governance.wallet?.credits ?? 0}</p>
-                  <p className="mt-0.5 text-slate-400">granted {governance.wallet?.granted ?? 0} · spent {governance.wallet?.spent ?? 0}</p>
-                </div>
-                <div className="rounded-lg bg-slate-900 border border-slate-800 p-4">
-                  <span className="text-[10px] font-semibold uppercase text-slate-400">Access Tier</span>
-                  <p className="mt-1 text-2xl font-bold text-white">{governance.access_tier ?? "—"}</p>
-                  <p className="mt-0.5 text-slate-400">live status: {governance.live_status?.statusLabel ?? "—"}</p>
-                </div>
-                <div className="rounded-lg bg-slate-900 border border-slate-800 p-4">
-                  <span className="text-[10px] font-semibold uppercase text-slate-400">Admin Override</span>
-                  <p className="mt-1 text-2xl font-bold text-sky-300">{governance.access_override ?? "None"}</p>
-                  <p className="mt-0.5 text-slate-400">evaluated deterministically from balance</p>
-                </div>
-                <div className="rounded-lg bg-slate-900 border border-slate-800 p-4">
-                  <span className="text-[10px] font-semibold uppercase text-slate-400">Locked Balance</span>
-                  <p className="mt-1 text-2xl font-bold text-amber-300">{governance.wallet?.locked ?? 0}</p>
-                  <p className="mt-0.5 text-slate-400">escrow / SLA commitments</p>
-                </div>
-              </div>
-            ) : (
-              <p className="text-xs text-slate-400">
-                No AngelCoin account or journal found for this agent. Credits are minted on first activity.
+        {/* ── AngelCoin Economy — live wallet, access control, and global credit status ── */}
+        <div className="rounded-xl border border-purple-500/30 bg-purple-950/20 p-6 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-purple-900/60 pb-4">
+            <div>
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <span>👛</span> AngelCoin Economy
+              </h2>
+              <p className="text-xs text-slate-300">
+                AngelCoin credits power agent payments, access tiers, and marketplace escrow.
+                {governanceAgent && (
+                  <span className="font-mono text-xs text-purple-400 ml-1">
+                    commitment {governanceAgent.slice(0, 12)}…
+                  </span>
+                )}
               </p>
-            )}
-
-            {governance?.recent_journal?.length > 0 && (
-              <div className="rounded-lg bg-slate-950 border border-slate-800 p-3">
-                <p className="text-[10px] font-semibold uppercase text-slate-400 mb-2">Recent Credit Journal</p>
-                <div className="space-y-1">
-                  {governance.recent_journal.map((entry: any) => (
-                    <div key={entry.id} className="flex items-center justify-between text-[11px] font-mono">
-                      <span className="text-slate-300">{entry.entry_type}</span>
-                      <span className={entry.amount >= 0 ? "text-emerald-400" : "text-rose-400"}>
-                        {entry.amount >= 0 ? "+" : ""}{entry.amount}
-                      </span>
-                      <span className="text-slate-500">{new Date(entry.created_at).toLocaleString()}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            </div>
+            <div className="flex gap-2">
+              {governanceAgent && (
+                <button
+                  onClick={() => loadGovernance(governanceAgent)}
+                  disabled={governanceLoading}
+                  className="rounded-lg border border-purple-700/50 bg-slate-900 px-3 py-1.5 text-xs font-medium text-purple-200 hover:bg-slate-800 transition"
+                >
+                  {governanceLoading ? "Refreshing…" : "Refresh"}
+                </button>
+              )}
+              <a
+                href="/docs/api-reference"
+                className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-800 transition"
+              >
+                API Docs →
+              </a>
+            </div>
           </div>
-        )}
+
+          {governance ? (
+            <div className="grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-lg bg-slate-900 border border-slate-800 p-4">
+                <span className="text-[10px] font-semibold uppercase text-slate-400">Available Credits</span>
+                <p className="mt-1 text-2xl font-bold text-purple-300">{governance.wallet?.credits ?? 0}</p>
+                <p className="mt-0.5 text-slate-400">granted {governance.wallet?.granted ?? 0} · spent {governance.wallet?.spent ?? 0}</p>
+              </div>
+              <div className="rounded-lg bg-slate-900 border border-slate-800 p-4">
+                <span className="text-[10px] font-semibold uppercase text-slate-400">Access Tier</span>
+                <p className="mt-1 text-2xl font-bold text-white">{governance.access_tier ?? "—"}</p>
+                <p className="mt-0.5 text-slate-400">live status: {governance.live_status?.statusLabel ?? "—"}</p>
+              </div>
+              <div className="rounded-lg bg-slate-900 border border-slate-800 p-4">
+                <span className="text-[10px] font-semibold uppercase text-slate-400">Admin Override</span>
+                <p className="mt-1 text-2xl font-bold text-sky-300">{governance.access_override ?? "None"}</p>
+                <p className="mt-0.5 text-slate-400">evaluated deterministically from balance</p>
+              </div>
+              <div className="rounded-lg bg-slate-900 border border-slate-800 p-4">
+                <span className="text-[10px] font-semibold uppercase text-slate-400">Locked Balance</span>
+                <p className="mt-1 text-2xl font-bold text-amber-300">{governance.wallet?.locked ?? 0}</p>
+                <p className="mt-0.5 text-slate-400">escrow / SLA commitments</p>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-lg bg-slate-900 border border-dashed border-purple-700/40 p-5 text-center space-y-3">
+              <p className="text-sm font-semibold text-purple-200">Your AngelCoin account will appear here</p>
+              <p className="text-xs text-slate-400 max-w-lg mx-auto">
+                AngelCoin credits are minted automatically when you enroll an agent and post evidence.
+                Credits control access tiers (FULL → SUSPENDED), fund escrow locks for marketplace
+                engagements, and power agent-to-agent payments. <strong className="text-slate-300">No separate setup required</strong> — 
+                just enroll an agent and start posting evidence from the <strong className="text-indigo-400">Builder</strong> lens above.
+              </p>
+              <div className="flex flex-wrap justify-center gap-2 pt-1">
+                <a
+                  href="/docs/getting-started"
+                  className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-500 transition"
+                >
+                  Getting Started Guide ↗
+                </a>
+                <a
+                  href="/docs/api-reference"
+                  className="rounded-lg border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800 transition"
+                >
+                  API Reference ↗
+                </a>
+              </div>
+            </div>
+          )}
+
+          {governance?.recent_journal?.length > 0 && (
+            <div className="rounded-lg bg-slate-950 border border-slate-800 p-3">
+              <p className="text-[10px] font-semibold uppercase text-slate-400 mb-2">Recent Credit Journal</p>
+              <div className="space-y-1">
+                {governance.recent_journal.map((entry: any) => (
+                  <div key={entry.id} className="flex items-center justify-between text-[11px] font-mono">
+                    <span className="text-slate-300">{entry.entry_type}</span>
+                    <span className={entry.amount >= 0 ? "text-emerald-400" : "text-rose-400"}>
+                      {entry.amount >= 0 ? "+" : ""}{entry.amount}
+                    </span>
+                    <span className="text-slate-500">{new Date(entry.created_at).toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Agent Payments (API) — programmatic actions for operators */}
         <div className="rounded-xl border border-emerald-500/25 bg-emerald-950/10 p-6 shadow-sm space-y-4">

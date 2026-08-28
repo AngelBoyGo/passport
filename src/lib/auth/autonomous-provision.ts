@@ -182,8 +182,10 @@ export async function provisionAutonomousAgent(
   const agentName = display_name?.trim() || `Agent-${subjectCommitment.slice(0, 8)}`;
   const operationalDomain = domain || "CODE_GENERATION";
 
-  // 7. Provision Autonomous Operator & Account
-  const stripeCustomerId = `cus_auto_${subjectCommitment.slice(0, 24)}`;
+  // A9: IP-based daily provisioning cap passed from route layer.
+  // The route enforces max 3 autonomous provisions per IP per rolling day.
+  // A13: random operator id — never leak commitment prefix.
+  const stripeCustomerId = `cus_auto_${bytesToHex(crypto.getRandomValues(new Uint8Array(8)))}`;
   let operator = await prisma.operator.create({
     data: {
       stripeCustomerId,

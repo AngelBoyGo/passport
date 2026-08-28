@@ -81,6 +81,14 @@ export async function issueReceipt(
   operatorDbId: string,
   input: IssueReceiptInput
 ) {
+  // B23: enforce max expiry of 1 year from now — prevents receipt expiry forgery.
+  const MAX_EXPIRY_MS = 365 * 86400 * 1000;
+  const expiryMs = new Date(input.expiry).getTime();
+  if (!Number.isFinite(expiryMs) || expiryMs - Date.now() > MAX_EXPIRY_MS) {
+    throw new Error("Expiry must be within 1 year from now");
+  }
+
+  // B32: server-authoritative issued_at — never trust client-supplied timestamps.
   const issuedAt = new Date();
   const receiptId = `rcpt_${crypto.randomUUID().replace(/-/g, "")}`;
 

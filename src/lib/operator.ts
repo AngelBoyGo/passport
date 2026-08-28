@@ -65,6 +65,13 @@ export async function ensureAgent(
   domain?: string,
   client: PrismaTx | typeof prisma = prisma
 ) {
+  // B31: per-operator agent cap to prevent sybil attacks.
+  const MAX_AGENTS = Number(process.env.MAX_AGENTS_PER_OPERATOR) || 50;
+  const count = await client.agent.count({ where: { operatorId } });
+  if (count >= MAX_AGENTS) {
+    throw new Error(`Operator already has ${count} agents (max ${MAX_AGENTS}). Cannot create more.`);
+  }
+
   return client.agent.upsert({
     where: {
       operatorId_agentId: { operatorId, agentId },
