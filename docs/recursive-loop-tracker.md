@@ -610,3 +610,33 @@ cd passport && npm test
 
 ### Loop N — Load baseline
 **Status:** In progress — `load-baseline-args.test.ts`, `scripts/load-baseline.ts` on disk uncommitted.
+
+---
+
+## Loop 39: Identity & Work Authenticity Security Audit (45 Attack Vectors)
+
+**Date:** 2026-08-28
+**Commit:** `9eb917a9ffde2bd0a2ec36eb7b93d0ef1498e213`
+
+| Area | Result | Status |
+|---|---|---|
+| Identity attack mapping (A1–A15) | 15 documented gaps, 12 with unit tests | ✅ |
+| Work authenticity attack mapping (B1–B35) | 35 documented gaps, 30 with unit tests | ✅ |
+| A1 global key uniqueness | `startEnrollment` rejects duplicate public keys across contexts | ✅ |
+| A9 IP daily cap | 3 autonomous provisions per IP per day default | ✅ |
+| A13 random operator ID | Stripe customer ID uses random suffix, not commitment prefix | ✅ |
+| B5 dedup collision | sourceDigest as secondary dedup key in evidence persistence | ✅ |
+| B23 max expiry | Receipt expiry capped at 1 year from now | ✅ |
+| B30 token bounds | Input/output tokens ≤ 1M, tool calls ≤ 10k | ✅ |
+| B31 agent sybil | Per-operator agent cap (50, env-configurable) | ✅ |
+| B34 checkpoint gap | detectCheckpointGap function added | ✅ |
+| B35 non-repudiation | Server-signed timestamp returned in evidence response | ✅ |
+| UI: AngelCoin always visible | Economy panel removed from conditionally rendered gate | ✅ |
+| UI: Landing page CTA | "View Live AngelCoin Economy →" link added | ✅ |
+| Test suite | 43 new attack-documentation tests (all pass) | ✅ |
+
+**Files changed:** 12 files, +915 / -66 lines
+**New identity-verification test file:** `src/lib/identity-verification/__tests__/identity-attacks.test.ts` (16 tests)
+**New work-authenticity test file:** `src/lib/verification/__tests__/work-authenticity-attacks.test.ts` (27 tests)
+**Pre-push suite:** tsc exit 0, 149 test files / 903 tests pass (3 pre-existing worker timeout noise)
+**Deploy:** Pushed to origin/main, awaiting Render rebuild
