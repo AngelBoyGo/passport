@@ -1,9 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
+import { StreakCard } from "@/components/gamification/streak-card";
+import { BadgesCard } from "@/components/gamification/badges-card";
+import { ConfettiEffect } from "@/components/gamification/confetti";
 
 type PersonaLens = "builder" | "datacenter" | "enterprise" | "auditor";
 
@@ -73,6 +76,8 @@ export default function UserDashboard() {
   const [activityFeed, setActivityFeed] = useState<any[] | null>(null);
   const [referralCode, setReferralCode] = useState<string | null>(null);
   const [copiedRef, setCopiedRef] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [confettiType, setConfettiType] = useState<"celebration" | "achievement" | "chest">("celebration");
 
   const loadDashboard = useCallback(async () => {
     try {
@@ -353,6 +358,13 @@ export default function UserDashboard() {
             <p className="mt-1 text-xs font-mono font-bold text-amber-300 break-all">{data?.merkle_root ? data.merkle_root.slice(0, 18) + "..." : "8f4b29c0..."}</p>
             <p className="mt-0.5 text-[11px] text-slate-400">Tamper-Proof Ledger State</p>
           </div>
+        </div>
+
+        {/* ── Gamification Section: Streak + Achievements + Confetti ── */}
+        {<ConfettiEffect trigger={showConfetti} type={confettiType} />}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <StreakCard />
+          <BadgesCard />
         </div>
 
         {/* ── Reputation Score (from governance) ── */}
