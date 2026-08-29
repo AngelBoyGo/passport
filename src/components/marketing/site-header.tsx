@@ -11,6 +11,8 @@ export function SiteHeader() {
   }, []);
 
   const links = [
+    { href: "/agents", label: "Agents" },
+    { href: "/playground", label: "Playground" },
     { href: "/datacenter", label: "Data Center" },
     { href: "/docs/getting-started", label: "Docs" },
     { href: "/docs/api-reference", label: "API" },

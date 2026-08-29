@@ -8,11 +8,13 @@ const footerLinks = [
       { href: "/#pricing", label: "Pricing" },
       { href: "/docs/getting-started", label: "Quickstart" },
       { href: "/docs/api-reference", label: "API Reference" },
+      { href: "/playground", label: "API Playground" },
     ],
   },
   {
     title: "Explore",
     links: [
+      { href: "/agents", label: "Agent Embassy" },
       { href: "/leaderboard", label: "Leaderboard" },
       { href: "/docs/integrations", label: "Integrations" },
       { href: "/security", label: "Security" },
@@ -23,11 +25,13 @@ const footerLinks = [
     links: [
       { href: "/public-key", label: "Public Key" },
       { href: "/badge", label: "Agent Badge" },
+      { href: "/verify/demo", label: "Verify an Agent" },
     ],
   },
   {
     title: "Legal",
     links: [
+      { href: "/.well-known/bill-of-rights.json", label: "AI Bill of Rights" },
       { href: "/privacy", label: "Privacy Policy" },
       { href: "/terms", label: "Terms of Service" },
     ],

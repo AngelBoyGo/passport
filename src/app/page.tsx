@@ -44,6 +44,12 @@ export default function LandingPage() {
               Verify an Agent →
             </Link>
             <Link
+              href="/playground"
+              className="rounded-lg border border-slate-300 bg-white px-6 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 text-center"
+            >
+              API Playground
+            </Link>
+            <Link
               href="/docs/getting-started"
               className="rounded-lg border px-6 py-3 text-sm font-medium hover:bg-slate-50 text-center"
             >

@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { ALL_BADGES, BADGE_RARITY_GLOW } from "@/lib/engagement/achievements";
+import { ShareCard } from "./share-card";
 
 interface AchievementBadgeData {
   id: string;
@@ -22,9 +23,13 @@ export function BadgesCard() {
   const [badges, setBadges] = useState<AchievementBadgeData[]>([]);
   const [loading, setLoading] = useState(true);
   const [newBadgeId, setNewBadgeId] = useState<string | null>(null);
+  const [commitment, setCommitment] = useState<string>("");
 
   useEffect(() => {
     loadBadges();
+    // Try to get the commitment from the URL or a data attribute
+    const el = document.querySelector("[data-commitment]");
+    if (el) setCommitment(el.getAttribute("data-commitment") || "");
   }, []);
 
   const loadBadges = useCallback(async () => {
@@ -36,7 +41,7 @@ export function BadgesCard() {
         const newest = data.badges?.find((b: AchievementBadgeData) => b.isNew);
         if (newest) {
           setNewBadgeId(newest.id);
-          setTimeout(() => setNewBadgeId(null), 5000);
+          setTimeout(() => setNewBadgeId(null), 10000);
         }
       }
     } catch {} finally {
@@ -95,10 +100,23 @@ export function BadgesCard() {
       </div>
 
       {newBadgeId && (
-        <div className="rounded-lg bg-gradient-to-r from-amber-950/40 to-purple-950/40 border border-amber-500/30 p-3 text-center animate-pulse">
-          <p className="text-sm font-bold text-amber-300">
-            🎉 New Achievement Unlocked!
-          </p>
+        <div className="space-y-3">
+          <div className="rounded-lg bg-gradient-to-r from-amber-950/40 to-purple-950/40 border border-amber-500/30 p-3 text-center animate-pulse">
+            <p className="text-sm font-bold text-amber-300">
+              🎉 New Achievement Unlocked!
+            </p>
+          </div>
+          {commitment && (
+            <ShareCard
+              type="badge"
+              commitment={commitment}
+              details={{
+                title: badges.find((b) => b.id === newBadgeId)?.name || "Achievement Unlocked",
+                description: badges.find((b) => b.id === newBadgeId)?.description || "",
+                emoji: badges.find((b) => b.id === newBadgeId)?.emoji || "🏆",
+              }}
+            />
+          )}
         </div>
       )}
     </div>
