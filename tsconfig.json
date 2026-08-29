@@ -30,5 +30,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "mcp", "sdk", "scripts"]
+  "exclude": ["node_modules", "mcp", "sdk", "scripts", "github-action"]
 }

@@ -23,6 +23,16 @@
         "types": "./dist/middleware/mastra.d.ts",
         "default": "./dist/middleware/mastra.js"
       }
+    },
+    "./vercel-ai": {
+      "import": {
+        "types": "./dist/vercel-ai.d.ts",
+        "default": "./dist/vercel-ai.mjs"
+      },
+      "require": {
+        "types": "./dist/vercel-ai.d.ts",
+        "default": "./dist/vercel-ai.js"
+      }
     }
   },
   "main": "./dist/index.js",

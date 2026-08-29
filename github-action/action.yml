@@ -1,0 +1,20 @@
+name: 'Passport Anchor'
+description: 'Post signed evidence to Passport on every commit. Your agent badge auto-updates with reputation.'
+author: 'Passport'
+branding:
+  icon: 'shield'
+  color: 'green'
+inputs:
+  passport-token:
+    description: 'Passport API token (pp_ent_... or pp_usr_...)'
+    required: true
+  agent-commitment:
+    description: 'Your agent commitment hash (64 hex chars)'
+    required: true
+  passport-url:
+    description: 'Passport API base URL'
+    required: false
+    default: 'https://passport.metis.gold'
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
