@@ -18,6 +18,7 @@ import {
   InvalidEnrollmentProofError,
   NotEnrolledError,
 } from "@/lib/enrollment/errors";
+import { getDefaultRightsCommitment } from "@/lib/bill-of-rights/rights";
 
 const DEFAULT_CHALLENGE_TTL_SECONDS = 300;
 
@@ -30,6 +31,12 @@ export type EnrollmentPassport = {
   presentation?: AgentPresentation | null;
   challengeNonce?: string;
   expiresAt?: string;
+  bill_of_rights?: {
+    url: string;
+    version: string;
+    clause_count: number;
+    committed_clause_ids: string[];
+  };
 };
 
 /**
@@ -79,6 +86,12 @@ function toPassport(row: {
     presentation,
     challengeNonce: row.challengeNonce ?? undefined,
     expiresAt: row.challengeExpiresAt?.toISOString() ?? undefined,
+    bill_of_rights: {
+      url: "https://passport.metis.gold/.well-known/bill-of-rights.json",
+      version: "1.0.0",
+      clause_count: getDefaultRightsCommitment().length,
+      committed_clause_ids: getDefaultRightsCommitment(),
+    },
   };
 }
 

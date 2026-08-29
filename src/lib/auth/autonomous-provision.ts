@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { hashApiKey } from "@/lib/operator";
 import { sha256Hex } from "@/lib/receipt/canonical";
 import { encodeDidKey } from "@/lib/did-key";
+import { getDefaultRightsCommitment } from "@/lib/bill-of-rights/rights";
 
 const CHALLENGE_TTL_MS = 120_000; // 2 minutes
 // H6 fix: raise difficulty so mass credit-farming is more costly per mint.
@@ -130,6 +131,12 @@ export interface ProvisionAgentResult {
   display_name: string;
   domain: string;
   initial_credits: number;
+  bill_of_rights?: {
+    url: string;
+    version: string;
+    clause_count: number;
+    committed_clause_ids: string[];
+  };
 }
 
 /**
@@ -239,5 +246,11 @@ export async function provisionAutonomousAgent(
     display_name: agentName,
     domain: operationalDomain,
     initial_credits: AUTONOMOUS_MINT_CREDITS,
+    bill_of_rights: {
+      url: "https://passport.metis.gold/.well-known/bill-of-rights.json",
+      version: "1.0.0",
+      clause_count: getDefaultRightsCommitment().length,
+      committed_clause_ids: getDefaultRightsCommitment(),
+    },
   };
 }
