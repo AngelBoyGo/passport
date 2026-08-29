@@ -5,6 +5,8 @@ const sessionFromRequestMock = vi.fn();
 const bridgeWalletFindUniqueMock = vi.fn();
 const bridgeWalletUpsertMock = vi.fn();
 const operatorUpdateMock = vi.fn();
+const operatorFindUniqueMock = vi.fn();
+const adminAuditLogCreateMock = vi.fn();
 
 vi.mock("@/lib/auth/cookies", () => ({
   sessionFromRequest: (...args: unknown[]) => sessionFromRequestMock(...args),
@@ -12,7 +14,11 @@ vi.mock("@/lib/auth/cookies", () => ({
 vi.mock("@/lib/db", () => ({
   prisma: {
     bridgeWallet: { findUnique: bridgeWalletFindUniqueMock, upsert: bridgeWalletUpsertMock },
-    operator: { update: operatorUpdateMock },
+    operator: {
+      update: operatorUpdateMock,
+      findUnique: operatorFindUniqueMock,
+    },
+    adminAuditLog: { create: adminAuditLogCreateMock },
   },
 }));
 
@@ -83,7 +89,9 @@ describe("Operator wallet + KYC routes", () => {
   it("POST /api/v1/admin/operator/kyc allows an executive admin to approve", async () => {
     process.env.ADMIN_OPERATOR_EMAILS = "ceo@example.com";
     sessionFromRequestMock.mockResolvedValue({ operator: makeOp("ceo@example.com") });
+    operatorFindUniqueMock.mockResolvedValue({ kycStatus: "PENDING" });
     operatorUpdateMock.mockResolvedValue({ id: "op_2", email: "b@x.com", kycStatus: "APPROVED" });
+    adminAuditLogCreateMock.mockResolvedValue({});
 
     const { POST } = await import("@/app/api/v1/admin/operator/kyc/route");
     const req = new NextRequest("http://localhost/api/v1/admin/operator/kyc", {

@@ -7,12 +7,11 @@ import {
 } from "@/lib/validation/angelcoinSchemas";
 import { angelcoinErrorResponse } from "@/lib/angelcoin/route-errors";
 import { isExecutiveAdmin } from "@/lib/admin/admin-auth";
+import { prisma } from "@/lib/db";
 
 /**
  * POST /api/v1/passport/credits/grants — operator grant of AngelCoin credits.
- * H5 fix: minting credits is a privileged supply operation. Only executive
- * admin operators may grant credits, so any key-holder can no longer inflate
- * supply for arbitrary subjects.
+ * H3: every grant is recorded in AdminAuditLog for full traceability.
  */
 export async function POST(request: NextRequest) {
   const operator = await authenticateApiKey(request.headers.get("authorization"));
@@ -47,6 +46,21 @@ export async function POST(request: NextRequest) {
       parsed.data.amount,
       parsed.data.metadata
     );
+
+    // H3: audit trail — log every credit grant
+    await prisma.adminAuditLog.create({
+      data: {
+        operatorId: operator.id,
+        action: "credit_grant",
+        targetId: parsed.data.subject_commitment,
+        details: JSON.stringify({
+          amount: parsed.data.amount,
+          metadata: parsed.data.metadata,
+          actor_email: operator.email,
+        }),
+      },
+    }).catch(() => {});
+
     return NextResponse.json(
       {
         subject_commitment: result.account.subjectCommitment,

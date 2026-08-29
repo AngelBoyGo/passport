@@ -356,6 +356,8 @@ model Session {
   operatorId String
   token      String   @unique
   expiresAt  DateTime
+  ipAddress  String?
+  userAgent  String?
   createdAt  DateTime @default(now())
 
   operator Operator @relation(fields: [operatorId], references: [id], onDelete: Cascade)
@@ -489,4 +491,35 @@ model ReferralCode {
   updatedAt    DateTime @updatedAt
 
   @@index([code])
+}
+
+/// H3: append-only audit trail for all privileged admin mutations (KYC, grants,
+/// overrides, operator modifications). Immutable once written.
+model AdminAuditLog {
+  id         String   @id @default(cuid())
+  operatorId String
+  action     String
+  targetId   String?
+  details    String?
+  createdAt  DateTime @default(now())
+
+  @@index([operatorId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+/// C2: retry queue for evidence→receipt bridge failures. Background job
+/// picks up unbridged events and retries up to maxRetries times.
+model EvidenceBridgeRetry {
+  id                    String   @id @default(cuid())
+  eventCommitmentHash   String   @unique
+  evidenceId            String
+  retryCount            Int      @default(0)
+  maxRetries            Int      @default(3)
+  lastError             String?
+  lastRetryAt           DateTime?
+  createdAt             DateTime @default(now())
+
+  @@index([retryCount])
+  @@index([createdAt])
 }

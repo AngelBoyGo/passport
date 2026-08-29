@@ -98,7 +98,7 @@ describe("Autonomous Agent Self-Provisioning & Security Hardening", () => {
     expect(result.api_key).toMatch(/^pp_usr_[0-9a-f]{64}$/);
     expect(result.role).toBe("HOLDER");
     expect(result.subject_commitment).toMatch(/^[0-9a-f]{64}$/);
-    expect(result.did).toBe(`did:key:z${pubKeyHex}`);
+    expect(result.did).toMatch(/^did:key:z[1-9A-HJ-NP-Za-km-z]{44,50}$/);
     expect(prismaMock.provisionChallenge.updateMany).toHaveBeenCalled();
   });
 

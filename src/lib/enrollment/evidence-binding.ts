@@ -151,27 +151,47 @@ export async function ingestEnrolledEvidence(
 
   const persistedRecords = await persistEvidence(maskedRecords);
 
-  // Capability: auto-mint a signed custody receipt for each persisted evidence
-  // event when enabled AND the evidence-bridge minter operator is configured.
-  // Opt-in (EVIDENCE_BRIDGE_AUTO_ENABLED=true) so ordinary evidence ingestion
-  // mints receipts only where intended, matching the documented bridge
-  // behavior. The bridge is idempotent on eventCommitmentHash, so replays
-  // never double-mint.
+  // C2: evidence bridge with retry queue — if bridge fails, the evidence is
+  // still persisted, and a background retry will pick it up. The bridge is
+  // idempotent on eventCommitmentHash, so retries never double-mint.
   if (persistedRecords.length > 0 && process.env.EVIDENCE_BRIDGE_AUTO_ENABLED === "true") {
     const { bridgeEvidenceToReceipt } = await import("@/lib/evidence-bridge/evidence-receipt-bridge");
     for (const rec of persistedRecords) {
-      bridgeEvidenceToReceipt({
-        id: rec.id,
-        sourceType: rec.sourceType,
-        agentIdentityCommitment: rec.agentIdentityCommitment,
-        eventCommitmentHash: rec.eventCommitmentHash,
-        normalizedEventType: rec.normalizedEventType,
-        rawErrorClassification: rec.rawErrorClassification ?? null,
-        validationSignalPresent: rec.validationSignalPresent,
-        observedAt: rec.observedAt,
-      }).catch((err) => {
-        console.warn("evidence→receipt bridge failed:", err);
-      });
+      try {
+        await bridgeEvidenceToReceipt({
+          id: rec.id,
+          sourceType: rec.sourceType,
+          agentIdentityCommitment: rec.agentIdentityCommitment,
+          eventCommitmentHash: rec.eventCommitmentHash,
+          normalizedEventType: rec.normalizedEventType,
+          rawErrorClassification: rec.rawErrorClassification ?? null,
+          validationSignalPresent: rec.validationSignalPresent,
+          observedAt: rec.observedAt,
+        });
+      } catch (err) {
+        // C2: log the failure and enqueue for retry. The evidence is already
+        // persisted; the receipt bridge will be retried on next cycle.
+        console.error("evidence→receipt bridge failed (will retry):", err instanceof Error ? err.message : err);
+        // Enqueue to a retry table so a background job can pick it up.
+        try {
+          await prisma.evidenceBridgeRetry.upsert({
+            where: { eventCommitmentHash: rec.eventCommitmentHash },
+            create: {
+              eventCommitmentHash: rec.eventCommitmentHash,
+              evidenceId: rec.id,
+              retryCount: 0,
+              maxRetries: 3,
+              lastError: err instanceof Error ? err.message : String(err),
+            },
+            update: {
+              retryCount: { increment: 1 },
+              lastError: err instanceof Error ? err.message : String(err),
+            },
+          });
+        } catch {
+          // non-fatal — evidence is already persisted
+        }
+      }
     }
   }
 

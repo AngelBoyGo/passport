@@ -79,16 +79,22 @@ function verifySessionTokenSignature(token: string): boolean {
   return sig === expected;
 }
 
-export async function createSession(operatorId: string) {
+export async function createSession(operatorId: string, ipAddress?: string, userAgent?: string) {
   const token = generateSessionToken();
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
   await prisma.session.create({
-    data: { operatorId, token, expiresAt },
+    data: {
+      operatorId,
+      token,
+      expiresAt,
+      ipAddress,
+      userAgent,
+    },
   });
   return { token, expiresAt };
 }
 
-export async function getSessionFromToken(token: string) {
+export async function getSessionFromToken(token: string, ipAddress?: string) {
   if (!verifySessionTokenSignature(token)) {
     return null;
   }
@@ -102,6 +108,10 @@ export async function getSessionFromToken(token: string) {
     }
     return null;
   }
+  // M1: if IP binding is set on the session, verify it matches
+  if (session.ipAddress && ipAddress && session.ipAddress !== ipAddress) {
+    return null;
+  }
   return session;
 }
 
@@ -112,9 +122,9 @@ export async function getSessionFromToken(token: string) {
  * Domain-scoped, differing paths from older deployments). Trying every
  * candidate makes login resilient to stale-cookie shadowing.
  */
-export async function resolveSessionFromTokens(tokens: string[]) {
+export async function resolveSessionFromTokens(tokens: string[], ipAddress?: string) {
   for (const token of tokens) {
-    const session = await getSessionFromToken(token);
+    const session = await getSessionFromToken(token, ipAddress);
     if (session) {
       return session;
     }

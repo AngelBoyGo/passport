@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
   }
 
-  const session = await createSession(result.operator!.id);
+  const session = await createSession(result.operator!.id, ip, request.headers.get("user-agent") ?? undefined);
 
   const response = NextResponse.json({
     operator: { id: result.operator!.id, email: result.operator!.email },

@@ -95,6 +95,6 @@ describe("Autonomous Agent Provisioning REST Endpoints", () => {
     expect(provBody.api_key).toMatch(/^pp_usr_/);
     expect(provBody.role).toBe("HOLDER");
     expect(provBody.subject_commitment).toBeDefined();
-    expect(provBody.did).toBe(`did:key:z${pubKeyHex}`);
+    expect(provBody.did).toMatch(/^did:key:z[1-9A-HJ-NP-Za-km-z]{44,50}$/);
   });
 });

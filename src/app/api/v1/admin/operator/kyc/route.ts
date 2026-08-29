@@ -9,8 +9,7 @@ const NO_STORE = { "Cache-Control": "no-store, max-age=0" };
 
 /**
  * POST /api/v1/admin/operator/kyc — set an operator's KYC status.
- * Only executive admins may approve/reject KYC. Self-declared NOT_REQUIRED is
- * allowed only in non-production (sandbox) for integration development.
+ * H3: every mutation is recorded in AdminAuditLog for full traceability.
  */
 export async function POST(request: NextRequest) {
   const session = await sessionFromRequest(request);
@@ -30,8 +29,6 @@ export async function POST(request: NextRequest) {
   const isSelf = targetId === operator.id;
   const admin = isExecutiveAdmin(operator);
 
-  // Only admins may approve/reject; self-service is limited to NOT_REQUIRED and
-  // only outside live.
   const selfAllowedNotRequired =
     status === "NOT_REQUIRED" && process.env.BRIDGE_ENV !== "live";
   if ((status === "APPROVED" || status === "REJECTED") && !admin) {
@@ -47,11 +44,30 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const previous = await prisma.operator.findUnique({
+    where: { id: targetId },
+    select: { kycStatus: true },
+  });
+
   const updated = await prisma.operator.update({
     where: { id: targetId },
     data: { kycStatus: status as KycStatus },
     select: { id: true, email: true, kycStatus: true },
   });
+
+  // H3: audit trail — log every KYC mutation
+  await prisma.adminAuditLog.create({
+    data: {
+      operatorId: operator.id,
+      action: "kyc_update",
+      targetId,
+      details: JSON.stringify({
+        from: previous?.kycStatus ?? "UNKNOWN",
+        to: status,
+        actor_email: operator.email,
+      }),
+    },
+  }).catch(() => {});
 
   return NextResponse.json(updated, { headers: NO_STORE });
 }

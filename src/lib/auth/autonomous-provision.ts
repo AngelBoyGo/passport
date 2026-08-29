@@ -4,6 +4,7 @@ import { bytesToHex, hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
 import { prisma } from "@/lib/db";
 import { hashApiKey } from "@/lib/operator";
 import { sha256Hex } from "@/lib/receipt/canonical";
+import { encodeDidKey } from "@/lib/did-key";
 
 const CHALLENGE_TTL_MS = 120_000; // 2 minutes
 // H6 fix: raise difficulty so mass credit-farming is more costly per mint.
@@ -176,15 +177,12 @@ export async function provisionAutonomousAgent(
     throw new Error("Invalid Ed25519 cryptographic signature (Proof of Possession failed)");
   }
 
-  // 6. Compute Deterministic Subject Commitment Hash
+  // H5: all validation complete — now create the operator (deferred creation).
   const salt = resolveProvisionSalt();
   const subjectCommitment = sha256Hex(pubKeyClean + salt);
   const agentName = display_name?.trim() || `Agent-${subjectCommitment.slice(0, 8)}`;
   const operationalDomain = domain || "CODE_GENERATION";
 
-  // A9: IP-based daily provisioning cap passed from route layer.
-  // The route enforces max 3 autonomous provisions per IP per rolling day.
-  // A13: random operator id — never leak commitment prefix.
   const stripeCustomerId = `cus_auto_${bytesToHex(crypto.getRandomValues(new Uint8Array(8)))}`;
   let operator = await prisma.operator.create({
     data: {
@@ -237,7 +235,7 @@ export async function provisionAutonomousAgent(
     api_key: rawKey,
     role: "HOLDER",
     subject_commitment: subjectCommitment,
-    did: `did:key:z${pubKeyClean}`,
+    did: encodeDidKey(pubKeyClean),
     display_name: agentName,
     domain: operationalDomain,
     initial_credits: AUTONOMOUS_MINT_CREDITS,

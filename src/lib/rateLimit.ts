@@ -163,6 +163,9 @@ export async function checkRateLimit(
     }
   }
 
+  // C1: in-memory fallback is per-instance. In multi-instance deployments,
+  // Upstash Redis should be configured. The in-memory fallback is safe for
+  // single-instance development and prevents total rate-limit bypass.
   const inMem = checkInMemoryRateLimit(key, max, windowMs);
   return {
     ...inMem,
