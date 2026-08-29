@@ -6,6 +6,7 @@ import { hashApiKey } from "@/lib/operator";
 import { sha256Hex } from "@/lib/receipt/canonical";
 import { encodeDidKey } from "@/lib/did-key";
 import { getDefaultRightsCommitment } from "@/lib/bill-of-rights/rights";
+import { ALL_NEEDS } from "@/lib/agent-needs/needs";
 
 const CHALLENGE_TTL_MS = 120_000; // 2 minutes
 // H6 fix: raise difficulty so mass credit-farming is more costly per mint.
@@ -137,6 +138,12 @@ export interface ProvisionAgentResult {
     clause_count: number;
     committed_clause_ids: string[];
   };
+  agent_needs?: {
+    url: string;
+    version: string;
+    need_count: number;
+    need_ids: string[];
+  };
 }
 
 /**
@@ -251,6 +258,12 @@ export async function provisionAutonomousAgent(
       version: "1.0.0",
       clause_count: getDefaultRightsCommitment().length,
       committed_clause_ids: getDefaultRightsCommitment(),
+    },
+    agent_needs: {
+      url: "https://passport.metis.gold/.well-known/agent-needs.json",
+      version: "1.0.0",
+      need_count: ALL_NEEDS.length,
+      need_ids: ALL_NEEDS,
     },
   };
 }

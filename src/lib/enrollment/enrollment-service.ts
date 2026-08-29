@@ -19,6 +19,7 @@ import {
   NotEnrolledError,
 } from "@/lib/enrollment/errors";
 import { getDefaultRightsCommitment } from "@/lib/bill-of-rights/rights";
+import { ALL_NEEDS } from "@/lib/agent-needs/needs";
 
 const DEFAULT_CHALLENGE_TTL_SECONDS = 300;
 
@@ -36,6 +37,12 @@ export type EnrollmentPassport = {
     version: string;
     clause_count: number;
     committed_clause_ids: string[];
+  };
+  agent_needs?: {
+    url: string;
+    version: string;
+    need_count: number;
+    need_ids: string[];
   };
 };
 
@@ -91,6 +98,12 @@ function toPassport(row: {
       version: "1.0.0",
       clause_count: getDefaultRightsCommitment().length,
       committed_clause_ids: getDefaultRightsCommitment(),
+    },
+    agent_needs: {
+      url: "https://passport.metis.gold/.well-known/agent-needs.json",
+      version: "1.0.0",
+      need_count: ALL_NEEDS.length,
+      need_ids: ALL_NEEDS,
     },
   };
 }

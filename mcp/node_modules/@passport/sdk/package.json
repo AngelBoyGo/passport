@@ -1,7 +1,12 @@
 {
   "name": "@passport/sdk",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
+  "description": "Passport SDK — cryptographic identity and authenticity layer for AI agents. Issue receipts, post evidence, verify agents.",
+  "keywords": ["ai", "agent", "identity", "verification", "receipt", "ed25519", "passport"],
+  "homepage": "https://passport.metis.gold",
+  "repository": { "type": "git", "url": "https://github.com/AngelBoyGo/passport.git" },
+  "license": "MIT",
   "type": "module",
   "exports": {
     ".": {
@@ -33,6 +38,16 @@
         "types": "./dist/vercel-ai.d.ts",
         "default": "./dist/vercel-ai.js"
       }
+    },
+    "./langchain": {
+      "import": {
+        "types": "./dist/langchain.d.ts",
+        "default": "./dist/langchain.mjs"
+      },
+      "require": {
+        "types": "./dist/langchain.d.ts",
+        "default": "./dist/langchain.js"
+      }
     }
   },
   "main": "./dist/index.js",
@@ -44,7 +59,12 @@
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
   },
   "devDependencies": {
     "@prisma/client": "^6.19.0",

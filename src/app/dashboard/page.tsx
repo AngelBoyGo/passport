@@ -7,6 +7,7 @@ import { SiteFooter } from "@/components/marketing/site-footer";
 import { StreakCard } from "@/components/gamification/streak-card";
 import { BadgesCard } from "@/components/gamification/badges-card";
 import { ConfettiEffect } from "@/components/gamification/confetti";
+import { NeedsCard } from "@/components/gamification/needs-card";
 
 type PersonaLens = "builder" | "datacenter" | "enterprise" | "auditor";
 
@@ -360,11 +361,14 @@ export default function UserDashboard() {
           </div>
         </div>
 
-        {/* ── Gamification Section: Streak + Achievements + Confetti ── */}
+        {/* ── Gamification Section: Streak + Achievements + Needs + Confetti ── */}
         {<ConfettiEffect trigger={showConfetti} type={confettiType} />}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <StreakCard />
-          <BadgesCard />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <StreakCard />
+            <BadgesCard />
+          </div>
+          <NeedsCard />
         </div>
 
         {/* ── Reputation Score (from governance) ── */}
