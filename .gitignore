@@ -4,6 +4,7 @@
 /node_modules
 mcp/node_modules
 github-action/node_modules
+mcp/node_modules/@passport/sdk
 /.pnp
 .pnp.*
 .yarn/*
