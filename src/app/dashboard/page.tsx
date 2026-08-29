@@ -619,6 +619,16 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
                   {governanceLoading ? "Refreshing…" : "Refresh"}
                 </button>
               )}
+              {governanceAgent && (
+                <a
+                  href={`/verify/${governanceAgent}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-lg border border-emerald-700/50 bg-slate-900 px-3 py-1.5 text-xs font-medium text-emerald-200 hover:bg-slate-800 transition"
+                >
+                  Share Trust Report ↗
+                </a>
+              )}
               <a
                 href="/docs/api-reference"
                 className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-800 transition"

@@ -38,6 +38,12 @@ export default function LandingPage() {
           <div className="mt-8 flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
             <LiveVerifyDemo />
             <Link
+              href="/verify/demo"
+              className="rounded-lg border border-indigo-300 bg-indigo-50 px-6 py-3 text-sm font-medium text-indigo-700 hover:bg-indigo-100 text-center"
+            >
+              Verify an Agent →
+            </Link>
+            <Link
               href="/docs/getting-started"
               className="rounded-lg border px-6 py-3 text-sm font-medium hover:bg-slate-50 text-center"
             >
