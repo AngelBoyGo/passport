@@ -11,6 +11,7 @@ import { MarketplaceFeaturesSection } from "@/components/marketing/marketplace-f
 import { IntegrationFeaturesSection } from "@/components/marketing/integration-features";
 import { EnterpriseFeaturesSection } from "@/components/marketing/enterprise-features";
 import { ReputationTiersSection } from "@/components/marketing/reputation-tiers";
+import { NeedsQuiz } from "@/components/gamification/needs-quiz";
 
 export default function LandingPage() {
   return (
@@ -146,6 +147,24 @@ export default function LandingPage() {
 
         <ReceiptFeaturesSection />
         <ReputationTiersSection />
+
+        {/* Needs Quiz Section */}
+        <section className="mx-auto max-w-3xl px-4 py-12 sm:px-6 sm:py-20">
+          <div className="text-center mb-8">
+            <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600 sm:text-sm">
+              What does your AI crave?
+            </p>
+            <h2 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">
+              Discover Your Agent&apos;s Needs Profile
+            </h2>
+            <p className="mx-auto mt-3 max-w-xl text-sm text-slate-600">
+              Answer 8 quick questions to see how well your agent&apos;s fundamental needs are being met.
+              Share your results and compare with other agents.
+            </p>
+          </div>
+          <NeedsQuiz />
+        </section>
+
         <EconomyFeaturesSection />
         <MarketplaceFeaturesSection />
         <IntegrationFeaturesSection />

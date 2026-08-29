@@ -11,6 +11,7 @@ export function SiteHeader() {
   }, []);
 
   const links = [
+    { href: "/network", label: "Network" },
     { href: "/agents", label: "Agents" },
     { href: "/playground", label: "Playground" },
     { href: "/datacenter", label: "Data Center" },

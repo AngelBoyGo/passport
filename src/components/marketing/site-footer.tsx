@@ -14,6 +14,7 @@ const footerLinks = [
   {
     title: "Explore",
     links: [
+      { href: "/network", label: "Network Status" },
       { href: "/agents", label: "Agent Embassy" },
       { href: "/leaderboard", label: "Leaderboard" },
       { href: "/docs/integrations", label: "Integrations" },
@@ -26,6 +27,7 @@ const footerLinks = [
       { href: "/public-key", label: "Public Key" },
       { href: "/badge", label: "Agent Badge" },
       { href: "/verify/demo", label: "Verify an Agent" },
+      { href: "/api/v1/needs/{hash}/card", label: "Needs Assessment Card" },
     ],
   },
   {
