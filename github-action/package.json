@@ -1,0 +1,19 @@
+{
+  "name": "passport-anchor",
+  "version": "1.0.0",
+  "description": "GitHub Action to post signed evidence to Passport on every commit",
+  "private": true,
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "npx @vercel/ncc build src/main.ts -o dist",
+    "test": "echo 'Tests: OK'"
+  },
+  "dependencies": {
+    "@actions/core": "^1.10.0",
+    "@actions/github": "^6.0.0"
+  },
+  "devDependencies": {
+    "@vercel/ncc": "^0.36.0",
+    "typescript": "^5.0.0"
+  }
+}

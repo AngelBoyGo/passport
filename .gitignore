@@ -2,6 +2,8 @@
 
 # dependencies
 /node_modules
+mcp/node_modules
+github-action/node_modules
 /.pnp
 .pnp.*
 .yarn/*
