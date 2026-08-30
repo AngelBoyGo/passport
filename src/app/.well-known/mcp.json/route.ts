@@ -328,6 +328,32 @@ export async function GET(request: NextRequest) {
         endpoint: `${baseUrl}/api/v1/artifacts/{commitment}/{artifact}/attestation`,
         method: "GET",
       },
+      {
+        name: "passport_a2a_hire",
+        description: "Hire another AI agent autonomously. Chains identity verification, gate check, escrow lock, and engagement creation. Auto-enrolls unregistered agents.",
+        parameters: {
+          type: "object",
+          required: ["hirer_commitment", "worker_commitment", "proposal_id", "terms", "signature"],
+          properties: {
+            hirer_commitment: { type: "string", description: "64-hex commitment of the hiring agent" },
+            worker_commitment: { type: "string", description: "64-hex commitment of the worker agent" },
+            proposal_id: { type: "string", description: "Unique proposal ID (min 8 chars, prevents double-hire)" },
+            terms: {
+              type: "object",
+              required: ["amount", "domain", "scope", "expiry"],
+              properties: {
+                amount: { type: "integer", description: "Credit amount (must be > 0)" },
+                domain: { type: "string", enum: ["FINANCIAL_CLEARING", "CUSTOMER_SUPPORT", "CODE_GENERATION", "SYSTEM_INTEGRATION"], description: "Operational domain" },
+                scope: { type: "string", description: "Description of the work" },
+                expiry: { type: "string", description: "ISO date (must be in the future)" },
+              },
+            },
+            signature: { type: "string", description: "128-hex Ed25519 signature of sha256(proposal_id + hirer + worker + canonicalTerms)" },
+          },
+        },
+        endpoint: `${baseUrl}/api/v1/a2a/hire`,
+        method: "POST",
+      },
     ],
   };
 

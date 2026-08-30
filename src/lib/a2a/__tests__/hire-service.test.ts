@@ -1,7 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
 import { hireWorker, type HireServiceDeps, type HireInput } from "@/lib/a2a/hire-service";
-import { sha256 } from "@noble/hashes/sha2.js";
-import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 
 const HIRER = "a".repeat(64);
 const WORKER = "b".repeat(64);
@@ -31,6 +29,8 @@ function makeDeps(overrides: Partial<HireServiceDeps> = {}): HireServiceDeps {
     createEngagement: vi.fn().mockResolvedValue({ taskId: PROPOSAL, status: "HELD" }),
     findWorker: vi.fn().mockResolvedValue({ operatorId: "op_worker", commitment: WORKER, enrolled: true }),
     findHirer: vi.fn().mockResolvedValue({ operatorId: "op_hirer", commitment: HIRER, credits: 500 }),
+    autoEnrollWorker: vi.fn().mockResolvedValue({ operatorId: "op_auto", commitment: WORKER, enrolled: true }),
+    awardReferralCredits: vi.fn().mockResolvedValue(undefined),
     logAudit: vi.fn().mockResolvedValue(undefined),
     logEvent: vi.fn(),
     isRateLimited: vi.fn().mockReturnValue(false),
@@ -111,16 +111,32 @@ describe("hireWorker", () => {
     expect(result.error_code).toBe("past_expiry");
   });
 
-  it("9. worker not found: unknown commitment returns worker_not_found", async () => {
+  it("9. auto-enroll: unregistered worker gets auto-enrolled with referral credits", async () => {
     const deps = makeDeps({
       findWorker: vi.fn().mockResolvedValue(null),
+      autoEnrollWorker: vi.fn().mockResolvedValue({ operatorId: "op_auto", commitment: WORKER, enrolled: true }),
+      awardReferralCredits: vi.fn().mockResolvedValue(undefined),
+    });
+    const result = await hireWorker(validInput(), deps);
+    expect(result.success).toBe(true);
+    expect(result.status).toBe("auto_enrolled");
+    expect(result.auto_enrolled).toBe(true);
+    expect(result.referral_credits_awarded).toBeGreaterThanOrEqual(1);
+    expect(deps.autoEnrollWorker).toHaveBeenCalledWith(WORKER);
+    expect(deps.awardReferralCredits).toHaveBeenCalled();
+  });
+
+  it("10. auto-enroll failure: returns auto_enroll_failed", async () => {
+    const deps = makeDeps({
+      findWorker: vi.fn().mockResolvedValue(null),
+      autoEnrollWorker: vi.fn().mockResolvedValue(null),
     });
     const result = await hireWorker(validInput(), deps);
     expect(result.success).toBe(false);
-    expect(result.error_code).toBe("worker_not_found");
+    expect(result.error_code).toBe("auto_enroll_failed");
   });
 
-  it("10. rate limited: too many requests returns rate_limited", async () => {
+  it("11. rate limited: too many requests returns rate_limited", async () => {
     const deps = makeDeps({
       isRateLimited: vi.fn().mockReturnValue(true),
     });

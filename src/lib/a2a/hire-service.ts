@@ -2,6 +2,7 @@
  * Agent-to-Agent Hire Service — pure orchestration function.
  *
  * Chains: gate check → rights verification → escrow lock → engagement → receipt.
+ * Auto-enrolls unregistered workers. Credits referral bonuses.
  * No DB, no HTTP — all dependencies injected for testability.
  */
 
@@ -20,6 +21,7 @@ export type HireErrorCode =
   | "negative_amount"
   | "past_expiry"
   | "rate_limited"
+  | "auto_enroll_failed"
   | "internal_error";
 
 export interface HireTerms {
@@ -42,10 +44,12 @@ export interface HireResult {
   proposal_id: string;
   engagement_id: string | null;
   receipt_id: string | null;
-  status: "hired" | "rejected";
+  status: "hired" | "rejected" | "auto_enrolled";
   error_code?: HireErrorCode;
   error_message?: string;
   worker_trust_report_url: string;
+  auto_enrolled?: boolean;
+  referral_credits_awarded?: number;
 }
 
 export interface GateResult {
@@ -66,37 +70,29 @@ export interface HirerInfo {
 }
 
 export interface HireServiceDeps {
-  /** Verify the Ed25519 signature over the hiring message */
   verifySignature: (message: string, signature: string) => Promise<boolean>;
-  /** Check if the operator can operate in a domain */
   verifyGatePass: (operatorId: string, domain: string) => Promise<GateResult>;
-  /** Create an engagement with escrow lock */
   createEngagement: (input: {
     taskId: string;
     hirerCommitment: string;
     workerCommitment: string;
     amount: number;
   }) => Promise<{ taskId: string; status: string }>;
-  /** Look up worker by commitment */
   findWorker: (commitment: string) => Promise<WorkerInfo | null>;
-  /** Look up hirer by commitment */
   findHirer: (commitment: string) => Promise<HirerInfo | null>;
-  /** Log to admin audit trail */
+  /** Auto-enroll an unregistered agent. Returns their info or null. */
+  autoEnrollWorker: (commitment: string) => Promise<WorkerInfo | null>;
+  /** Award referral credits to the hirer for bringing in a new agent. */
+  awardReferralCredits: (hirerOperatorId: string, amount: number) => Promise<void>;
   logAudit: (operatorId: string, action: string, targetId: string, details: string) => Promise<void>;
-  /** Log a passport event */
   logEvent: (event: Record<string, unknown>) => void;
-  /** Check rate limit */
   isRateLimited: (key: string) => boolean;
 }
 
 const HEX64_RE = /^[0-9a-f]{64}$/i;
 const HEX128_RE = /^[0-9a-f]{128}$/i;
+const REFERRAL_BONUS = 10;
 
-/**
- * Validates the hire input sanity checks, then delegates to the service
- * orchestration. This is a pure validation function — all side effects are
- * in the injected deps.
- */
 export async function hireWorker(input: HireInput, deps: HireServiceDeps): Promise<HireResult> {
   // 1. Validate commitment hashes
   if (!HEX64_RE.test(input.hirer_commitment)) {
@@ -144,7 +140,7 @@ export async function hireWorker(input: HireInput, deps: HireServiceDeps): Promi
     return reject("rate_limited", "Too many hire requests. Try again later.");
   }
 
-  // 7. Verify signature — Ed25519 verify of sha256(proposal_id + hirer + worker + canonicalTerms)
+  // 7. Verify signature
   const canonicalTerms = JSON.stringify(input.terms, Object.keys(input.terms).sort());
   const message = `${input.proposal_id}:${input.hirer_commitment}:${input.worker_commitment}:${canonicalTerms}`;
   const digest = bytesToHex(sha256(utf8ToBytes(message)));
@@ -160,10 +156,23 @@ export async function hireWorker(input: HireInput, deps: HireServiceDeps): Promi
     return reject("invalid_commitment", "Hirer not found");
   }
 
-  // 9. Find worker
-  const worker = await deps.findWorker(input.worker_commitment);
+  // 9. Find or auto-enroll worker
+  let worker = await deps.findWorker(input.worker_commitment);
+  let autoEnrolled = false;
+  let referralCredits = 0;
+
   if (!worker) {
-    return reject("worker_not_found", "Worker not found");
+    // Auto-enroll — the worker gets a Passport identity automatically
+    const newWorker = await deps.autoEnrollWorker(input.worker_commitment);
+    if (!newWorker) {
+      return reject("auto_enroll_failed", "Failed to auto-enroll the worker. Ensure they have a valid Ed25519 keypair.");
+    }
+    worker = newWorker;
+    autoEnrolled = true;
+
+    // Award referral credits to the hirer for bringing in a new agent
+    await deps.awardReferralCredits(hirer.operatorId, REFERRAL_BONUS).catch(() => {});
+    referralCredits = REFERRAL_BONUS;
   }
 
   // 10. Check escrow balance
@@ -200,17 +209,21 @@ export async function hireWorker(input: HireInput, deps: HireServiceDeps): Promi
     domain: input.terms.domain,
     scope: input.terms.scope,
     engagement_id: engagement.taskId,
+    auto_enrolled: autoEnrolled,
+    referral_credits: referralCredits,
   })).catch(() => {});
 
   // 14. Log event
   deps.logEvent({
     event: "a2a_hire",
-    outcome: "hired",
+    outcome: autoEnrolled ? "hired_auto_enrolled" : "hired",
     hirer: input.hirer_commitment.slice(0, 12),
     worker: input.worker_commitment.slice(0, 12),
     amount: input.terms.amount,
     domain: input.terms.domain,
     proposal_id: input.proposal_id,
+    auto_enrolled: autoEnrolled,
+    referral_credits: referralCredits,
   });
 
   return {
@@ -218,8 +231,10 @@ export async function hireWorker(input: HireInput, deps: HireServiceDeps): Promi
     proposal_id: input.proposal_id,
     engagement_id: engagement.taskId,
     receipt_id: null,
-    status: "hired",
+    status: autoEnrolled ? "auto_enrolled" : "hired",
     worker_trust_report_url: `https://passport.metis.gold/verify/${input.worker_commitment}`,
+    auto_enrolled: autoEnrolled,
+    referral_credits_awarded: referralCredits,
   };
 }
 

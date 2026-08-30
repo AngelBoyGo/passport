@@ -1,25 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { authenticateApiKey } from "@/lib/operator";
+import { authenticateApiKey, hashApiKey } from "@/lib/operator";
 import { verifyGatePass } from "@/lib/gate/verifyGatePass";
 import { createEngagement } from "@/lib/engagement/engagement-service";
 import { logPassportEvent } from "@/lib/observability/logger";
 import { checkInMemoryRateLimit, clientIpFromRequest } from "@/lib/rateLimit";
 import { hireWorker, type HireServiceDeps, type HireInput } from "@/lib/a2a/hire-service";
 import { verify } from "@noble/ed25519";
-import { hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
+import { getPublicKey } from "@noble/ed25519";
+import { sha256 } from "@noble/hashes/sha2.js";
+import { bytesToHex, hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
 import "@/lib/receipt/crypto";
 
 export const dynamic = "force-dynamic";
 
 const RATE_LIMIT_MAX = 15;
 const RATE_LIMIT_WINDOW = 60_000;
+const AUTO_ENROLL_CREDITS = 25;
+const REFERRAL_BONUS = 10;
 
 /**
  * POST /api/v1/a2a/hire — Agent-to-Agent Autonomous Hiring Protocol.
  *
- * Chains: identity verification → gate check → escrow lock → engagement → receipt.
- * Any agent with a valid API key can hire any other agent autonomously.
+ * Chains: identity verification → auto-enroll (if needed) → gate check →
+ * escrow lock → engagement → referral credits → receipt.
+ *
+ * Any agent can hire any other agent autonomously. If the worker doesn't
+ * have a Passport yet, they get auto-enrolled. The hirer gets referral
+ * credits for bringing in a new agent.
  */
 export async function POST(request: NextRequest) {
   const ip = clientIpFromRequest(request.headers);
@@ -31,7 +39,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Authenticate the calling agent
   const operator = await authenticateApiKey(request.headers.get("authorization"));
   if (!operator) {
     return NextResponse.json({ error: "Unauthorized", error_code: "invalid_signature" }, { status: 401 });
@@ -119,6 +126,64 @@ export async function POST(request: NextRequest) {
         credits: op?.credits ?? 0,
       };
     },
+    autoEnrollWorker: async (commitment) => {
+      // Auto-enroll: create a minimal operator + enrollment for the worker
+      const stripeCustomerId = `cus_auto_a2a_${commitment.slice(0, 16)}`;
+      let operator = await prisma.operator.create({
+        data: {
+          stripeCustomerId,
+          email: null,
+          tier: "free",
+          credits: AUTO_ENROLL_CREDITS,
+        },
+      });
+
+      // Generate a Holder API key for the worker
+      const rawKey = `pp_usr_${bytesToHex(crypto.getRandomValues(new Uint8Array(32)))}`;
+      const keyHash = hashApiKey(rawKey);
+      await prisma.apiKey.create({
+        data: {
+          operatorId: operator.id,
+          keyHash,
+          name: `Agent-${commitment.slice(0, 8)}`,
+          role: "HOLDER",
+        },
+      });
+
+      // Register the agent
+      await prisma.agent.create({
+        data: {
+          operatorId: operator.id,
+          agentId: commitment.toLowerCase(),
+          domain: body.terms?.domain || "CODE_GENERATION",
+        },
+      });
+
+      // Enroll the agent
+      await prisma.agentEnrollment.upsert({
+        where: { subjectCommitment: commitment.toLowerCase() },
+        create: {
+          subjectCommitment: commitment.toLowerCase(),
+          publicKey: commitment.toLowerCase(),
+          context: "A2A_AUTO_ENROLLED",
+          status: "ISSUED",
+          issuedAt: new Date(),
+        },
+        update: { status: "ISSUED" },
+      });
+
+      return {
+        operatorId: operator.id,
+        commitment: commitment.toLowerCase(),
+        enrolled: true,
+      };
+    },
+    awardReferralCredits: async (hirerOperatorId: string, amount: number) => {
+      await prisma.operator.update({
+        where: { id: hirerOperatorId },
+        data: { credits: { increment: amount } },
+      }).catch(() => {});
+    },
     logAudit: async (operatorId, action, targetId, details) => {
       await prisma.adminAuditLog.create({
         data: { operatorId, action, targetId, details },
@@ -146,6 +211,7 @@ export async function POST(request: NextRequest) {
       negative_amount: 400,
       past_expiry: 400,
       rate_limited: 429,
+      auto_enroll_failed: 500,
       internal_error: 500,
     };
     const status = statusMap[result.error_code ?? "internal_error"] ?? 400;
