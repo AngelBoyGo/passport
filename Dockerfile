@@ -1,43 +1,38 @@
-# syntax=docker/dockerfile:1
-
-FROM node:20-alpine AS deps
+# Passport — Production Dockerfile
+FROM node:20-alpine AS base
+RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
-COPY package.json package-lock.json ./
-COPY prisma/schema.prisma ./prisma/schema.prisma
+
+# Install dependencies
+FROM base AS deps
+COPY package.json package-lock.json* ./
 RUN npm ci
 
-FROM node:20-alpine AS builder
-WORKDIR /app
+# Build the app
+FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+ENV NEXT_TELEMETRY_DISABLED=1
 RUN npx prisma generate
 RUN npm run build
 
-FROM node:20-alpine AS prisma-cli
-WORKDIR /prisma-cli
-RUN npm init -y && npm install prisma@6.19.0
-
-FROM node:20-alpine AS runner
-WORKDIR /app
-
+# Production image
+FROM base AS runner
 ENV NODE_ENV=production
-ENV PORT=3000
-ENV HOSTNAME=0.0.0.0
+ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
 
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
-# CRITICAL FIX: Prisma CLI + bin + full node_modules tree for migrate deploy
-COPY --from=prisma-cli --chown=nextjs:nodejs /prisma-cli/node_modules ./prisma-cli/node_modules
-COPY --from=prisma-cli --chown=nextjs:nodejs /prisma-cli/node_modules/prisma ./node_modules/prisma
-COPY --from=prisma-cli --chown=nextjs:nodejs /prisma-cli/node_modules/.bin ./node_modules/.bin
+COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/client
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
 USER nextjs
 EXPOSE 3000
-
-CMD ["sh", "-c", "./prisma-cli/node_modules/.bin/prisma migrate deploy && node server.js"]
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+CMD ["node", "server.js"]

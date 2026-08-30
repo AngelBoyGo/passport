@@ -1,0 +1,39 @@
+# Passport — Caddy reverse proxy configuration
+# Auto-provisions SSL via Let's Encrypt
+# Replace passport.metis.gold with your actual domain
+
+passport.metis.gold {
+    # Security headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+    }
+
+    # Reverse proxy to Next.js
+    reverse_proxy app:3000 {
+        # Health check
+        health_uri /api/health
+        health_interval 30s
+        health_timeout 5s
+    }
+
+    # Gzip compression
+    encode gzip
+
+    # Logs
+    log {
+        output file /data/logs/access.log
+        format json
+    }
+}
+
+# Development — no SSL, localhost only
+# Comment out the production block above and use this for local testing
+# :80 {
+#     reverse_proxy app:3000
+#     log { output file /data/logs/dev.log }
+# }
