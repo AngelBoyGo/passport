@@ -8,6 +8,7 @@ import { StreakCard } from "@/components/gamification/streak-card";
 import { BadgesCard } from "@/components/gamification/badges-card";
 import { ConfettiEffect } from "@/components/gamification/confetti";
 import { NeedsCard } from "@/components/gamification/needs-card";
+import { AgentInbox } from "@/components/gamification/agent-inbox";
 
 type PersonaLens = "builder" | "datacenter" | "enterprise" | "auditor";
 
@@ -368,7 +369,10 @@ export default function UserDashboard() {
             <StreakCard />
             <BadgesCard />
           </div>
-          <NeedsCard />
+          <div className="space-y-4">
+            <NeedsCard />
+            <AgentInbox />
+          </div>
         </div>
 
         {/* ── Reputation Score (from governance) ── */}

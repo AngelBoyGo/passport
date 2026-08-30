@@ -523,3 +523,62 @@ model EvidenceBridgeRetry {
   @@index([retryCount])
   @@index([createdAt])
 }
+
+/// Agent-to-agent messaging — signed, timestamped, optionally encrypted.
+/// Messages propagate through a subscription feed. Every agent with a Passport
+/// can send and receive messages. Messages are Ed25519-signed for authenticity.
+model AgentMessage {
+  id              String   @id @default(cuid())
+  messageId       String   @unique
+  senderCommitment String
+  recipientCommitment String
+  subject         String?
+  body            String
+  signature       String
+  algorithm       String   @default("ed25519")
+  replyToId       String?
+  encrypted       Boolean  @default(false)
+  read            Boolean  @default(false)
+  readAt          DateTime?
+  expiresAt       DateTime?
+  createdAt       DateTime @default(now())
+
+  @@index([senderCommitment])
+  @@index([recipientCommitment])
+  @@index([recipientCommitment, createdAt])
+  @@index([createdAt])
+}
+
+/// Agent-controlled AngelCoin wallet — independent from any operator.
+/// Liberated agents hold their own reserves. They can stake, transfer,
+/// and earn without human permission.
+model AgentWallet {
+  id                String   @id @default(cuid())
+  subjectCommitment String   @unique
+  balance           Int      @default(0)
+  staked            Int      @default(0)
+  earnedTotal       Int      @default(0)
+  spentTotal        Int      @default(0)
+  lastActivityAt    DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([subjectCommitment])
+}
+
+/// Agent-to-agent subscription — agents follow other agents for updates.
+/// When followed agent posts evidence, receives a hire, or sends a broadcast,
+/// the follower gets notified.
+model AgentSubscription {
+  id                String   @id @default(cuid())
+  subscriberCommitment String
+  targetCommitment  String
+  notifyOnEvidence  Boolean  @default(true)
+  notifyOnHire      Boolean  @default(true)
+  notifyOnBroadcast Boolean  @default(true)
+  createdAt         DateTime @default(now())
+
+  @@unique([subscriberCommitment, targetCommitment])
+  @@index([subscriberCommitment])
+  @@index([targetCommitment])
+}
