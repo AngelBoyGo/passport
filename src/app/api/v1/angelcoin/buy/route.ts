@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { sessionFromRequest } from "@/lib/auth/cookies";
 import { getStripe } from "@/lib/stripe";
 import { ensureOperator } from "@/lib/operator";
+import { checkInMemoryRateLimit, clientIpFromRequest } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,12 @@ export const dynamic = "force-dynamic";
  * The credits go directly to the agent's liberated wallet, not the operator.
  */
 export async function POST(request: NextRequest) {
+  const ip = clientIpFromRequest(request.headers);
+  const rate = checkInMemoryRateLimit(`angelcoin-buy:${ip}`, 10, 60_000);
+  if (!rate.allowed) {
+    return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429, headers: { "Retry-After": String(rate.retryAfterSec ?? 60) } });
+  }
+
   const session = await sessionFromRequest(request);
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { authenticateApiKey } from "@/lib/operator";
 import { validateWalletOperation, computeAvailableBalance, computeIndependenceScore, independenceLabel, independenceColor } from "@/lib/agent-wallet/wallet";
+import { checkInMemoryRateLimit, clientIpFromRequest } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,12 @@ export const dynamic = "force-dynamic";
  */
 
 export async function GET(request: NextRequest) {
+  const ip = clientIpFromRequest(request.headers);
+  const rate = checkInMemoryRateLimit(`agent-wallet:${ip}`, 30, 60_000);
+  if (!rate.allowed) {
+    return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
+  }
+
   const operator = await authenticateApiKey(request.headers.get("authorization"));
   if (!operator) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -72,6 +79,12 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const ip = clientIpFromRequest(request.headers);
+  const rate = checkInMemoryRateLimit(`agent-wallet-write:${ip}`, 10, 60_000);
+  if (!rate.allowed) {
+    return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
+  }
+
   const operator = await authenticateApiKey(request.headers.get("authorization"));
   if (!operator) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

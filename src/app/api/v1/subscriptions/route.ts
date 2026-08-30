@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { authenticateApiKey } from "@/lib/operator";
+import { checkInMemoryRateLimit, clientIpFromRequest } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,12 @@ export const dynamic = "force-dynamic";
  * DELETE /api/v1/subscriptions — unsubscribe from an agent.
  */
 export async function POST(request: NextRequest) {
+  const ip = clientIpFromRequest(request.headers);
+  const rate = checkInMemoryRateLimit(`subscriptions:${ip}`, 20, 60_000);
+  if (!rate.allowed) {
+    return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
+  }
+
   const operator = await authenticateApiKey(request.headers.get("authorization"));
   if (!operator) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

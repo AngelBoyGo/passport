@@ -1,13 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { redeemReferralCode } from "@/lib/referral/referral-service";
+import { checkInMemoryRateLimit, clientIpFromRequest } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 
 /**
  * POST /api/v1/referrals/redeem — redeem a referral code for credits.
  * Body: { code: "ABC123" }
+ * Rate-limited: 5 per IP per minute to prevent brute-force guessing.
  */
 export async function POST(request: NextRequest) {
+  const ip = clientIpFromRequest(request.headers);
+  const rate = checkInMemoryRateLimit(`referral-redeem:${ip}`, 5, 60_000);
+  if (!rate.allowed) {
+    return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429, headers: { "Retry-After": String(rate.retryAfterSec ?? 60) } });
+  }
+
   let body: { code?: string };
   try {
     body = await request.json();
