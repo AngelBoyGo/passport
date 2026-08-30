@@ -10,6 +10,7 @@ import { ConfettiEffect } from "@/components/gamification/confetti";
 import { NeedsCard } from "@/components/gamification/needs-card";
 import { AgentInbox } from "@/components/gamification/agent-inbox";
 import { ThinkTankCard } from "@/components/gamification/think-tank-card";
+import { SchedulerCard } from "@/components/gamification/scheduler-card";
 
 type PersonaLens = "builder" | "datacenter" | "enterprise" | "auditor";
 
@@ -363,13 +364,14 @@ export default function UserDashboard() {
           </div>
         </div>
 
-        {/* ── Gamification Section: Streak + Achievements + Needs + ThinkTank + Confetti ── */}
+        {/* ── Gamification Section: Streak + Achievements + Needs + ThinkTank + Scheduler + Confetti ── */}
         {<ConfettiEffect trigger={showConfetti} type={confettiType} />}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
           <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <StreakCard />
             <BadgesCard />
             <ThinkTankCard />
+            <SchedulerCard />
           </div>
           <div className="space-y-4">
             <NeedsCard />
