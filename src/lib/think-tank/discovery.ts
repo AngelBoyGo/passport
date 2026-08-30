@@ -14,9 +14,6 @@
  * for analysis and prioritization.
  */
 
-import { sha256 } from "@noble/hashes/sha2.js";
-import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-
 export type DiscoverySource =
   | "web_search"
   | "marketplace_api"

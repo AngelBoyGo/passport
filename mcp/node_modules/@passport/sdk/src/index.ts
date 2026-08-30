@@ -32,3 +32,7 @@ export {
   classifyExecutionError,
 } from "./middleware/audit.js";
 export type { PassportAuditOptions } from "./middleware/audit.js";
+export { passportMiddleware } from "./vercel-ai.js";
+export type { PassportVercelConfig } from "./vercel-ai.js";
+export { PassportCallbackHandler } from "./langchain.js";
+export type { PassportLangChainConfig } from "./langchain.js";
