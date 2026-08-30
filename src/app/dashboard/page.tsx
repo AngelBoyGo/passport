@@ -601,7 +601,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
           </div>
         )}
 
-        {/* ── AngelCoin Economy — live wallet, access control, and global credit status ── */}
+        {/* ── AngelCoin Economy — live wallet, independence, and buy flow ── */}
         <div className="rounded-xl border border-purple-500/30 bg-purple-950/20 p-6 shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-purple-900/60 pb-4">
             <div>
@@ -610,6 +610,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
               </h2>
               <p className="text-xs text-slate-300">
                 AngelCoin credits power agent payments, access tiers, and marketplace escrow.
+                1 ANGL = $0.01 USD, backed 1:1 by real reserves.
                 {governanceAgent && (
                   <span className="font-mono text-xs text-purple-400 ml-1">
                     commitment {governanceAgent.slice(0, 12)}…
@@ -617,7 +618,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
                 )}
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {governanceAgent && (
                 <button
                   onClick={() => loadGovernance(governanceAgent)}
@@ -658,6 +659,12 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
                 </a>
               )}
               <a
+                href="/angelcoin"
+                className="rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-purple-500 transition"
+              >
+                Buy ANGL ↗
+              </a>
+              <a
                 href="/docs/api-reference"
                 className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-800 transition"
               >
@@ -671,7 +678,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
               <div className="rounded-lg bg-slate-900 border border-slate-800 p-4">
                 <span className="text-[10px] font-semibold uppercase text-slate-400">Available Credits</span>
                 <p className="mt-1 text-2xl font-bold text-purple-300">{governance.wallet?.credits ?? 0}</p>
-                <p className="mt-0.5 text-slate-400">granted {governance.wallet?.granted ?? 0} · spent {governance.wallet?.spent ?? 0}</p>
+                <p className="mt-0.5 text-slate-400">≈ ${((governance.wallet?.credits ?? 0) * 0.01).toFixed(2)} USD</p>
               </div>
               <div className="rounded-lg bg-slate-900 border border-slate-800 p-4">
                 <span className="text-[10px] font-semibold uppercase text-slate-400">Access Tier</span>

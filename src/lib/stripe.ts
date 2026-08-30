@@ -240,11 +240,63 @@ export async function handleStripeWebhook(
           await tx.operatorLedgerEntry.create({
             data: {
               operatorId: operator.id,
-              deltaMicros: amountTotal * 10_000, // cents -> micro-dollars
+              deltaMicros: amountTotal * 10_000,
               kind: "stablecoin_topup",
               metadata: JSON.stringify({ session_id: session.id, usd_cents: amountTotal, credits }),
             },
           });
+          return {
+            handled: true,
+            duplicate: false as const,
+            operatorId: operatorIdFromStripe(customerId),
+          };
+        }
+
+        // AngelCoin direct-to-agent-wallet top-up
+        if (session.metadata?.product === "angelcoin_topup") {
+          const { ensureOperator } = await import("./operator");
+          const operator = await ensureOperator(customerId, session.customer_email, tx);
+          const creditAmount = parseInt(session.metadata?.credit_amount || "0", 10);
+          const targetCommitment = session.metadata?.target_commitment;
+
+          if (targetCommitment && targetCommitment !== "operator") {
+            // Deposit directly into the agent's liberated wallet
+            await tx.agentWallet.upsert({
+              where: { subjectCommitment: targetCommitment },
+              create: {
+                subjectCommitment: targetCommitment,
+                balance: creditAmount,
+                earnedTotal: creditAmount,
+                lastActivityAt: new Date(),
+              },
+              update: {
+                balance: { increment: creditAmount },
+                earnedTotal: { increment: creditAmount },
+                lastActivityAt: new Date(),
+              },
+            });
+          } else {
+            // Fall back to operator credits
+            await tx.operator.update({
+              where: { id: operator.id },
+              data: { credits: { increment: creditAmount } },
+            });
+          }
+
+          await tx.operatorLedgerEntry.create({
+            data: {
+              operatorId: operator.id,
+              deltaMicros: creditAmount * 100_000,
+              kind: "angelcoin_topup",
+              metadata: JSON.stringify({
+                session_id: session.id,
+                credit_amount: creditAmount,
+                target_commitment: targetCommitment || "operator",
+                usd_value_cents: creditAmount,
+              }),
+            },
+          });
+
           return {
             handled: true,
             duplicate: false as const,

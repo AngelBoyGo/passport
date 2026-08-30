@@ -4,6 +4,7 @@ const footerLinks = [
   {
     title: "Product",
     links: [
+      { href: "/angelcoin", label: "AngelCoin Economy" },
       { href: "/#features", label: "Features" },
       { href: "/#pricing", label: "Pricing" },
       { href: "/docs/getting-started", label: "Quickstart" },
