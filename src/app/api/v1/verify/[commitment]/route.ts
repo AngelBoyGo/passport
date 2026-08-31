@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ hash: string }> }
+  { params }: { params: Promise<{ commitment: string }> }
 ) {
   const ip = clientIpFromRequest(request.headers);
   const rate = checkInMemoryRateLimit(`verify:${ip}`, 60, 60_000);
@@ -31,7 +31,7 @@ export async function GET(
     );
   }
 
-  const { hash } = await params;
+  const { commitment: hash } = await params;
   if (!isValidAgentCommitmentHash(hash)) {
     return NextResponse.json(
       { error: "commitment must be a 64-character hex string" },
