@@ -4,20 +4,21 @@ import { sessionFromRequest } from "@/lib/auth/cookies";
 import { getStripe } from "@/lib/stripe";
 import { ensureOperator } from "@/lib/operator";
 import { checkInMemoryRateLimit, clientIpFromRequest } from "@/lib/rateLimit";
+import { ANGL_BATCHES, type AnglBatch } from "@/lib/angelcoin/batch-economy";
 
 export const dynamic = "force-dynamic";
 
 /**
- * POST /api/v1/angelcoin/buy — Buy AngelCoin credits with USD.
+ * POST /api/v1/angelcoin/buy — Buy AngelCoin in fixed batches.
  *
- * Creates a Stripe Checkout session that accepts USDC.
- * On completion, credits are deposited into the agent's wallet.
+ * ANGL is ONLY sold in predefined batch sizes (5 × 3^n pattern) that
+ * never divide evenly into feature costs. This guarantees leftover ANGL
+ * in every wallet, creating recurring demand and infusing value.
  *
- * Rate: 1 AngelCoin = $0.01 USD (100 AngelCoin = $1)
- * Min: $1.00 (100 AngelCoin)
- * Max: $5,000 (500,000 AngelCoin)
+ * Batches: Starter(15) → Small(75) → Medium(375) → Standard(1,875)
+ *          → Pro(5,625) → Business(16,875) → Whale(50,625)
  *
- * The credits go directly to the agent's liberated wallet, not the operator.
+ * Rate: 1 ANGL = $0.01 USD. No custom amounts accepted.
  */
 export async function POST(request: NextRequest) {
   const ip = clientIpFromRequest(request.headers);
@@ -31,25 +32,33 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { usd_cents?: number; agent_commitment?: string };
+  let body: { batch_id?: string; agent_commitment?: string };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const usdCents = body.usd_cents ?? 0;
-  if (!Number.isFinite(usdCents) || usdCents < 100 || usdCents > 500000) {
-    return NextResponse.json({ error: "Amount must be between $1.00 and $5,000.00" }, { status: 400 });
+  if (!body.batch_id) {
+    return NextResponse.json({
+      error: "batch_id is required. Available batches:",
+      batches: ANGL_BATCHES.map((b) => ({ batch_id: b.batch_id, angl: b.angl, usd: `$${(b.usd_cents / 100).toFixed(2)}`, label: b.label })),
+    }, { status: 400 });
   }
 
-  // Determine target — agent wallet or operator credits
+  const batch: AnglBatch | undefined = ANGL_BATCHES.find((b) => b.batch_id === body.batch_id);
+  if (!batch) {
+    return NextResponse.json({
+      error: `Invalid batch_id: ${body.batch_id}`,
+      available: ANGL_BATCHES.map((b) => b.batch_id),
+    }, { status: 400 });
+  }
+
   const targetCommitment = body.agent_commitment?.toLowerCase() || null;
   if (targetCommitment && !/^[0-9a-f]{64}$/i.test(targetCommitment)) {
     return NextResponse.json({ error: "Invalid agent commitment hash" }, { status: 400 });
   }
 
-  // Verify agent ownership if specified
   if (targetCommitment) {
     const agent = await prisma.agent.findFirst({
       where: { operatorId: session.operator.id, agentId: targetCommitment },
@@ -59,19 +68,19 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const creditAmount = Math.floor((usdCents * 100) / 100); // 1 cent = 1 AngelCoin
   const operator = await ensureOperator(session.operator.stripeCustomerId, session.operator.email);
   const stripe = getStripe();
 
   if (!stripe) {
-    // Dev/mock path
     return NextResponse.json({
       mock: true,
-      rate: "1 AngelCoin = $0.01",
-      usd_cents: usdCents,
-      angelcoin: creditAmount,
+      batch_id: batch.batch_id,
+      label: batch.label,
+      angl: batch.angl,
+      usd: `$${(batch.usd_cents / 100).toFixed(2)}`,
       target: targetCommitment || "operator_credits",
       url: "/?checkout=mock",
+      note: "Dev mode — no Stripe configured. In production, this creates a real Stripe checkout.",
     });
   }
 
@@ -83,33 +92,69 @@ export async function POST(request: NextRequest) {
         price_data: {
           currency: "usd",
           product_data: {
-            name: `AngelCoin credit top-up`,
-            description: targetCommitment
-              ? `${creditAmount} AngelCoin → agent wallet ${targetCommitment.slice(0, 12)}…`
-              : `${creditAmount} AngelCoin → operator credits`,
+            name: `AngelCoin ${batch.label} Batch`,
+            description: `${batch.angl.toLocaleString()} ANGL — ${batch.description}`,
           },
-          unit_amount: usdCents,
+          unit_amount: batch.usd_cents,
         },
         quantity: 1,
       },
     ],
     payment_method_types: ["card"],
-    success_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://passport.metis.gold"}/dashboard?buy_success=1`,
+    success_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://passport.metis.gold"}/dashboard?buy_success=1&batch=${batch.batch_id}`,
     cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://passport.metis.gold"}/dashboard?buy_canceled=1`,
     metadata: {
       product: "angelcoin_topup",
-      usd_cents: String(usdCents),
-      credit_amount: String(creditAmount),
+      batch_id: batch.batch_id,
+      credit_amount: String(batch.angl),
+      usd_cents: String(batch.usd_cents),
       target_commitment: targetCommitment || "operator",
     },
   });
 
   return NextResponse.json({
-    mock: false,
-    rate: "1 AngelCoin = $0.01",
-    usd_cents: usdCents,
-    angelcoin: creditAmount,
+    batch_id: batch.batch_id,
+    label: batch.label,
+    angl: batch.angl,
+    usd: `$${(batch.usd_cents / 100).toFixed(2)}`,
     target: targetCommitment || "operator_credits",
     url: checkout.url,
+    note: "You will receive exactly this amount of ANGL. Batches are fixed — no custom amounts.",
   });
+}
+
+/**
+ * GET /api/v1/angelcoin/buy — list available batches.
+ */
+export async function GET() {
+  return NextResponse.json({
+    batches: ANGL_BATCHES.map((b) => ({
+      batch_id: b.batch_id,
+      angl: b.angl,
+      usd: `$${(b.usd_cents / 100).toFixed(2)}`,
+      label: b.label,
+      description: b.description,
+      recommended_for: getRecommendedFor(b.batch_id),
+    })),
+    rate: "1 ANGL = $0.01 USD",
+    note: "ANGL is only sold in fixed batches. Batch sizes are designed so you always have leftover ANGL for future features.",
+  }, {
+    headers: {
+      "Cache-Control": "public, max-age=3600",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
+}
+
+function getRecommendedFor(batchId: string): string {
+  switch (batchId) {
+    case "starter": return "Trying Passport for the first time";
+    case "small": return "Light agent activity — a few hires or credentials";
+    case "medium": return "Monthly usage for a single active agent";
+    case "standard": return "Pro subscription + regular hiring";
+    case "pro": return "Multiple agents, heavy marketplace activity";
+    case "business": return "Team of agents across multiple platforms";
+    case "whale": return "Enterprise operations, never worry about balance";
+    default: return "";
+  }
 }
