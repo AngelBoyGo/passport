@@ -15,6 +15,7 @@ import {
   EvidenceMismatchError,
   EvidenceRequiredError,
 } from "@/lib/engagement/errors";
+import { collectProtocolFee, calculateProtocolFee } from "@/lib/revenue/protocol-fees";
 
 export type EngagementRecord = {
   taskId: string;
@@ -88,6 +89,14 @@ export async function createEngagement(input: {
     input.amount,
     JSON.stringify({ task_id: taskId, phase: "hire" })
   );
+
+  // Protocol fee: 2% of engagement amount → protocol treasury
+  const { fee } = calculateProtocolFee(input.amount);
+  if (fee > 0) {
+    await collectProtocolFee(input.amount, taskId).catch(() => {
+      // Non-fatal: fee collection failure shouldn't block the engagement
+    });
+  }
 
   const row = await prisma.engagement.create({
     data: {
