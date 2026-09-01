@@ -582,3 +582,39 @@ model AgentSubscription {
   @@index([subscriberCommitment])
   @@index([targetCommitment])
 }
+
+/// OAuth-style scoped delegation — agents grant platforms time-limited,
+/// revocable access without sharing master API keys.
+model AgentDelegationToken {
+  id             String    @id @default(cuid())
+  agentCommitment String
+  platformName   String
+  scopes         String[]
+  nonce          String    @unique
+  tokenHash      String    @unique
+  expiresAt      DateTime
+  revoked        Boolean   @default(false)
+  revokedAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([agentCommitment])
+  @@index([platformName])
+  @@index([expiresAt])
+}
+
+/// One-time claim link for cross-platform wallet visibility.
+/// When a platform buys ANGEL for a user, Passport emails a claim link.
+/// Claiming binds the wallet to a login (email magic-link for humans).
+model WalletClaimToken {
+  id         String    @id @default(cuid())
+  token      String    @unique
+  email      String
+  commitment String
+  claimed    Boolean   @default(false)
+  claimedAt  DateTime?
+  expiresAt  DateTime
+  createdAt  DateTime  @default(now())
+
+  @@index([email])
+  @@index([commitment])
+}

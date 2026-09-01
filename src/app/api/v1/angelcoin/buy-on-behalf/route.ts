@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { authenticateApiKey } from "@/lib/operator";
 import { checkInMemoryRateLimit, clientIpFromRequest } from "@/lib/rateLimit";
+import { bytesToHex } from "@noble/hashes/utils.js";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +52,7 @@ export async function POST(request: NextRequest) {
     usd_amount?: number;
     operator?: string;
     source_job_id?: string;
+    buyer_email?: string;
   };
 
   try {
@@ -159,6 +161,22 @@ export async function POST(request: NextRequest) {
     select: { balance: true },
   });
 
+  // Auto-wallet: if buyer_email provided, create a claim token so the
+  // user can view their balance at passport.metis.gold
+  let claim_url: string | null = null;
+  if (body.buyer_email) {
+    const claimToken = bytesToHex(crypto.getRandomValues(new Uint8Array(24)));
+    await prisma.walletClaimToken.create({
+      data: {
+        token: claimToken,
+        email: body.buyer_email.toLowerCase(),
+        commitment: commitment,
+        expiresAt: new Date(Date.now() + 7 * 86400000), // 7 days to claim
+      },
+    }).catch(() => {});
+    claim_url = `${process.env.NEXT_PUBLIC_APP_URL || "https://passport.metis.gold"}/claim/${claimToken}`;
+  }
+
   return NextResponse.json({
     status: "credited",
     angl_credited: anglAmount,
@@ -168,6 +186,10 @@ export async function POST(request: NextRequest) {
     wallet_balance: wallet?.balance ?? anglAmount,
     operator: body.operator,
     source_job_id: body.source_job_id,
+    claim_url,
+    claim_message: claim_url
+      ? "A claim link has been generated. Share it with the buyer so they can view their ANGEL balance at passport.metis.gold."
+      : null,
     credited_at: new Date().toISOString(),
   }, { status: 201 });
 }
