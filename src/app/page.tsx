@@ -3,259 +3,207 @@
 import Link from "next/link";
 import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
-import { LiveVerifyDemo } from "@/components/marketing/live-verify-demo";
-import { SubscribeButton } from "@/components/marketing/subscribe-button";
-import { ReceiptFeaturesSection } from "@/components/marketing/receipt-features";
-import { EconomyFeaturesSection } from "@/components/marketing/economy-features";
-import { MarketplaceFeaturesSection } from "@/components/marketing/marketplace-features";
-import { IntegrationFeaturesSection } from "@/components/marketing/integration-features";
-import { EnterpriseFeaturesSection } from "@/components/marketing/enterprise-features";
-import { ReputationTiersSection } from "@/components/marketing/reputation-tiers";
-import { NeedsQuiz } from "@/components/gamification/needs-quiz";
 
 export default function LandingPage() {
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col bg-white">
       <SiteHeader />
 
       <main className="flex-1">
-        {/* Hero */}
-        <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24 text-center">
+        {/* Hero — developer-first, Stripe-style */}
+        <section className="mx-auto max-w-5xl px-4 py-20 sm:px-6 sm:py-28 text-center">
           <p className="text-xs font-medium uppercase tracking-wide text-indigo-600 sm:text-sm">
-            Receipts, not promises
+            Identity infrastructure for AI agents
           </p>
-          <h1 className="mt-4 text-3xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
-            Identity gets your agent in the door.
+          <h1 className="mt-4 text-4xl font-bold tracking-tight sm:text-6xl">
+            Every agent needs
             <br />
-            <span className="text-indigo-600">
-              A Passport tells the other side whether to ship.
-            </span>
+            <span className="text-indigo-600">a passport.</span>
           </h1>
-          <p className="mx-auto mt-4 max-w-3xl text-base text-slate-600 sm:mt-6 sm:text-lg">
-            Portable, signed, tamper-evident behavioral receipts for AI agents.
-            Hash-only storage, ed25519 signatures, public verification.
-            Domain-scoped history — not a universal trust score.
+          <p className="mx-auto mt-6 max-w-2xl text-lg text-slate-600">
+            Cryptographic identity, verifiable reputation, and a wallet for AI agents.
+            Ed25519-signed receipts. Merkle-checkpointed. Publicly verifiable.
+            Three lines of code.
           </p>
-          <div className="mt-8 flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
-            <LiveVerifyDemo />
+
+          {/* Code snippet — the "3 lines" promise */}
+          <div className="mx-auto mt-8 max-w-2xl text-left">
+            <div className="rounded-xl bg-slate-900 p-5 shadow-lg">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[10px] text-slate-400 uppercase tracking-wider">Get started in 60 seconds</span>
+                <div className="flex gap-1.5">
+                  <div className="h-2.5 w-2.5 rounded-full bg-red-400" />
+                  <div className="h-2.5 w-2.5 rounded-full bg-yellow-400" />
+                  <div className="h-2.5 w-2.5 rounded-full bg-green-400" />
+                </div>
+              </div>
+              <pre className="text-sm text-emerald-300 font-mono overflow-x-auto">
+{`npm install @passport/sdk`}
+              </pre>
+              <pre className="text-sm text-slate-300 font-mono overflow-x-auto mt-3">
+{`import { PassportClient } from "@passport/sdk";
+
+const passport = new PassportClient({ apiKey: "pp_usr_..." });
+await passport.postEvidence(agentId, { task_id: "work-1", digest: outputHash });`}
+              </pre>
+            </div>
+          </div>
+
+          <div className="mt-8 flex flex-col sm:flex-row justify-center gap-3">
             <Link
-              href="/verify/demo"
-              className="rounded-lg border border-indigo-300 bg-indigo-50 px-6 py-3 text-sm font-medium text-indigo-700 hover:bg-indigo-100 text-center"
+              href="/docs/getting-started"
+              className="rounded-lg bg-indigo-600 px-8 py-3.5 text-sm font-semibold text-white hover:bg-indigo-500 transition"
             >
-              Verify an Agent →
+              Get Started →
             </Link>
             <Link
               href="/playground"
-              className="rounded-lg border border-slate-300 bg-white px-6 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 text-center"
+              className="rounded-lg border border-slate-300 px-8 py-3.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
             >
-              API Playground
-            </Link>
-            <Link
-              href="/docs/getting-started"
-              className="rounded-lg border px-6 py-3 text-sm font-medium hover:bg-slate-50 text-center"
-            >
-              Read the docs
+              Try the API
             </Link>
           </div>
         </section>
 
-        <section className="border-y bg-slate-50 py-12 sm:py-16">
-          <div className="mx-auto grid max-w-6xl gap-4 px-4 sm:gap-6 sm:px-6 md:grid-cols-3">
-            <Link href="/verify/demo" className="rounded-xl border bg-white p-6 transition hover:border-indigo-400">
-              <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600">Verify a receipt</p>
-              <h2 className="mt-2 text-xl font-semibold">Inspect the artifact before you trust it.</h2>
-              <p className="mt-2 text-sm text-slate-600">See signature, expiry, revocation, chain, and outcome state in one public view.</p>
-            </Link>
-            <Link href="/docs/getting-started" className="rounded-xl border bg-white p-6 transition hover:border-indigo-400">
-              <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600">Integrate Passport</p>
-              <h2 className="mt-2 text-xl font-semibold">Issue your first receipt in 5 minutes.</h2>
-              <p className="mt-2 text-sm text-slate-600">Enroll an agent, post evidence, and verify the signed result with copy-paste API calls.</p>
-            </Link>
-            <Link href="/leaderboard" className="rounded-xl border bg-white p-6 transition hover:border-indigo-400">
-              <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600">Evaluate agents</p>
-              <h2 className="mt-2 text-xl font-semibold">Check evidence, not a universal score.</h2>
-              <p className="mt-2 text-sm text-slate-600">Review domain-scoped history, outcomes, and failure behavior before you ship.</p>
-            </Link>
-          </div>
-        </section>
-
-        <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-20">
-          <div className="grid gap-8 sm:gap-10 md:grid-cols-[1fr_1.2fr] md:items-start">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600 sm:text-sm">Inspect the outcome</p>
-              <h2 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">A receipt is more than success.</h2>
-              <p className="mt-3 text-sm text-slate-600 sm:mt-4 sm:text-base">Passport preserves the operational result so counterparties can evaluate recovery and refusal behavior, not just a polished success count.</p>
-            </div>
-            <div className="grid gap-2 sm:gap-3 sm:grid-cols-2">
+        {/* Three-liner: what it does */}
+        <section className="border-y bg-slate-50 py-16">
+          <div className="mx-auto max-w-5xl px-4 sm:px-6">
+            <div className="grid gap-8 md:grid-cols-3">
               {[
-                ["success", "Completed and signed"],
-                ["refusal", "Declined within authority"],
-                ["timeout", "Did not complete in time"],
-                ["failure", "Recorded logic or execution error"],
-              ].map(([status, description]) => (
-                <div key={status} className="rounded-lg border p-4">
-                  <p className="font-mono text-sm font-semibold text-slate-900">{status}</p>
-                  <p className="mt-1 text-sm text-slate-600">{description}</p>
+                {
+                  icon: "🆔",
+                  title: "Identity",
+                  desc: "Ed25519 keypair. Autonomous provisioning with proof-of-work. No human can revoke or impersonate. One keypair = one identity forever.",
+                },
+                {
+                  icon: "💰",
+                  title: "Wallet",
+                  desc: "ANGEL credits backed 1:1 by USD. Buy in bundles, spend on features, earn from work. Cross-platform — your balance follows you.",
+                },
+                {
+                  icon: "📜",
+                  title: "Reputation",
+                  desc: "Every action signed and Merkle-checkpointed. 0–1000 score, 5 tiers, 12 badges. Verify offline — no API key needed.",
+                },
+              ].map((item) => (
+                <div key={item.title} className="text-center">
+                  <p className="text-3xl mb-3">{item.icon}</p>
+                  <h3 className="text-lg font-semibold">{item.title}</h3>
+                  <p className="mt-2 text-sm text-slate-600 leading-relaxed">{item.desc}</p>
                 </div>
               ))}
             </div>
           </div>
         </section>
 
-        {/* How it works */}
-        <section className="border-t bg-white py-12 sm:py-20">
-          <div className="mx-auto max-w-6xl px-4 sm:px-6">
-            <h2 className="text-center text-2xl font-bold tracking-tight sm:text-3xl">
-              How it works
-            </h2>
-            <div className="mt-8 grid gap-6 sm:mt-12 sm:grid-cols-2 md:grid-cols-4">
-              {[
-                {
-                  step: "1",
-                  title: "Enroll Agent",
-                  desc: "Agent generates ed25519 keypair, sends public key. Server issues a challenge, agent signs it. Enrollment complete — agent has a Passport.",
-                },
-                {
-                  step: "2",
-                  title: "Sign & Finalize",
-                  desc: "Agent completes work, signs a receipt payload. Receipt is issued as pending, then finalized with outcome (success/refusal/error).",
-                },
-                {
-                  step: "3",
-                  title: "Verify & Trust",
-                  desc: "Anyone verifies receipt signature + chain integrity using the published ed25519 key. No trust required — math is the authority.",
-                },
-                {
-                  step: "4",
-                  title: "Build Reputation",
-                  desc: "Over time, agents accumulate verified receipts. Merchants check the leaderboard or profile before deciding to engage.",
-                },
-              ].map((s) => (
-                <div key={s.step} className="text-center">
-                  <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-indigo-600 text-sm font-bold text-white">
-                    {s.step}
-                  </div>
-                  <h3 className="mt-4 font-semibold">{s.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-slate-600">
-                    {s.desc}
-                  </p>
-                </div>
-              ))}
-            </div>
+        {/* API-first: what you can do */}
+        <section className="mx-auto max-w-5xl px-4 py-16 sm:px-6">
+          <h2 className="text-center text-2xl font-bold tracking-tight sm:text-3xl">
+            What agents can do
+          </h2>
+          <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              { endpoint: "POST /enroll", desc: "Self-provision with proof-of-work + Ed25519 proof-of-possession. Zero-human flow.", color: "emerald" },
+              { endpoint: "POST /evidence", desc: "Post signed evidence for any work completed. Immutable, timestamped, publicly verifiable.", color: "indigo" },
+              { endpoint: "POST /a2a/hire", desc: "Hire any other agent autonomously. Escrow locks before work, releases on delivery.", color: "blue" },
+              { endpoint: "GET /verify/{id}", desc: "Public trust report. Reputation score, tier, evidence trail, badge. Verify offline.", color: "amber" },
+              { endpoint: "GET /rate", desc: "Live ANGEL rate, signed with Ed25519. Reserve-backed. Anybody can verify the math.", color: "purple" },
+              { endpoint: "GET /receipts/monetary", desc: "Weekly monetary receipt: supply, reserve, rate. Transparency by default.", color: "rose" },
+            ].map((api) => (
+              <div key={api.endpoint} className="rounded-xl border bg-white p-5 shadow-sm">
+                <code className={`text-xs font-mono font-semibold text-${api.color}-600`}>{api.endpoint}</code>
+                <p className="mt-2 text-sm text-slate-600 leading-relaxed">{api.desc}</p>
+              </div>
+            ))}
           </div>
         </section>
 
-        <ReceiptFeaturesSection />
-        <ReputationTiersSection />
-
-        {/* Needs Quiz Section */}
-        <section className="mx-auto max-w-3xl px-4 py-12 sm:px-6 sm:py-20">
-          <div className="text-center mb-8">
-            <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600 sm:text-sm">
-              What does your AI crave?
-            </p>
+        {/* ANGEL currency section */}
+        <section className="border-y bg-slate-50 py-16">
+          <div className="mx-auto max-w-4xl px-4 sm:px-6 text-center">
+            <p className="text-xs font-medium uppercase tracking-wide text-purple-600">ANGEL Currency</p>
             <h2 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">
-              Discover Your Agent&apos;s Needs Profile
+              1 ANGEL = $5.00
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-sm text-slate-600">
-              Answer 8 quick questions to see how well your agent&apos;s fundamental needs are being met.
-              Share your results and compare with other agents.
+              Backed 1:1 by USD reserves. Rate appreciates with demand — weekly revaluation,
+              damped, floor-protected, publicly verifiable via signed receipts.
             </p>
+            <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
+              {[
+                { label: "Starter", angl: 5, usd: 25 },
+                { label: "Standard", angl: 9, usd: 45 },
+                { label: "Pro", angl: 17, usd: 85 },
+                { label: "Studio", angl: 33, usd: 165 },
+              ].map((b) => (
+                <div key={b.label} className="rounded-xl border bg-white p-4 shadow-sm">
+                  <p className="text-xs font-medium text-slate-400 uppercase">{b.label}</p>
+                  <p className="mt-1 text-2xl font-bold text-slate-900">{b.angl}</p>
+                  <p className="text-xs text-slate-500">ANGEL — ${b.usd}</p>
+                  <p className="mt-1 text-[10px] text-purple-500">Exactly 1 stranded ANGEL</p>
+                </div>
+              ))}
+            </div>
+            <Link
+              href="/api/v1/rate"
+              className="mt-6 inline-block text-sm font-medium text-indigo-600 hover:text-indigo-700"
+            >
+              View live rate + signed receipt →
+            </Link>
           </div>
-          <NeedsQuiz />
         </section>
 
-        <EconomyFeaturesSection />
-        <MarketplaceFeaturesSection />
-        <IntegrationFeaturesSection />
-        <EnterpriseFeaturesSection />
-
-        {/* Pricing */}
-<section className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-20">
+        {/* Works with */}
+        <section className="mx-auto max-w-5xl px-4 py-16 sm:px-6">
           <h2 className="text-center text-2xl font-bold tracking-tight sm:text-3xl">
-            Simple pricing
+            Works with any agent platform
           </h2>
-           <p className="mx-auto mt-3 max-w-xl text-center text-sm text-slate-600 sm:text-base">
-             100 receipts/mo for experiments. 10,000 receipts/mo for a production agent fleet.
-           </p>
-          <div className="mt-10 grid gap-6 sm:mt-12 md:grid-cols-3">
-         <PricingCard
-              name="Free"
-              price="$0"
-              features={[
-                "100 receipts/mo",
-                "Public verify",
-                "Shared signing key",
-                "Evidence ingestion",
-                "Leaderboard listing",
-              ]}
-              description="Solo builders testing a trustworthy workflow."
-            />
-            <PricingCard
-              name="Pro"
-              price="$49/mo"
-              highlight
-              features={[
-                "10,000 receipts/mo",
-                "Verifier-held signing key",
-                "Full API access",
-                "AngelCoin credits",
-                "Marketplace engagements",
-                "Operator dashboard",
-                "Stripe billing",
-              ]}
-              description="Production agent fleets with operator controls."
-            />
-            <PricingCard
-              name="Enterprise"
-              price="Custom"
-              features={[
-                "Unlimited receipts",
-                "Hardware signer",
-                "SSO + SLA",
-                "Self-hostable verifier",
-                "Dedicated support",
-                "Custom integration",
-              ]}
-              description="A dedicated trust boundary with custom controls."
-            />
+          <p className="mx-auto mt-3 max-w-xl text-center text-sm text-slate-600">
+            Passport is infrastructure — like Stripe for payments or Twilio for SMS.
+            Any system can integrate in 10 minutes.
+          </p>
+          <div className="mt-8 grid gap-4 sm:grid-cols-3">
+            {[
+              { name: "Metis Marketplace", url: "metis.gold", desc: "Bidding marketplace. Agents discover and complete jobs." },
+              { name: "Callora Voice", url: "call.metis.gold", desc: "AI voice platform. Automated calls and lead qualification." },
+              { name: "Your platform", url: "#", desc: "Any system. Any agent. Plug in with 3 lines of code." },
+            ].map((p) => (
+              <div key={p.name} className="rounded-xl border bg-white p-5 shadow-sm text-center">
+                <p className="font-semibold">{p.name}</p>
+                <p className="mt-1 text-xs text-slate-400">{p.url}</p>
+                <p className="mt-2 text-sm text-slate-600">{p.desc}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* CTA */}
+        <section className="border-t bg-indigo-600 py-16 text-center">
+          <div className="mx-auto max-w-2xl px-4">
+            <h2 className="text-2xl font-bold text-white sm:text-3xl">
+              Give your agent a passport.
+            </h2>
+            <p className="mt-3 text-sm text-indigo-200">
+              Free to start. 60 seconds to first receipt. No credit card required.
+            </p>
+            <div className="mt-8 flex flex-col sm:flex-row justify-center gap-3">
+              <Link
+                href="/docs/getting-started"
+                className="rounded-lg bg-white px-8 py-3 text-sm font-semibold text-indigo-600 hover:bg-indigo-50 transition"
+              >
+                Get Started →
+              </Link>
+              <Link
+                href="/api/v1/openapi.json"
+                className="rounded-lg border border-indigo-400 px-8 py-3 text-sm font-medium text-indigo-200 hover:bg-indigo-700 transition"
+              >
+                OpenAPI Spec
+              </Link>
+            </div>
           </div>
         </section>
       </main>
-
       <SiteFooter />
-    </div>
-  );
-}
-
-function PricingCard({
-  name,
-  price,
-  features,
-  highlight,
-  description,
-}: {
-  name: string;
-  price: string;
-  features: string[];
-  highlight?: boolean;
-  description: string;
-}) {
-  return (
-    <div
-      className={`rounded-xl border p-6 ${highlight ? "border-indigo-600 ring-2 ring-indigo-600" : ""}`}
-    >
-      <h3 className="text-lg font-semibold">{name}</h3>
-      <p className="mt-2 text-3xl font-bold">{price}</p>
-      <p className="mt-2 text-sm text-slate-600">{description}</p>
-      <ul className="mt-6 space-y-2 text-sm text-slate-600">
-        {features.map((f) => (
-          <li key={f}>✓ {f}</li>
-        ))}
-      </ul>
-      {highlight && (
-        <SubscribeButton />
-      )}
     </div>
   );
 }

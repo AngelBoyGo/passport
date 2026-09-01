@@ -5,36 +5,29 @@ import { useState, useEffect } from "react";
 export function SiteHeader() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Close mobile menu on route change (Next.js App Router)
   useEffect(() => {
     setMobileOpen(false);
   }, []);
 
   const links = [
-    { href: "/angelcoin", label: "AngelCoin" },
-    { href: "/network", label: "Network" },
-    { href: "/agents", label: "Agents" },
-    { href: "/playground", label: "Playground" },
-    { href: "/datacenter", label: "Data Center" },
     { href: "/docs/getting-started", label: "Docs" },
     { href: "/docs/api-reference", label: "API" },
+    { href: "/playground", label: "Playground" },
+    { href: "/agents", label: "Agents" },
     { href: "/leaderboard", label: "Leaderboard" },
-    { href: "/#pricing", label: "Pricing" },
-    { href: "/public-key", label: "Public Key" },
+    { href: "/angelcoin", label: "ANGEL" },
   ];
 
   return (
     <header className="sticky top-0 z-50 border-b bg-white shadow-sm">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
-        {/* Logo always visible */}
         <Link href="/" className="flex items-center gap-2 shrink-0">
           <span className="text-lg font-bold tracking-tight sm:text-xl">Passport</span>
           <span className="hidden rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700 sm:inline">
-            Beta
+            Infrastructure
           </span>
         </Link>
 
-        {/* Desktop nav — hidden on mobile */}
         <nav className="hidden items-center gap-4 text-sm font-medium text-slate-600 md:flex">
           {links.map((l) => (
             <Link key={l.href} href={l.href} className="hover:text-slate-900 transition-colors">
@@ -49,7 +42,6 @@ export function SiteHeader() {
           </Link>
         </nav>
 
-        {/* Mobile hamburger — larger touch target */}
         <button
           className="flex md:hidden items-center justify-center p-2 -mr-2 rounded-lg hover:bg-slate-100 transition-colors"
           onClick={() => setMobileOpen(!mobileOpen)}
@@ -66,7 +58,6 @@ export function SiteHeader() {
         </button>
       </div>
 
-      {/* Mobile dropdown — full-width, animated */}
       <div
         className={`overflow-hidden transition-all duration-200 ease-in-out md:hidden ${
           mobileOpen ? "max-h-80 opacity-100" : "max-h-0 opacity-0"

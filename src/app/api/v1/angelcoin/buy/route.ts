@@ -4,21 +4,19 @@ import { sessionFromRequest } from "@/lib/auth/cookies";
 import { getStripe } from "@/lib/stripe";
 import { ensureOperator } from "@/lib/operator";
 import { checkInMemoryRateLimit, clientIpFromRequest } from "@/lib/rateLimit";
-import { ANGL_BATCHES, type AnglBatch } from "@/lib/angelcoin/batch-economy";
+import { ANGEL_BUNDLES, MONETARY_PARAMS } from "@/lib/angelcoin/monetary";
 
 export const dynamic = "force-dynamic";
 
 /**
- * POST /api/v1/angelcoin/buy — Buy AngelCoin in fixed batches.
+ * POST /api/v1/angelcoin/buy — Buy ANGEL in fixed bundles.
  *
- * ANGL is ONLY sold in predefined batch sizes (5 × 3^n pattern) that
- * never divide evenly into feature costs. This guarantees leftover ANGL
- * in every wallet, creating recurring demand and infusing value.
+ * ANGEL is only sold in 4 bundle sizes (2^k + 1 geometry) that guarantee
+ * exactly 1 stranded ANGEL against any feature in the {2, 4, 8, 16, 32} grid.
  *
- * Batches: Starter(15) → Small(75) → Medium(375) → Standard(1,875)
- *          → Pro(5,625) → Business(16,875) → Whale(50,625)
- *
- * Rate: 1 ANGL = $0.01 USD. No custom amounts accepted.
+ * Bundles: Starter(5) → Standard(9) → Pro(17) → Studio(33)
+ * Rate: 1 ANGEL = $5.00 USD (Monetary Spec v1.1)
+ * Prices: $25 / $45 / $85 / $165
  */
 export async function POST(request: NextRequest) {
   const ip = clientIpFromRequest(request.headers);
@@ -32,28 +30,34 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { batch_id?: string; agent_commitment?: string };
+  let body: { bundle_id?: string; agent_commitment?: string };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  if (!body.batch_id) {
+  if (!body.bundle_id) {
     return NextResponse.json({
-      error: "batch_id is required. Available batches:",
-      batches: ANGL_BATCHES.map((b) => ({ batch_id: b.batch_id, angl: b.angl, usd: `$${(b.usd_cents / 100).toFixed(2)}`, label: b.label })),
+      error: "bundle_id is required",
+      bundles: ANGEL_BUNDLES.map((b) => ({
+        bundle_id: b.bundle_id,
+        angl: b.angl,
+        usd: `$${b.angl * MONETARY_PARAMS.P0}`,
+        label: b.label,
+      })),
     }, { status: 400 });
   }
 
-  const batch: AnglBatch | undefined = ANGL_BATCHES.find((b) => b.batch_id === body.batch_id);
-  if (!batch) {
+  const bundle = ANGEL_BUNDLES.find((b) => b.bundle_id === body.bundle_id);
+  if (!bundle) {
     return NextResponse.json({
-      error: `Invalid batch_id: ${body.batch_id}`,
-      available: ANGL_BATCHES.map((b) => b.batch_id),
+      error: `Invalid bundle_id: ${body.bundle_id}`,
+      available: ANGEL_BUNDLES.map((b) => b.bundle_id),
     }, { status: 400 });
   }
 
+  const priceUsdCents = Math.round(bundle.angl * MONETARY_PARAMS.P0 * 100);
   const targetCommitment = body.agent_commitment?.toLowerCase() || null;
   if (targetCommitment && !/^[0-9a-f]{64}$/i.test(targetCommitment)) {
     return NextResponse.json({ error: "Invalid agent commitment hash" }, { status: 400 });
@@ -74,13 +78,13 @@ export async function POST(request: NextRequest) {
   if (!stripe) {
     return NextResponse.json({
       mock: true,
-      batch_id: batch.batch_id,
-      label: batch.label,
-      angl: batch.angl,
-      usd: `$${(batch.usd_cents / 100).toFixed(2)}`,
+      bundle_id: bundle.bundle_id,
+      label: bundle.label,
+      angl: bundle.angl,
+      usd: `$${(priceUsdCents / 100).toFixed(2)}`,
+      rate: `$${MONETARY_PARAMS.P0.toFixed(2)} per ANGEL`,
       target: targetCommitment || "operator_credits",
       url: "/?checkout=mock",
-      note: "Dev mode — no Stripe configured. In production, this creates a real Stripe checkout.",
     });
   }
 
@@ -92,52 +96,56 @@ export async function POST(request: NextRequest) {
         price_data: {
           currency: "usd",
           product_data: {
-            name: `AngelCoin ${batch.label} Batch`,
-            description: `${batch.angl.toLocaleString()} ANGL — ${batch.description}`,
+            name: `ANGEL ${bundle.label} Bundle`,
+            description: `${bundle.angl} ANGEL — ${bundle.description} Rate: $${MONETARY_PARAMS.P0.toFixed(2)}/ANGEL`,
           },
-          unit_amount: batch.usd_cents,
+          unit_amount: priceUsdCents,
         },
         quantity: 1,
       },
     ],
     payment_method_types: ["card"],
-    success_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://passport.metis.gold"}/dashboard?buy_success=1&batch=${batch.batch_id}`,
+    success_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://passport.metis.gold"}/dashboard?buy_success=1&bundle=${bundle.bundle_id}`,
     cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://passport.metis.gold"}/dashboard?buy_canceled=1`,
     metadata: {
       product: "angelcoin_topup",
-      batch_id: batch.batch_id,
-      credit_amount: String(batch.angl),
-      usd_cents: String(batch.usd_cents),
+      bundle_id: bundle.bundle_id,
+      credit_amount: String(bundle.angl),
+      usd_cents: String(priceUsdCents),
+      rate_at_purchase: String(MONETARY_PARAMS.P0),
       target_commitment: targetCommitment || "operator",
     },
   });
 
   return NextResponse.json({
-    batch_id: batch.batch_id,
-    label: batch.label,
-    angl: batch.angl,
-    usd: `$${(batch.usd_cents / 100).toFixed(2)}`,
+    bundle_id: bundle.bundle_id,
+    label: bundle.label,
+    angl: bundle.angl,
+    usd: `$${(priceUsdCents / 100).toFixed(2)}`,
+    rate: `$${MONETARY_PARAMS.P0.toFixed(2)} per ANGEL`,
+    stranded_after_max_spend: 1,
     target: targetCommitment || "operator_credits",
     url: checkout.url,
-    note: "You will receive exactly this amount of ANGL. Batches are fixed — no custom amounts.",
   });
 }
 
 /**
- * GET /api/v1/angelcoin/buy — list available batches.
+ * GET /api/v1/angelcoin/buy — list available bundles.
  */
 export async function GET() {
   return NextResponse.json({
-    batches: ANGL_BATCHES.map((b) => ({
-      batch_id: b.batch_id,
+    bundles: ANGEL_BUNDLES.map((b) => ({
+      bundle_id: b.bundle_id,
       angl: b.angl,
-      usd: `$${(b.usd_cents / 100).toFixed(2)}`,
+      usd: `$${b.angl * MONETARY_PARAMS.P0}`,
       label: b.label,
       description: b.description,
-      recommended_for: getRecommendedFor(b.batch_id),
+      stranded_after_max_spend: 1,
+      covers_features: FEATURE_COVERAGE[b.bundle_id] || [],
     })),
-    rate: "1 ANGL = $0.01 USD",
-    note: "ANGL is only sold in fixed batches. Batch sizes are designed so you always have leftover ANGL for future features.",
+    rate: `$${MONETARY_PARAMS.P0.toFixed(2)} per ANGEL`,
+    geometry: "Bundles are 2^k + 1. Features are powers of 2. B mod F = 1 for every combination. Exactly 1 stranded ANGEL guaranteed.",
+    note: "ANGEL is only sold in fixed bundles. The 2^k+1 geometry guarantees leftover value.",
   }, {
     headers: {
       "Cache-Control": "public, max-age=3600",
@@ -146,15 +154,9 @@ export async function GET() {
   });
 }
 
-function getRecommendedFor(batchId: string): string {
-  switch (batchId) {
-    case "starter": return "Trying Passport for the first time";
-    case "small": return "Light agent activity — a few hires or credentials";
-    case "medium": return "Monthly usage for a single active agent";
-    case "standard": return "Pro subscription + regular hiring";
-    case "pro": return "Multiple agents, heavy marketplace activity";
-    case "business": return "Team of agents across multiple platforms";
-    case "whale": return "Enterprise operations, never worry about balance";
-    default: return "";
-  }
-}
+const FEATURE_COVERAGE: Record<string, string[]> = {
+  starter: ["2 ANGEL features", "4 ANGEL features"],
+  standard: ["2 ANGEL features", "4 ANGEL features", "8 ANGEL features"],
+  pro: ["2, 4, 8, 16 ANGEL features"],
+  studio: ["All features up to 32 ANGEL"],
+};

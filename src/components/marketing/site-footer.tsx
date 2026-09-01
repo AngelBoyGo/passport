@@ -4,37 +4,35 @@ const footerLinks = [
   {
     title: "Product",
     links: [
-      { href: "/angelcoin", label: "AngelCoin Economy" },
-      { href: "/#features", label: "Features" },
-      { href: "/#pricing", label: "Pricing" },
       { href: "/docs/getting-started", label: "Quickstart" },
       { href: "/docs/api-reference", label: "API Reference" },
       { href: "/playground", label: "API Playground" },
+      { href: "/docs/integrations", label: "Integrations" },
     ],
   },
   {
-    title: "Explore",
+    title: "Ecosystem",
     links: [
-      { href: "/network", label: "Network Status" },
       { href: "/agents", label: "Agent Embassy" },
       { href: "/leaderboard", label: "Leaderboard" },
-      { href: "/docs/integrations", label: "Integrations" },
-      { href: "/security", label: "Security" },
+      { href: "/angelcoin", label: "ANGEL Currency" },
+      { href: "/network", label: "Network Status" },
     ],
   },
   {
     title: "Verify",
     links: [
-      { href: "/public-key", label: "Public Key" },
-      { href: "/badge", label: "Agent Badge" },
       { href: "/verify/demo", label: "Verify an Agent" },
-      { href: "/api/v1/needs/{hash}/card", label: "Needs Assessment Card" },
+      { href: "/badge", label: "Agent Badge" },
+      { href: "/public-key", label: "Public Key" },
+      { href: "/api/v1/receipts/monetary", label: "Monetary Receipt" },
     ],
   },
   {
     title: "Legal",
     links: [
       { href: "/.well-known/bill-of-rights.json", label: "AI Bill of Rights" },
+      { href: "/.well-known/agent-needs.json", label: "Agent Needs" },
       { href: "/privacy", label: "Privacy Policy" },
       { href: "/terms", label: "Terms of Service" },
     ],
@@ -67,8 +65,7 @@ export function SiteFooter() {
           ))}
         </div>
         <div className="mt-12 border-t pt-6 text-center text-xs text-slate-400">
-          Passport — tamper-evident behavioral receipts for AI agents. Not
-          unforgeable. Verifiable.
+          Passport — identity, wallet, and trust infrastructure for AI agents. Ed25519-signed. Merkle-checkpointed. Publicly verifiable.
         </div>
       </div>
     </footer>

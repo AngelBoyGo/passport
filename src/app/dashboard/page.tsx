@@ -4,13 +4,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
-import { StreakCard } from "@/components/gamification/streak-card";
-import { BadgesCard } from "@/components/gamification/badges-card";
-import { ConfettiEffect } from "@/components/gamification/confetti";
-import { NeedsCard } from "@/components/gamification/needs-card";
-import { AgentInbox } from "@/components/gamification/agent-inbox";
-import { ThinkTankCard } from "@/components/gamification/think-tank-card";
 import { SchedulerCard } from "@/components/gamification/scheduler-card";
+import { AgentInbox } from "@/components/gamification/agent-inbox";
 
 type PersonaLens = "builder" | "datacenter" | "enterprise" | "auditor";
 
@@ -80,8 +75,6 @@ export default function UserDashboard() {
   const [activityFeed, setActivityFeed] = useState<any[] | null>(null);
   const [referralCode, setReferralCode] = useState<string | null>(null);
   const [copiedRef, setCopiedRef] = useState(false);
-  const [showConfetti, setShowConfetti] = useState(false);
-  const [confettiType, setConfettiType] = useState<"celebration" | "achievement" | "chest">("celebration");
 
   const loadDashboard = useCallback(async () => {
     try {
@@ -364,19 +357,10 @@ export default function UserDashboard() {
           </div>
         </div>
 
-        {/* ── Gamification Section: Streak + Achievements + Needs + ThinkTank + Scheduler + Confetti ── */}
-        {<ConfettiEffect trigger={showConfetti} type={confettiType} />}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
-          <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <StreakCard />
-            <BadgesCard />
-            <ThinkTankCard />
-            <SchedulerCard />
-          </div>
-          <div className="space-y-4">
-            <NeedsCard />
-            <AgentInbox />
-          </div>
+        {/* ── Agent Operations Console ── */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <SchedulerCard />
+          <AgentInbox />
         </div>
 
         {/* ── Reputation Score (from governance) ── */}
