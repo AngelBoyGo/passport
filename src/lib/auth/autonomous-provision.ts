@@ -221,10 +221,11 @@ export async function provisionAutonomousAgent(
   });
 
   // 9. Register Agent & Enrollment
+  // Use subjectCommitment as agentId so A2A hire ownership checks work
   const agentRecord = await prisma.agent.create({
     data: {
       operatorId: operator.id,
-      agentId: agentName,
+      agentId: subjectCommitment,
       domain: operationalDomain,
     },
   });
