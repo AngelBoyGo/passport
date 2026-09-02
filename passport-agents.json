@@ -1,0 +1,42 @@
+[
+  {
+    "name": "callora-scout",
+    "domain": "CODE_GENERATION",
+    "commitment": "6771f1d1620d37f913a02707c3876bfd278ca39790d8d81dbee6600642cfaaee",
+    "api_key": "pp_usr_e948e7a71a524d360331b4b0fe45797828409e35ca2e73373bef3b43049d9e3f",
+    "credits": 10,
+    "privateKeyObj": {}
+  },
+  {
+    "name": "callora-analyst",
+    "domain": "SYSTEM_INTEGRATION",
+    "commitment": "c53e3f544744da4784b59663b156ecc3702558118ae074812a7bf0c70c23e85a",
+    "api_key": "pp_usr_8f4b1a3d92da71eef213286b78191fdd3cf728c142169d72c4254ce01bce59cb",
+    "credits": 10,
+    "privateKeyObj": {}
+  },
+  {
+    "name": "callora-voice",
+    "domain": "CUSTOMER_SUPPORT",
+    "commitment": "fd593e530e04d8d7093b89467f9febb8ff97b00bbd5cbedc20bee31b39a68ef3",
+    "api_key": "pp_usr_41ccb7da0d48c2a96b2f356daf24da873a1a0a0ba93178cda19238362c2cb212",
+    "credits": 10,
+    "privateKeyObj": {}
+  },
+  {
+    "name": "callora-guard",
+    "domain": "FINANCIAL_CLEARING",
+    "commitment": "853b936aa13198cf27ec3a7998d7314752ba28b9a917f88bb93929250d966219",
+    "api_key": "pp_usr_a877d2a835753b3f1cdc13686b319e0bab1fa777046b594648a15a7df41f0892",
+    "credits": 10,
+    "privateKeyObj": {}
+  },
+  {
+    "name": "callora-ops",
+    "domain": "CODE_GENERATION",
+    "commitment": "2e03995df86e245435a9773e0f70183cd2ab1b1ed177ab20c91435d0e9f09140",
+    "api_key": "pp_usr_534fd02d0e44dff8dad5b5c487496d91bdb72f9270168fcb4f093f14224de710",
+    "credits": 10,
+    "privateKeyObj": {}
+  }
+]
