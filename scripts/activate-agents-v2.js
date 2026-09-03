@@ -138,8 +138,10 @@ async function main() {
     for (let e = 0; e < evidenceBuilders.length; e++) {
       const payload = evidenceBuilders[e](agent);
       const canonical = canonicalJson(payload.payload);
-      const digest = sha256(utf8ToBytes(canonical));
-      const sig = bytesToHex(noble.sign(digest, privKey));
+      // CRITICAL: The server verifies against utf8ToBytes(digestHexString), NOT raw sha256 bytes.
+      // We must sign the HEX STRING encoded as UTF-8, not the raw digest.
+      const digestHex = bytesToHex(sha256(utf8ToBytes(canonical)));
+      const sig = bytesToHex(noble.sign(utf8ToBytes(digestHex), privKey));
 
       const res = await fetchJson(`${BASE}/api/v1/passport/agents/${agent.commitment}/evidence`, "POST",
         { ...payload, signature: sig }, { Authorization: `Bearer ${agent.api_key}` });
@@ -160,8 +162,8 @@ async function main() {
     const terms = { amount: 5, domain: "CODE_GENERATION", scope: "Monitor API and report uptime", expiry: new Date(Date.now() + 7 * 86400000).toISOString() };
     const canonicalTerms = canonicalJson(terms);
     const msg = `${proposalId}:${hirer.commitment}:${worker.commitment}:${canonicalTerms}`;
-    const digest = sha256(utf8ToBytes(msg));
-    const sig = bytesToHex(noble.sign(digest, hirerPriv));
+    const msgDigestHex = bytesToHex(sha256(utf8ToBytes(msg)));
+    const sig = bytesToHex(noble.sign(utf8ToBytes(msgDigestHex), hirerPriv));
 
     const hireRes = await fetchJson(`${BASE}/api/v1/a2a/hire`, "POST", {
       hirer_commitment: hirer.commitment, worker_commitment: worker.commitment,
@@ -175,8 +177,8 @@ async function main() {
       const workerPriv = hexToBytes(worker.priv_hex);
       const deliverable = { task_id: proposalId, digest: sha256Hex("Task complete"), observed_at: new Date().toISOString() };
       const delCanonical = canonicalJson(deliverable);
-      const delDigest = sha256(utf8ToBytes(delCanonical));
-      const delSig = bytesToHex(noble.sign(delDigest, workerPriv));
+      const delDigestHex = bytesToHex(sha256(utf8ToBytes(delCanonical)));
+      const delSig = bytesToHex(noble.sign(utf8ToBytes(delDigestHex), workerPriv));
 
       await fetchJson(`${BASE}/api/v1/passport/agents/${worker.commitment}/evidence`, "POST",
         { source_type: "task_deliverable", payload: deliverable, signature: delSig },
