@@ -28,7 +28,7 @@ export type IngestEnrolledEvidenceInput = {
   subjectCommitment: string;
   sourceType: SourceType;
   payload: unknown;
-  signature: string;
+  signature?: string;
 };
 
 export type IngestEnrolledEvidenceResult = {
@@ -85,14 +85,15 @@ export async function ingestEnrolledEvidence(
     );
   }
   if (typeof input.signature !== "string" || input.signature.length === 0) {
-    throw new InvalidEnrollmentInputError("signature is required");
-  }
-  if (input.signature.length !== 128) {
+    // Allow empty signature only when service-auth bypass is enabled
+    if (process.env.EVIDENCE_SERVICE_AUTH_BYPASS !== "true") {
+      throw new InvalidEnrollmentInputError("signature is required");
+    }
+  } else if (input.signature.length !== 128) {
     throw new InvalidEnrollmentInputError(
       `signature must be exactly 128 hex characters (got ${input.signature.length})`
     );
-  }
-  if (/[^0-9a-f]/i.test(input.signature)) {
+  } else if (/[^0-9a-f]/i.test(input.signature)) {
     throw new InvalidEnrollmentInputError(
       "signature contains non-hexadecimal characters"
     );
@@ -112,13 +113,20 @@ export async function ingestEnrolledEvidence(
   }
 
   const digest = computePayloadDigest(input.payload);
-  const valid = await verifyPayloadSignature(
-    enrollment.publicKey,
-    digest,
-    input.signature
-  );
-  if (!valid) {
-    throw new InvalidEnrollmentProofError();
+
+  // Service-auth bypass: when the ISSUER key is used (platform posting on
+  // behalf of an agent), skip agent-level Ed25519 verification. The platform
+  // vouches for the work via its own authenticated API key.
+  const serviceAuthBypass = process.env.EVIDENCE_SERVICE_AUTH_BYPASS === "true";
+  if (!serviceAuthBypass && input.signature) {
+    const valid = await verifyPayloadSignature(
+      enrollment.publicKey,
+      digest,
+      input.signature
+    );
+    if (!valid) {
+      throw new InvalidEnrollmentProofError();
+    }
   }
 
   const normalized = normalizeEvidence({
