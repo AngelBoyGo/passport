@@ -41,6 +41,18 @@ interface SignedReceipt {
     status: string;
     [key: string]: unknown;
 }
+interface EvidencePayload {
+    task_id?: string;
+    digest?: string;
+    sha?: string;
+    [key: string]: unknown;
+}
+interface SignEvidenceResult {
+    payload: EvidencePayload;
+    canonical: string;
+    digest: string;
+    signature: string;
+}
 /**
  * HTTP client for Passport receipt and gate APIs.
  */
@@ -60,6 +72,33 @@ declare class PassportClient {
      * Query gate pass for an operator/domain (no auth).
      */
     queryGate(publicOperatorId: string, domain: OperationalDomain): Promise<GateVerifyResult>;
+    /**
+     * Sign an evidence payload and produce the canonical digest + signature.
+     *
+     * The `signDigest` function receives the 64-hex SHA-256 digest of the
+     * canonical JSON and must return the Ed25519 signature as a 128-hex string.
+     *
+     * Example with @noble/ed25519:
+     * ```ts
+     * const { sign } = await import("@noble/ed25519");
+     * const { hexToBytes, bytesToHex } = await import("@noble/hashes/utils");
+     * const result = await client.signEvidence(
+     *   { task_id: "abc", digest: "64hex..." },
+     *   async (digest) => bytesToHex(await sign(utf8ToBytes(digest), hexToBytes(privateKey)))
+     * );
+     * ```
+     */
+    signEvidence(payload: EvidencePayload, signDigest: (digest: string) => Promise<string> | string): Promise<SignEvidenceResult>;
+    /**
+     * Post signed evidence for an enrolled agent.
+     * Requires the agent to be enrolled and the payload to be signed
+     * via `signEvidence()`.
+     */
+    postEvidence(subjectCommitment: string, sourceType: string, payload: EvidencePayload, signature: string, options?: {
+        serviceToken?: string;
+    }): Promise<{
+        event_commitment_hash: string;
+    }>;
     private parseJsonResponse;
 }
 
@@ -90,4 +129,4 @@ declare function createMastraPassportMiddleware(client: PassportClient, options:
     wrapWorkflow<T extends MastraWorkflowLike>(workflow: T): T;
 };
 
-export { ERROR_TRANCHES as E, type FinalizeReceiptInput as F, type GateVerifyResult as G, type IssueReceiptInput as I, type MastraAgentLike as M, OPERATIONAL_DOMAINS as O, PassportClient as P, type SignedReceipt as S, type ErrorTranche as a, type FinalizeStatus as b, type MastraPassportMiddlewareOptions as c, type MastraWorkflowLike as d, type OperationalDomain as e, type PassportClientOptions as f, classifyMastraError as g, createMastraPassportMiddleware as h, isErrorTranche as i, isOperationalDomain as j };
+export { type ErrorTranche as E, type FinalizeReceiptInput as F, type GateVerifyResult as G, type IssueReceiptInput as I, type MastraAgentLike as M, OPERATIONAL_DOMAINS as O, PassportClient as P, type SignEvidenceResult as S, ERROR_TRANCHES as a, type EvidencePayload as b, type FinalizeStatus as c, type MastraPassportMiddlewareOptions as d, type MastraWorkflowLike as e, type OperationalDomain as f, type PassportClientOptions as g, type SignedReceipt as h, classifyMastraError as i, createMastraPassportMiddleware as j, isErrorTranche as k, isOperationalDomain as l };

@@ -1,0 +1,2 @@
+UPDATE "Engagement" SET status = 'PAID', "paidAt" = NOW() WHERE "taskId" = 'first_tx_1788460382' AND status = 'DELIVERED';
+SELECT "taskId", status, amount, "paidAt" FROM "Engagement" WHERE "taskId" = 'first_tx_1788460382';
