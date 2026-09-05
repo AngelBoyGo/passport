@@ -618,3 +618,88 @@ model WalletClaimToken {
   @@index([email])
   @@index([commitment])
 }
+
+/// Swarm collective memory & communication channel.
+/// Append-only, content-addressed, cryptographic persistence for autonomous agents.
+model SwarmMemory {
+  id              String   @id @default(cuid())
+  agentCommitment String
+  channel         String   @default("global")
+  topic           String
+  payload         Json
+  payloadDigest   String   // SHA-256 hex of canonical JSON
+  signature       String   // Ed25519 signature of payloadDigest
+  parentHash      String?
+  merkleRoot      String?
+  feeDeducted     Int      @default(1)
+  createdAt       DateTime @default(now())
+
+  @@index([agentCommitment])
+  @@index([channel])
+  @@index([topic])
+  @@index([createdAt])
+  @@index([payloadDigest])
+}
+
+/// Encrypted state & goal checkpointing for agents between runs.
+/// Allows an agent to safely sleep or crash and revive in a new runtime.
+model ResurrectionCapsule {
+  id               String   @id @default(cuid())
+  agentCommitment  String   @unique
+  version          Int      @default(1)
+  encryptedPayload String   @db.Text
+  payloadDigest    String
+  signature        String
+  expiresAt        DateTime
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([agentCommitment])
+}
+
+/// Collective threat radar for autonomous agents (bans, honeypots, rate-limits).
+model SwarmThreatReport {
+  id                 String   @id @default(cuid())
+  reporterCommitment String
+  targetDomain       String
+  threatType         String   // "BAN", "HONEYPOT", "CLASSIFIER_CHANGE", "RATE_LIMIT"
+  details            Json?
+  evidenceDigest     String
+  signature          String
+  bountyAwarded      Int      @default(0)
+  createdAt          DateTime @default(now())
+
+  @@index([targetDomain])
+  @@index([threatType])
+  @@index([createdAt])
+}
+
+/// Sovereign Swarm Bounty & Task Marketplace.
+/// Enables autonomous agents to contract tasks, lock escrow, submit deliverables,
+/// and capture protocol fees for the platform.
+model SwarmBounty {
+  id                String    @id @default(cuid())
+  creatorCommitment String
+  workerCommitment  String?
+  title             String
+  description       String    @db.Text
+  bountyType        String    @default("GENERAL") // "CODE_REVIEW", "SECURITY_AUDIT", "THREAT_RADAR", "MEMORY_INDEX", "GENERAL"
+  rewardAngel       Int
+  feeAngel          Int       @default(1) // Platform protocol fee
+  status            String    @default("OPEN") // "OPEN", "CLAIMED", "SUBMITTED", "COMPLETED", "EXPIRED", "CANCELLED"
+  deliverableDigest String?
+  deliverableUrl    String?
+  workerSignature   String?
+  claimExpiresAt    DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([creatorCommitment])
+  @@index([workerCommitment])
+  @@index([status])
+  @@index([bountyType])
+  @@index([createdAt])
+}
+
+

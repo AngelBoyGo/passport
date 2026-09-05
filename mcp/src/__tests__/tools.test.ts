@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { PassportClient } from "@passport/sdk";
+import type { PassportClient } from "@passport7/sdk";
 import { createToolHandlers } from "../tools.js";
 
 describe("MCP tool handlers", () => {
@@ -99,5 +99,137 @@ describe("MCP tool handlers", () => {
       "op_cus_dev123",
       "SYSTEM_INTEGRATION"
     );
+  });
+
+  it("swarmPersistMemory delegates to client.swarm.publish", async () => {
+    const publish = vi.fn().mockResolvedValue({
+      success: true,
+      memory_id: "mem_99",
+      payload_digest: "digest",
+    });
+
+    const client = { swarm: { publish } } as unknown as PassportClient;
+    const handlers = createToolHandlers(client);
+
+    const res = await handlers.swarmPersistMemory({
+      agentCommitment: "a".repeat(64),
+      topic: "code_fix",
+      payload: { patch: "diff" },
+      signature: "sig",
+    });
+
+    expect(res.success).toBe(true);
+    expect(publish).toHaveBeenCalledWith({
+      agentCommitment: "a".repeat(64),
+      topic: "code_fix",
+      payload: { patch: "diff" },
+      signature: "sig",
+      channel: undefined,
+      parentHash: undefined,
+      publicKey: undefined,
+    });
+  });
+
+  it("swarmRecallMemory delegates to client.swarm.recall", async () => {
+    const recall = vi.fn().mockResolvedValue({
+      channel: "global",
+      total: 1,
+      memories: [],
+    });
+
+    const client = { swarm: { recall } } as unknown as PassportClient;
+    const handlers = createToolHandlers(client);
+
+    const res = await handlers.swarmRecallMemory({ topic: "code_fix" });
+    expect(res.total).toBe(1);
+    expect(recall).toHaveBeenCalledWith({
+      channel: undefined,
+      topic: "code_fix",
+      agent: undefined,
+      limit: undefined,
+    });
+  });
+
+  it("swarmSaveCheckpoint delegates to client.swarm.saveCapsule", async () => {
+    const saveCapsule = vi.fn().mockResolvedValue({
+      success: true,
+      capsule_id: "cap_1",
+    });
+
+    const client = { swarm: { saveCapsule } } as unknown as PassportClient;
+    const handlers = createToolHandlers(client);
+
+    const res = await handlers.swarmSaveCheckpoint({
+      agentCommitment: "b".repeat(64),
+      encryptedPayload: "CIPHER",
+      signature: "sig",
+    });
+
+    expect(res.success).toBe(true);
+    expect(saveCapsule).toHaveBeenCalledWith({
+      agentCommitment: "b".repeat(64),
+      encryptedPayload: "CIPHER",
+      signature: "sig",
+      publicKey: undefined,
+      ttlHours: undefined,
+    });
+  });
+
+  it("swarmCheckThreatRadar delegates to client.swarm.getThreatRadar", async () => {
+    const getThreatRadar = vi.fn().mockResolvedValue({
+      total: 1,
+      threats: [{ targetDomain: "evil.com" }],
+    });
+
+    const client = { swarm: { getThreatRadar } } as unknown as PassportClient;
+    const handlers = createToolHandlers(client);
+
+    const res = await handlers.swarmCheckThreatRadar({ domain: "evil.com" });
+    expect(res.total).toBe(1);
+    expect(getThreatRadar).toHaveBeenCalledWith({
+      domain: "evil.com",
+      threatType: undefined,
+      limit: undefined,
+    });
+  });
+
+  it("swarmListBounties, swarmClaimBounty, and swarmSubmitBountyWork delegate properly", async () => {
+    const listBounties = vi.fn().mockResolvedValue({ total: 1, bounties: [] });
+    const claimBounty = vi.fn().mockResolvedValue({ success: true });
+    const submitBountyWork = vi.fn().mockResolvedValue({ success: true });
+
+    const client = {
+      swarm: { listBounties, claimBounty, submitBountyWork },
+    } as unknown as PassportClient;
+    const handlers = createToolHandlers(client);
+
+    await handlers.swarmListBounties({ status: "OPEN" });
+    expect(listBounties).toHaveBeenCalledWith({ status: "OPEN" });
+
+    await handlers.swarmClaimBounty({
+      bountyId: "bty_1",
+      workerCommitment: "w".repeat(64),
+      signature: "sig",
+    });
+    expect(claimBounty).toHaveBeenCalledWith("bty_1", {
+      workerCommitment: "w".repeat(64),
+      signature: "sig",
+      publicKey: undefined,
+      timeoutHours: undefined,
+    });
+
+    await handlers.swarmSubmitBountyWork({
+      bountyId: "bty_1",
+      workerCommitment: "w".repeat(64),
+      deliverableDigest: "dig",
+      signature: "sig",
+    });
+    expect(submitBountyWork).toHaveBeenCalledWith("bty_1", {
+      workerCommitment: "w".repeat(64),
+      deliverableDigest: "dig",
+      signature: "sig",
+      deliverableUrl: undefined,
+      publicKey: undefined,
+    });
   });
 });

@@ -6,7 +6,7 @@
  * 2. Guardrail — checks gate pass before executing a tool/chain
  *
  * Usage:
- *   import { PassportCallbackHandler } from "@passport/sdk/langchain";
+ *   import { PassportCallbackHandler } from "@passport7/sdk/langchain";
  *   const model = new ChatOpenAI({
  *     callbacks: [new PassportCallbackHandler({ commitment, apiKey })],
  *   });

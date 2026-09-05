@@ -8,6 +8,14 @@ export type {
   SignedReceipt,
   EvidencePayload,
   SignEvidenceResult,
+  SwarmPublishInput,
+  SwarmQueryInput,
+  SwarmMemoryItem,
+  SaveCapsuleInput,
+  ReportThreatInput,
+  SwarmBountyItem,
+  CreateBountyParams,
+  SwarmClient,
 } from "./client.js";
 export {
   OPERATIONAL_DOMAINS,

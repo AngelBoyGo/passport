@@ -1,5 +1,5 @@
-import type { ErrorTranche } from "@passport/sdk";
-import type { FinalizeStatus } from "@passport/sdk";
+import type { ErrorTranche } from "@passport7/sdk";
+import type { FinalizeStatus } from "@passport7/sdk";
 /**
  * Derives finalize status from error tranche.
  */

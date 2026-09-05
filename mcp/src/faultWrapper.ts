@@ -1,4 +1,4 @@
-import type { PassportClient } from "@passport/sdk";
+import type { PassportClient } from "@passport7/sdk";
 import { mapErrorToTranche } from "./mappings.js";
 
 /**

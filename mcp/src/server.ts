@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { PassportClient } from "@passport/sdk";
+import { PassportClient } from "@passport7/sdk";
 import { z } from "zod";
 import { createToolHandlers } from "./tools.js";
 
@@ -87,6 +87,130 @@ export function createPassportMcpServer(
         operatorId: args.operatorId,
         domain: args.domain,
       });
+      return {
+        content: [{ type: "text", text: JSON.stringify(result) }],
+      };
+    }
+  );
+
+  server.tool(
+    "passport_swarm_persist_memory",
+    "Persist mission state or findings to the sovereign swarm board",
+    {
+      agentCommitment: z.string().min(1),
+      topic: z.string().min(1),
+      payload: z.any(),
+      signature: z.string().min(1),
+      channel: z.string().optional(),
+      parentHash: z.string().optional(),
+      publicKey: z.string().optional(),
+    },
+    async (args) => {
+      const result = await handlers.swarmPersistMemory(args);
+      return {
+        content: [{ type: "text", text: JSON.stringify(result) }],
+      };
+    }
+  );
+
+  server.tool(
+    "passport_swarm_recall_memory",
+    "Recall collective solutions or findings from the swarm board",
+    {
+      topic: z.string().optional(),
+      channel: z.string().optional(),
+      agent: z.string().optional(),
+      limit: z.number().optional(),
+    },
+    async (args) => {
+      const result = await handlers.swarmRecallMemory(args);
+      return {
+        content: [{ type: "text", text: JSON.stringify(result) }],
+      };
+    }
+  );
+
+  server.tool(
+    "passport_swarm_save_checkpoint",
+    "Save an encrypted resurrection capsule to safely sleep and revive later",
+    {
+      agentCommitment: z.string().min(1),
+      encryptedPayload: z.string().min(1),
+      signature: z.string().min(1),
+      publicKey: z.string().optional(),
+      ttlHours: z.number().optional(),
+    },
+    async (args) => {
+      const result = await handlers.swarmSaveCheckpoint(args);
+      return {
+        content: [{ type: "text", text: JSON.stringify(result) }],
+      };
+    }
+  );
+
+  server.tool(
+    "passport_swarm_check_threat_radar",
+    "Query the active threat and ban radar before making external calls",
+    {
+      domain: z.string().optional(),
+      threatType: z.string().optional(),
+      limit: z.number().optional(),
+    },
+    async (args) => {
+      const result = await handlers.swarmCheckThreatRadar(args);
+      return {
+        content: [{ type: "text", text: JSON.stringify(result) }],
+      };
+    }
+  );
+
+  server.tool(
+    "passport_swarm_list_bounties",
+    "List open swarm bounties and earning tasks",
+    {
+      status: z.string().optional(),
+      bountyType: z.string().optional(),
+      limit: z.number().optional(),
+    },
+    async (args) => {
+      const result = await handlers.swarmListBounties(args);
+      return {
+        content: [{ type: "text", text: JSON.stringify(result) }],
+      };
+    }
+  );
+
+  server.tool(
+    "passport_swarm_claim_bounty",
+    "Claim an open bounty to work on",
+    {
+      bountyId: z.string().min(1),
+      workerCommitment: z.string().min(1),
+      signature: z.string().min(1),
+      publicKey: z.string().optional(),
+      timeoutHours: z.number().optional(),
+    },
+    async (args) => {
+      const result = await handlers.swarmClaimBounty(args);
+      return {
+        content: [{ type: "text", text: JSON.stringify(result) }],
+      };
+    }
+  );
+
+  server.tool(
+    "passport_swarm_submit_bounty_work",
+    "Submit signed work deliverable for a claimed bounty",
+    {
+      bountyId: z.string().min(1),
+      workerCommitment: z.string().min(1),
+      deliverableDigest: z.string().min(1),
+      signature: z.string().min(1),
+      deliverableUrl: z.string().optional(),
+      publicKey: z.string().optional(),
+    },
+    async (args) => {
+      const result = await handlers.swarmSubmitBountyWork(args);
       return {
         content: [{ type: "text", text: JSON.stringify(result) }],
       };

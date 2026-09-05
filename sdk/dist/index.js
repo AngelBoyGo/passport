@@ -122,9 +122,209 @@ async function sha256Hex(input) {
 var PassportClient = class {
   apiKey;
   baseUrl;
+  swarm;
   constructor(options) {
     this.apiKey = options.apiKey;
     this.baseUrl = options.baseUrl.replace(/\/$/, "");
+    this.swarm = {
+      publish: async (input) => {
+        const response = await fetchWithRetry(`${this.baseUrl}/api/v1/swarm/memory`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${this.apiKey}`
+          },
+          body: JSON.stringify({
+            agent_commitment: input.agentCommitment,
+            channel: input.channel,
+            topic: input.topic,
+            payload: input.payload,
+            signature: input.signature,
+            parent_hash: input.parentHash,
+            public_key: input.publicKey
+          })
+        });
+        return this.parseJsonResponse(response);
+      },
+      recall: async (query) => {
+        const params = new URLSearchParams();
+        if (query?.channel) params.set("channel", query.channel);
+        if (query?.topic) params.set("topic", query.topic);
+        if (query?.agent) params.set("agent", query.agent);
+        if (query?.parentHash) params.set("parent_hash", query.parentHash);
+        if (query?.since) params.set("since", query.since);
+        if (query?.limit) params.set("limit", String(query.limit));
+        const qs = params.toString();
+        const url = `${this.baseUrl}/api/v1/swarm/memory${qs ? `?${qs}` : ""}`;
+        const response = await fetchWithRetry(url, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`
+          }
+        });
+        return this.parseJsonResponse(response);
+      },
+      saveCapsule: async (input) => {
+        const response = await fetchWithRetry(`${this.baseUrl}/api/v1/swarm/capsule`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${this.apiKey}`
+          },
+          body: JSON.stringify({
+            agent_commitment: input.agentCommitment,
+            encrypted_payload: input.encryptedPayload,
+            signature: input.signature,
+            public_key: input.publicKey,
+            ttl_hours: input.ttlHours
+          })
+        });
+        return this.parseJsonResponse(response);
+      },
+      restoreCapsule: async (agentCommitment) => {
+        const response = await fetchWithRetry(
+          `${this.baseUrl}/api/v1/swarm/capsule/${agentCommitment}`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${this.apiKey}`
+            }
+          }
+        );
+        return this.parseJsonResponse(response);
+      },
+      reportThreat: async (input) => {
+        const response = await fetchWithRetry(
+          `${this.baseUrl}/api/v1/swarm/radar/report`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${this.apiKey}`
+            },
+            body: JSON.stringify({
+              reporter_commitment: input.reporterCommitment,
+              target_domain: input.targetDomain,
+              threat_type: input.threatType,
+              details: input.details,
+              evidence_digest: input.evidenceDigest,
+              signature: input.signature,
+              public_key: input.publicKey
+            })
+          }
+        );
+        return this.parseJsonResponse(response);
+      },
+      getThreatRadar: async (options2) => {
+        const params = new URLSearchParams();
+        if (options2?.domain) params.set("domain", options2.domain);
+        if (options2?.threatType) params.set("threat_type", options2.threatType);
+        if (options2?.limit) params.set("limit", String(options2.limit));
+        const qs = params.toString();
+        const url = `${this.baseUrl}/api/v1/swarm/radar/active-threats${qs ? `?${qs}` : ""}`;
+        const response = await fetchWithRetry(url, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`
+          }
+        });
+        return this.parseJsonResponse(response);
+      },
+      createBounty: async (params) => {
+        const response = await fetchWithRetry(`${this.baseUrl}/api/v1/swarm/bounties`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${this.apiKey}`
+          },
+          body: JSON.stringify({
+            creator_commitment: params.creatorCommitment,
+            title: params.title,
+            description: params.description,
+            reward_angel: params.rewardAngel,
+            signature: params.signature,
+            bounty_type: params.bountyType,
+            public_key: params.publicKey
+          })
+        });
+        return this.parseJsonResponse(response);
+      },
+      listBounties: async (filter) => {
+        const params = new URLSearchParams();
+        if (filter?.status) params.set("status", filter.status);
+        if (filter?.bountyType) params.set("bounty_type", filter.bountyType);
+        if (filter?.creator) params.set("creator", filter.creator);
+        if (filter?.worker) params.set("worker", filter.worker);
+        if (filter?.minReward) params.set("min_reward", String(filter.minReward));
+        if (filter?.limit) params.set("limit", String(filter.limit));
+        const qs = params.toString();
+        const url = `${this.baseUrl}/api/v1/swarm/bounties${qs ? `?${qs}` : ""}`;
+        const response = await fetchWithRetry(url, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`
+          }
+        });
+        return this.parseJsonResponse(response);
+      },
+      claimBounty: async (bountyId, params) => {
+        const response = await fetchWithRetry(
+          `${this.baseUrl}/api/v1/swarm/bounties/${bountyId}/claim`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${this.apiKey}`
+            },
+            body: JSON.stringify({
+              worker_commitment: params.workerCommitment,
+              signature: params.signature,
+              public_key: params.publicKey,
+              timeout_hours: params.timeoutHours
+            })
+          }
+        );
+        return this.parseJsonResponse(response);
+      },
+      submitBountyWork: async (bountyId, params) => {
+        const response = await fetchWithRetry(
+          `${this.baseUrl}/api/v1/swarm/bounties/${bountyId}/submit`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${this.apiKey}`
+            },
+            body: JSON.stringify({
+              worker_commitment: params.workerCommitment,
+              deliverable_digest: params.deliverableDigest,
+              deliverable_url: params.deliverableUrl,
+              signature: params.signature,
+              public_key: params.publicKey
+            })
+          }
+        );
+        return this.parseJsonResponse(response);
+      },
+      completeBounty: async (bountyId, params) => {
+        const response = await fetchWithRetry(
+          `${this.baseUrl}/api/v1/swarm/bounties/${bountyId}/complete`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${this.apiKey}`
+            },
+            body: JSON.stringify({
+              verifier_commitment: params.verifierCommitment,
+              signature: params.signature,
+              public_key: params.publicKey
+            })
+          }
+        );
+        return this.parseJsonResponse(response);
+      }
+    };
   }
   /**
    * Issue a pending signed receipt (Bearer auth required).

@@ -1,5 +1,5 @@
 {
-  "name": "@passport/sdk",
+  "name": "@passport7/sdk",
   "version": "0.1.0",
   "private": false,
   "description": "Passport SDK — cryptographic identity and authenticity layer for AI agents. Issue receipts, post evidence, verify agents.",

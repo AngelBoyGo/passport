@@ -16,6 +16,7 @@ export function SiteHeader() {
     { href: "/agents", label: "Agents" },
     { href: "/leaderboard", label: "Leaderboard" },
     { href: "/angelcoin", label: "ANGEL" },
+    { href: "/haven", label: "Haven" },
   ];
 
   return (

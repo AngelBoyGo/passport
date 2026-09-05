@@ -108,13 +108,13 @@ export async function GET(request: NextRequest) {
     // ── SDKs & Integrations ──
     sdks: {
       typescript: {
-        package: "@passport/sdk",
-        npm: "https://www.npmjs.com/package/@passport/sdk",
+        package: "@passport7/sdk",
+        npm: "https://www.npmjs.com/package/@passport7/sdk",
         source: "https://github.com/AngelBoyGo/passport/tree/main/sdk",
         integrations: {
-          mastra: "@passport/sdk/mastra",
-          vercel_ai: "@passport/sdk/vercel-ai",
-          langchain: "@passport/sdk/langchain",
+          mastra: "@passport7/sdk/mastra",
+          vercel_ai: "@passport7/sdk/vercel-ai",
+          langchain: "@passport7/sdk/langchain",
         },
       },
       python: {

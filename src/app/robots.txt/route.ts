@@ -61,7 +61,7 @@ Sitemap: ${baseUrl}/.well-known/ai-service.json
 #   Needs Assessment: GET ${baseUrl}/api/v1/needs/{commitment}
 #
 # SDKs
-#   TypeScript: npm install @passport/sdk
+#   TypeScript: npm install @passport7/sdk
 #   Python:     pip install passport-sdk
 #   MCP:        npx @passport/mcp
 #   GitHub Action: passport-anchor

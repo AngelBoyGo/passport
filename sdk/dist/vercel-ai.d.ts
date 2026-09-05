@@ -5,7 +5,7 @@
  * Every generateText/streamText gets a signed receipt.
  *
  * Usage:
- *   import { passportMiddleware } from "@passport/sdk/vercel-ai";
+ *   import { passportMiddleware } from "@passport7/sdk/vercel-ai";
  *   const result = await generateText({
  *     model: openai("gpt-4"),
  *     prompt: "hello",

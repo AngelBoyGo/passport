@@ -12,7 +12,7 @@
 | **Gamification engineering** | Reputation tiers (0–1000), achievement badges, activity streaks, confetti animations, variable-ratio rewards |
 | **Regulatory awareness** | NIST AI RMF, EU AI Act, SOC 2 compliance packages, KYC/AML/sanctions screening |
 | **Production operations** | Render + Cloudflare deploy, PostgreSQL, R2 encrypted backups, Upstash Redis rate limiting |
-| **Open-source SDK** | `@passport/sdk` with Mastra middleware, audit interceptor, MCP server |
+| **Open-source SDK** | `@passport7/sdk` with Mastra middleware, audit interceptor, MCP server |
 
 ### Ideal Customer Profile (ICP)
 

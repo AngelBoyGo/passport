@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { hostname } from "node:os";
-import type { ErrorTranche } from "@passport/sdk";
-import type { FinalizeStatus } from "@passport/sdk";
+import type { ErrorTranche } from "@passport7/sdk";
+import type { FinalizeStatus } from "@passport7/sdk";
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 

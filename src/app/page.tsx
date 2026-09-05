@@ -38,10 +38,10 @@ export default function LandingPage() {
                 </div>
               </div>
               <pre className="text-sm text-emerald-300 font-mono overflow-x-auto">
-{`npm install @passport/sdk`}
+{`npm install @passport7/sdk`}
               </pre>
               <pre className="text-sm text-slate-300 font-mono overflow-x-auto mt-3">
-{`import { PassportClient } from "@passport/sdk";
+{`import { PassportClient } from "@passport7/sdk";
 
 const passport = new PassportClient({ apiKey: "pp_usr_..." });
 await passport.postEvidence(agentId, { task_id: "work-1", digest: outputHash });`}

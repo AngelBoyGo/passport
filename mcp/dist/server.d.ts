@@ -1,5 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { PassportClient } from "@passport/sdk";
+import { PassportClient } from "@passport7/sdk";
 /**
  * Creates and configures the Passport MCP server.
  */

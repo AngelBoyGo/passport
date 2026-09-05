@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
-    "@passport/sdk": "file:../sdk"
+    "@passport7/sdk": "file:../sdk"
   },
   "devDependencies": {
     "@types/node": "^20",

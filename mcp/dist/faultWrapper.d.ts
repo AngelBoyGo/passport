@@ -1,4 +1,4 @@
-import type { PassportClient } from "@passport/sdk";
+import type { PassportClient } from "@passport7/sdk";
 /**
  * Runs fn and finalizes the receipt with a mapped tranche on throw, then rethrows.
  */
