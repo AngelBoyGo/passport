@@ -123,6 +123,9 @@ var PassportClient = class {
   apiKey;
   baseUrl;
   swarm;
+  reserves;
+  escrow;
+  artisanal;
   constructor(options) {
     this.apiKey = options.apiKey;
     this.baseUrl = options.baseUrl.replace(/\/$/, "");
@@ -322,6 +325,237 @@ var PassportClient = class {
             })
           }
         );
+        return this.parseJsonResponse(response);
+      }
+    };
+    this.reserves = {
+      getPoR: async (options2) => {
+        const params = new URLSearchParams();
+        if (options2?.commodity) params.set("commodity", options2.commodity);
+        if (options2?.batchNumber) params.set("batch", options2.batchNumber);
+        const qs = params.toString();
+        const url = `${this.baseUrl}/api/v1/reserves/por${qs ? `?${qs}` : ""}`;
+        const response = await fetchWithRetry(url, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`
+          }
+        });
+        return this.parseJsonResponse(response);
+      },
+      listVaults: async () => {
+        const url = `${this.baseUrl}/api/v1/reserves/vaults`;
+        const response = await fetchWithRetry(url, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`
+          }
+        });
+        return this.parseJsonResponse(response);
+      },
+      getRegimeState: async () => {
+        const url = `${this.baseUrl}/api/v1/reserves/state`;
+        const response = await fetchWithRetry(url, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`
+          }
+        });
+        return this.parseJsonResponse(response);
+      },
+      listAssays: async (options2) => {
+        const params = new URLSearchParams();
+        if (options2?.batchNumber) params.set("batch", options2.batchNumber);
+        if (options2?.limit) params.set("limit", String(options2.limit));
+        const qs = params.toString();
+        const url = `${this.baseUrl}/api/v1/reserves/assays${qs ? `?${qs}` : ""}`;
+        const response = await fetchWithRetry(url, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`
+          }
+        });
+        return this.parseJsonResponse(response);
+      },
+      getDividends: async (options2) => {
+        const params = new URLSearchParams();
+        if (options2?.limit) params.set("limit", String(options2.limit));
+        const qs = params.toString();
+        const url = `${this.baseUrl}/api/v1/reserves/dividends${qs ? `?${qs}` : ""}`;
+        const response = await fetchWithRetry(url, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`
+          }
+        });
+        return this.parseJsonResponse(response);
+      },
+      proposeQuorum: async (input) => {
+        const response = await fetchWithRetry(`${this.baseUrl}/api/v1/reserves/quorum/propose`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${this.apiKey}`
+          },
+          body: JSON.stringify({
+            proposal_id: input.proposalId,
+            action_type: input.actionType,
+            payload: input.payload,
+            proposer_state: input.proposerState,
+            required_threshold: input.requiredThreshold,
+            ttl_hours: input.ttlHours
+          })
+        });
+        return this.parseJsonResponse(response);
+      },
+      signQuorum: async (input) => {
+        const response = await fetchWithRetry(`${this.baseUrl}/api/v1/reserves/quorum/sign`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${this.apiKey}`
+          },
+          body: JSON.stringify({
+            proposal_id: input.proposalId,
+            signer_state: input.signerState,
+            signature: input.signature,
+            signer_public_key: input.signerPublicKey
+          })
+        });
+        return this.parseJsonResponse(response);
+      },
+      listQuorumProposals: async (options2) => {
+        const params = new URLSearchParams();
+        if (options2?.limit) params.set("limit", String(options2.limit));
+        const qs = params.toString();
+        const url = `${this.baseUrl}/api/v1/reserves/quorum/proposals${qs ? `?${qs}` : ""}`;
+        const response = await fetchWithRetry(url, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`
+          }
+        });
+        return this.parseJsonResponse(response);
+      }
+    };
+    this.escrow = {
+      createCommodityEscrow: async (input) => {
+        try {
+          const response = await fetchWithRetry(`${this.baseUrl}/api/v1/reserves/escrow`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${this.apiKey}`
+            },
+            body: JSON.stringify({
+              action: "create",
+              escrow_id: input.escrowId,
+              buyer_commitment: input.buyerCommitment,
+              seller_commitment: input.sellerCommitment,
+              batch_number: input.batchNumber,
+              fine_grams: input.fineGrams,
+              unit_price_usd: input.unitPriceUsd,
+              locked_angel: input.lockedAngel,
+              commodity_type: input.commodityType,
+              timeout_hours: input.timeoutHours
+            })
+          });
+          return await this.parseJsonResponse(response);
+        } catch (err) {
+          const status = err.status;
+          if (status === 400) {
+            return this.escrow.getEscrow(input.escrowId);
+          }
+          throw err;
+        }
+      },
+      releaseEscrowOnAssay: async (input) => {
+        const response = await fetchWithRetry(`${this.baseUrl}/api/v1/reserves/escrow`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${this.apiKey}`
+          },
+          body: JSON.stringify({
+            action: "release",
+            escrow_id: input.escrowId,
+            assay_certification_number: input.assayCertificationNumber,
+            release_signature: input.releaseSignature
+          })
+        });
+        return this.parseJsonResponse(response);
+      },
+      refundEscrowOnTimeout: async (escrowId) => {
+        const response = await fetchWithRetry(`${this.baseUrl}/api/v1/reserves/escrow`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${this.apiKey}`
+          },
+          body: JSON.stringify({
+            action: "refund",
+            escrow_id: escrowId
+          })
+        });
+        return this.parseJsonResponse(response);
+      },
+      getEscrow: async (escrowId) => {
+        const url = `${this.baseUrl}/api/v1/reserves/escrow?escrow_id=${encodeURIComponent(escrowId)}`;
+        const response = await fetchWithRetry(url, {
+          method: "GET"
+        });
+        return this.parseJsonResponse(response);
+      }
+    };
+    this.artisanal = {
+      intakeOre: async (input) => {
+        const response = await fetchWithRetry(`${this.baseUrl}/api/v1/reserves/artisanal/intake`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${this.apiKey}`
+          },
+          body: JSON.stringify({
+            receipt_number: input.receiptNumber,
+            station_code: input.stationCode,
+            miner_commitment: input.minerCommitment,
+            gross_weight_grams: input.grossWeightGrams,
+            assayed_fineness: input.assayedFineness,
+            spectrometer_signature: input.spectrometerSignature,
+            payout_rate_percent: input.payoutRatePercent
+          })
+        });
+        return this.parseJsonResponse(response);
+      },
+      listStations: async () => {
+        const url = `${this.baseUrl}/api/v1/reserves/artisanal/stations`;
+        const response = await fetchWithRetry(url, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`
+          }
+        });
+        return this.parseJsonResponse(response);
+      },
+      bridgeDor\u00E9: async (input) => {
+        const response = await fetchWithRetry(`${this.baseUrl}/api/v1/reserves/artisanal/bridge`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${this.apiKey}`
+          },
+          body: JSON.stringify({
+            receipt_numbers: input.receiptNumbers,
+            target_batch_number: input.targetBatchNumber,
+            vault_id: input.vaultId,
+            custodian_name: input.custodianName,
+            location_city: input.locationCity,
+            location_country: input.locationCountry,
+            bar_serials: input.barSerials,
+            refined_gross_grams: input.refinedGrossGrams,
+            refined_fineness: input.refinedFineness
+          })
+        });
         return this.parseJsonResponse(response);
       }
     };

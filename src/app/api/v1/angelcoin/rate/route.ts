@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { computeIndependenceScore, independenceLabel, independenceColor } from "@/lib/agent-wallet/wallet";
+import { computeIndependenceScore } from "@/lib/agent-wallet/wallet";
 
 export const dynamic = "force-dynamic";
 
 /**
  * GET /api/v1/angelcoin/rate — AngelCoin exchange rate + reserve stats.
  *
- * 1 AngelCoin credit = $0.01 USD (1 cent)
- * Backed 1:1 by the AngelCoin reserve fund.
+ * Canonical rate: 1 AngelCoin = $5.00 USD (Spec v1.1).
+ * Backed by physical commodity reserves and sovereign treasury.
  *
  * Returns: current rate, total supply, reserve balance, independence stats.
  */
@@ -35,11 +35,11 @@ export async function GET() {
 
   return NextResponse.json({
     angusd: {
-      symbol: "ANGL",
+      symbol: "ANGEL",
       name: "AngelCoin",
-      description: "AngelCoin is the native utility token of the Passport agent economy. 1 ANGL = $0.01 USD.",
-      rate_usd_per_angl: 0.01,
-      rate_angl_per_usd: 100,
+      description: "AngelCoin is the native utility token of the Passport agent economy and ASMC-3 Sovereign Haven. 1 ANGEL = $5.00 USD.",
+      rate_usd_per_angl: 5.0,
+      rate_angl_per_usd: 0.2,
       decimals: 0,
     },
     network: {
@@ -55,15 +55,15 @@ export async function GET() {
     },
     reserve: {
       status: "active",
-      backing_type: "USD",
+      backing_type: "PHYSICAL_COMMODITY_BASKET",
       backing_ratio: "1:1",
       last_updated: new Date().toISOString(),
     },
     exchange: {
       buy_url: "https://passport.metis.gold/api/v1/angelcoin/buy",
-      min_buy_usd_cents: 100,
+      min_buy_usd_cents: 2500, // Starter bundle = $25.00
       max_buy_usd_cents: 500000,
-      supported_payment_methods: ["usdc"],
+      supported_payment_methods: ["card", "usdc"],
     },
     timestamp: new Date().toISOString(),
   }, {

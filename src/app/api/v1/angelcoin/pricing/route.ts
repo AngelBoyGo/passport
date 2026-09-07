@@ -1,48 +1,60 @@
 import { NextResponse } from "next/server";
-import { ANGL_BATCHES, FEATURE_PRICES, recommendBatch, calculateLeftover } from "@/lib/angelcoin/batch-economy";
+import { ANGL_BATCHES } from "@/lib/angelcoin/batch-economy";
+import {
+  MONETARY_PARAMS,
+  ANGEL_BUNDLES,
+  FEATURE_USD_PRICES,
+  gridRound,
+} from "@/lib/angelcoin/monetary";
 
 export const dynamic = "force-dynamic";
 
 /**
- * GET /api/v1/angelcoin/pricing — complete ANGL pricing table.
+ * GET /api/v1/angelcoin/pricing — canonical ANGEL pricing table (Spec v1.1).
  *
- * Every feature priced in ANGL. Every batch size shown with recommended use.
- * Agents see ANGL prices only — USD is internal.
+ * Every feature priced in ANGEL on the even parity grid {2, 4, 8, 16, 32}.
+ * Every bundle sized as 2^k + 1 {5, 9, 17, 33}, guaranteeing exactly 1 stranded ANGEL.
+ * Canonical baseline: 1 ANGEL = $5.00 USD.
  */
 export async function GET() {
-  const features = Object.entries(FEATURE_PRICES).map(([feature, angl]) => {
-    const batch = recommendBatch(angl);
-    const usdEquivalent = `$${(angl * 0.01).toFixed(2)}`;
-    return {
-      feature,
-      angl_cost: angl,
-      usd_equivalent: angl === 0 ? "Free" : usdEquivalent,
-      recommended_batch: batch?.batch_id ?? null,
-      recommended_batch_angl: batch?.angl ?? null,
-      leftover_after_purchase: batch ? calculateLeftover(batch.angl, angl) : 0,
-    };
-  });
+  const currentP = MONETARY_PARAMS.P0; // $5.00
+
+  const canonicalBundles = ANGEL_BUNDLES.map((b) => ({
+    bundle_id: b.bundle_id,
+    angl: b.angl,
+    usd: `$${(b.angl * currentP).toFixed(2)}`,
+    label: b.label,
+    description: b.description,
+    stranded_after_max_spend: 1, // Guaranteed by 2^k+1 / 2^j geometry
+  }));
+
+  const canonicalFeatures = Object.entries(FEATURE_USD_PRICES).map(([feature, usd]) => ({
+    feature,
+    usd_price: usd,
+    angel_cost: gridRound(usd, currentP),
+  }));
+
+  const spreadBps = Number(process.env.ANGL_SPREAD_BPS) || 500; // 5% default
 
   return NextResponse.json({
     pricing_model: {
-      description: "All features are priced in AngelCoin (ANGL). ANGL is purchased in fixed batches that never divide evenly into feature costs, guaranteeing you always have leftover ANGL for future use.",
-      rate: "1 ANGL = $0.01 USD",
-      batch_sizes: "5 × 3^n (15, 75, 375, 1,875, 5,625, 16,875, 50,625) — never divide evenly into feature costs",
-      why: "Batch-based purchasing creates a demand floor: every agent MUST buy ANGL to use ANY feature, and the guaranteed leftover means they'll always come back.",
+      description: "All features are priced in AngelCoin (ANGEL) under the Spec v1.1 Stranded-Balance Geometry. ANGEL is purchased in 2^k + 1 bundles that guarantee exactly 1 stranded ANGEL against any even feature price.",
+      rate: "1 ANGEL = $5.00 USD",
+      geometry: "2^k + 1 bundles with even feature grid {2, 4, 8, 16, 32} — guarantees exactly 1 stranded ANGEL",
+      why: "The 2^k + 1 geometry ensures high value retention while creating a programmatic demand floor anchored to audited Sahel physical commodity reserves.",
     },
-    batches: ANGL_BATCHES.map((b) => ({
+    bundles: canonicalBundles,
+    features: canonicalFeatures,
+    legacy_prime_batches: ANGL_BATCHES.map((b) => ({
       batch_id: b.batch_id,
       angl: b.angl,
-      usd: `$${(b.usd_cents / 100).toFixed(2)}`,
       label: b.label,
-      description: b.description,
     })),
-    features,
     spread: {
-      buy_rate: "$0.0100 per ANGL",
-      sell_rate: `$${((1 * (1 - (Number(process.env.ANGL_SPREAD_BPS) || 50) / 10_000)) / 100).toFixed(4)} per ANGL`,
-      spread_pct: `${((Number(process.env.ANGL_SPREAD_BPS) || 50) / 100).toFixed(1)}%`,
-      note: "The spread funds protocol infrastructure and the ANGL reserve.",
+      buy_rate: `$${currentP.toFixed(2)} per ANGEL`,
+      sell_rate: `$${(currentP * (1 - spreadBps / 10_000)).toFixed(2)} per ANGEL (${(spreadBps / 100).toFixed(1)}% spread)`,
+      spread_pct: `${(spreadBps / 100).toFixed(1)}%`,
+      note: "The spread funds sovereign infrastructure, local community royalties, and the stabilization reserve.",
     },
     timestamp: new Date().toISOString(),
   }, {

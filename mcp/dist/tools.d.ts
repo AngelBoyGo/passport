@@ -111,4 +111,59 @@ export declare function createToolHandlers(client: PassportClient): {
         success: boolean;
         bounty: import("@passport7/sdk").SwarmBountyItem;
     }>;
+    queryPoR(input?: {
+        commodity?: string;
+        batchNumber?: string;
+    }): Promise<import("@passport7/sdk").PoRResponse>;
+    getRegimeState(): Promise<import("@passport7/sdk").RegimeStateResponse>;
+    createCommodityEscrow(input: {
+        escrowId: string;
+        buyerCommitment: string;
+        sellerCommitment: string;
+        batchNumber: string;
+        fineGrams: number;
+        unitPriceUsd: number;
+        lockedAngel: number;
+        commodityType?: string;
+        timeoutHours?: number;
+    }): Promise<{
+        success: boolean;
+        escrow: import("@passport7/sdk").CommodityEscrowRecord;
+    }>;
+    releaseCommodityEscrow(input: {
+        escrowId: string;
+        assayCertificationNumber: string;
+        releaseSignature: string;
+    }): Promise<{
+        success: boolean;
+        escrow: import("@passport7/sdk").CommodityEscrowRecord;
+    }>;
+    refundCommodityEscrow(input: {
+        escrowId: string;
+    }): Promise<{
+        success: boolean;
+        escrow: import("@passport7/sdk").CommodityEscrowRecord;
+    }>;
+    getSovereignDividends(options?: {
+        limit?: number;
+    }): Promise<import("@passport7/sdk").DividendsResponse>;
+    recordOreIntake(input: {
+        receiptNumber: string;
+        stationCode: string;
+        minerCommitment: string;
+        grossWeightGrams: number;
+        assayedFineness: number;
+        spectrometerSignature: string;
+        payoutRatePercent?: number;
+    }): Promise<import("@passport7/sdk").OreIntakeResponse>;
+    listArtisanalStations(): Promise<import("@passport7/sdk").ArtisanalStationsResponse>;
+    submitQuorumSignature(input: {
+        proposalId: string;
+        signerState: string;
+        signature: string;
+        signerPublicKey?: string;
+    }): Promise<import("@passport7/sdk").QuorumSignResponse>;
+    listQuorumProposals(options?: {
+        limit?: number;
+    }): Promise<import("@passport7/sdk").QuorumProposalsListResponse>;
 };

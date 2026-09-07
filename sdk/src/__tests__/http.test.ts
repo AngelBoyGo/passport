@@ -57,7 +57,7 @@ describe("fetchWithRetry", () => {
       });
     });
 
-    globalThis.fetch = fetchMock;
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
 
     const promise = fetchWithRetry("https://api.example.com/slow", undefined, {
       timeoutMs: 4000,

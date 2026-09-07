@@ -6,7 +6,7 @@ import { bytesToHex } from "@noble/hashes/utils.js";
 
 export const dynamic = "force-dynamic";
 
-const ANGL_USD_CENTS = 1; // 1 ANGL = $0.01
+const ANGL_USD_CENTS = 500; // 1 ANGEL = $5.00 nominal launch base (MONETARY_PARAMS.P0 * 100)
 
 /**
  * POST /api/v1/angelcoin/buy-on-behalf
@@ -78,9 +78,9 @@ export async function POST(request: NextRequest) {
   }
 
   const usdCents = Math.round(body.usd_amount * 100);
-  if (usdCents < 1 || usdCents > 500_000) {
+  if (usdCents < ANGL_USD_CENTS || usdCents > 500_000) {
     return NextResponse.json(
-      { error: "usd_amount must be between $0.01 and $5,000.00" },
+      { error: "Minimum purchase is $5.00 (1 ANGEL). usd_amount must be between $5.00 and $5,000.00" },
       { status: 400 }
     );
   }
@@ -181,6 +181,7 @@ export async function POST(request: NextRequest) {
     status: "credited",
     angl_credited: anglAmount,
     usd_charged: `$${(usdCents / 100).toFixed(2)}`,
+    rate_usd: "$5.00 per ANGEL",
     agent_commitment: commitment,
     did: body.did,
     wallet_balance: wallet?.balance ?? anglAmount,

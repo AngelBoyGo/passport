@@ -12,7 +12,7 @@ describe("PassportClient", () => {
         headers: { "Content-Type": "application/json" },
       })
     );
-    globalThis.fetch = fetchMock;
+    globalThis.fetch = fetchMock as typeof fetch;
   });
 
   afterEach(() => {
@@ -252,5 +252,400 @@ describe("PassportClient", () => {
       signature: "sig",
     });
     expect(claimed.bounty.status).toBe("CLAIMED");
+  });
+
+  describe("client.reserves namespace", () => {
+    it("getPoR queries /api/v1/reserves/por with optional query parameters", async () => {
+      fetchMock.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            reserve: { total_fine_grams: 50000, merkle_root: "root123" },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      );
+
+      const por = await client.reserves.getPoR({ commodity: "GOLD", batchNumber: "BKO-01" });
+      expect(por.success).toBe(true);
+      expect(fetchMock).toHaveBeenCalledOnce();
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe("https://passport.example.com/api/v1/reserves/por?commodity=GOLD&batch=BKO-01");
+      expect(init.method).toBe("GET");
+      expect(init.headers).toMatchObject({
+        Authorization: "Bearer pk_test_secret",
+      });
+    });
+
+    it("listVaults queries /api/v1/reserves/vaults", async () => {
+      fetchMock.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            total_vaults: 1,
+            vaults: [{ vault_id: "VAULT-BKO", total_fine_grams: 25000 }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      );
+
+      const vaults = await client.reserves.listVaults();
+      expect(vaults.success).toBe(true);
+      expect(vaults.total_vaults).toBe(1);
+      const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe("https://passport.example.com/api/v1/reserves/vaults");
+    });
+
+    it("getRegimeState queries /api/v1/reserves/state", async () => {
+      fetchMock.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            regime: "SOLID",
+            belief_score: 0.05,
+            damping_fee_bps: 50,
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      );
+
+      const state = await client.reserves.getRegimeState();
+      expect(state.success).toBe(true);
+      expect(state.regime).toBe("SOLID");
+      const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe("https://passport.example.com/api/v1/reserves/state");
+    });
+
+    it("listAssays queries /api/v1/reserves/assays with query parameters", async () => {
+      fetchMock.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            count: 1,
+            assays: [{ certification_number: "CERT-1" }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      );
+
+      const assays = await client.reserves.listAssays({ batchNumber: "BKO-01", limit: 10 });
+      expect(assays.success).toBe(true);
+      expect(assays.count).toBe(1);
+      const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe("https://passport.example.com/api/v1/reserves/assays?batch=BKO-01&limit=10");
+    });
+
+    it("getDividends queries /api/v1/reserves/dividends with limit parameter", async () => {
+      fetchMock.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            totals: { total_fees_captured_angel: 100 },
+            recent_disbursements: [{ disbursement_id: "disb_1" }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      );
+
+      const dividends = await client.reserves.getDividends({ limit: 5 });
+      expect(dividends.success).toBe(true);
+      expect(dividends.totals.total_fees_captured_angel).toBe(100);
+      const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe("https://passport.example.com/api/v1/reserves/dividends?limit=5");
+    });
+
+    it("proposeQuorum POSTs proposal to /api/v1/reserves/quorum/propose", async () => {
+      fetchMock.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            proposal: { proposal_id: "PROP-1", action_type: "QUARANTINE_VAULT" },
+          }),
+          { status: 201, headers: { "Content-Type": "application/json" } }
+        )
+      );
+
+      const res = await client.reserves.proposeQuorum({
+        actionType: "QUARANTINE_VAULT",
+        payload: { batchNumber: "BKO-01" },
+        proposerState: "ML",
+      });
+
+      expect(res.success).toBe(true);
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe("https://passport.example.com/api/v1/reserves/quorum/propose");
+      expect(init.method).toBe("POST");
+      expect(JSON.parse(init.body as string)).toEqual({
+        action_type: "QUARANTINE_VAULT",
+        payload: { batchNumber: "BKO-01" },
+        proposer_state: "ML",
+      });
+    });
+
+    it("signQuorum POSTs signature to /api/v1/reserves/quorum/sign", async () => {
+      fetchMock.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            proposal_id: "PROP-1",
+            executed: true,
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      );
+
+      const res = await client.reserves.signQuorum({
+        proposalId: "PROP-1",
+        signerState: "BF",
+        signature: "sig_bf",
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.executed).toBe(true);
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe("https://passport.example.com/api/v1/reserves/quorum/sign");
+      expect(init.method).toBe("POST");
+    });
+
+    it("listQuorumProposals GETs /api/v1/reserves/quorum/proposals", async () => {
+      fetchMock.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            count: 1,
+            proposals: [{ proposal_id: "PROP-1" }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      );
+
+      const res = await client.reserves.listQuorumProposals({ limit: 5 });
+      expect(res.success).toBe(true);
+      const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe("https://passport.example.com/api/v1/reserves/quorum/proposals?limit=5");
+    });
+  });
+
+  describe("client.escrow namespace", () => {
+    const escrowRecord = {
+      escrowId: "esc_1",
+      status: "HELD",
+      buyerCommitment: "a".repeat(64),
+      sellerCommitment: "b".repeat(64),
+      batchNumber: "BKO-01",
+      commodityType: "GOLD",
+      fineGrams: 100,
+      unitPriceUsd: 75,
+      lockedAngel: 100,
+      protocolFeeAngel: 3,
+    };
+
+    it("createCommodityEscrow POSTs create action with snake_case body", async () => {
+      fetchMock.mockResolvedValueOnce(
+        new Response(JSON.stringify({ success: true, escrow: escrowRecord }), {
+          status: 201,
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+
+      await client.escrow.createCommodityEscrow({
+        escrowId: "esc_1",
+        buyerCommitment: "a".repeat(64),
+        sellerCommitment: "b".repeat(64),
+        batchNumber: "BKO-01",
+        fineGrams: 100,
+        unitPriceUsd: 75,
+        lockedAngel: 100,
+        timeoutHours: 72,
+      });
+
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe("https://passport.example.com/api/v1/reserves/escrow");
+      expect(init.method).toBe("POST");
+      expect(init.headers).toMatchObject({
+        Authorization: "Bearer pk_test_secret",
+        "Content-Type": "application/json",
+      });
+      expect(JSON.parse(init.body as string)).toEqual({
+        action: "create",
+        escrow_id: "esc_1",
+        buyer_commitment: "a".repeat(64),
+        seller_commitment: "b".repeat(64),
+        batch_number: "BKO-01",
+        fine_grams: 100,
+        unit_price_usd: 75,
+        locked_angel: 100,
+        timeout_hours: 72,
+      });
+    });
+
+    it("releaseEscrowOnAssay POSTs release action", async () => {
+      fetchMock.mockResolvedValueOnce(
+        new Response(JSON.stringify({ success: true, escrow: { ...escrowRecord, status: "RELEASED" } }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+
+      await client.escrow.releaseEscrowOnAssay({
+        escrowId: "esc_1",
+        assayCertificationNumber: "CERT-1",
+        releaseSignature: "sig",
+      });
+
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe("https://passport.example.com/api/v1/reserves/escrow");
+      expect(JSON.parse(init.body as string)).toEqual({
+        action: "release",
+        escrow_id: "esc_1",
+        assay_certification_number: "CERT-1",
+        release_signature: "sig",
+      });
+    });
+
+    it("refundEscrowOnTimeout POSTs refund action", async () => {
+      fetchMock.mockResolvedValueOnce(
+        new Response(JSON.stringify({ success: true, escrow: { ...escrowRecord, status: "REFUNDED" } }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+
+      await client.escrow.refundEscrowOnTimeout("esc_1");
+
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe("https://passport.example.com/api/v1/reserves/escrow");
+      expect(JSON.parse(init.body as string)).toEqual({ action: "refund", escrow_id: "esc_1" });
+    });
+
+    it("getEscrow GETs without an Authorization header", async () => {
+      fetchMock.mockResolvedValueOnce(
+        new Response(JSON.stringify({ success: true, escrow: escrowRecord }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+
+      await client.escrow.getEscrow("esc_1");
+
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe("https://passport.example.com/api/v1/reserves/escrow?escrow_id=esc_1");
+      expect(init.method).toBe("GET");
+      expect(init.headers).not.toMatchObject({ Authorization: expect.anything() });
+    });
+
+    it("createCommodityEscrow is idempotent on duplicate escrow_id (re-reads existing)", async () => {
+      fetchMock
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ error: "Unique constraint" }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          })
+        )
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ success: true, escrow: escrowRecord }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          })
+        );
+
+      const result = await client.escrow.createCommodityEscrow({
+        escrowId: "esc_1",
+        buyerCommitment: "a".repeat(64),
+        sellerCommitment: "b".repeat(64),
+        batchNumber: "BKO-01",
+        fineGrams: 100,
+        unitPriceUsd: 75,
+        lockedAngel: 100,
+      });
+
+      expect(result.escrow.escrowId).toBe("esc_1");
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      const secondCall = fetchMock.mock.calls[1] as [string, RequestInit];
+      expect(secondCall[0]).toBe("https://passport.example.com/api/v1/reserves/escrow?escrow_id=esc_1");
+    });
+  });
+
+  describe("client.artisanal namespace", () => {
+    it("intakeOre POSTs intake payload with Bearer auth", async () => {
+      fetchMock.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            receipt: { receipt_number: "ORE-01", payout_angel: 95 },
+          }),
+          { status: 201, headers: { "Content-Type": "application/json" } }
+        )
+      );
+
+      const res = await client.artisanal.intakeOre({
+        receiptNumber: "ORE-01",
+        stationCode: "STN-KEN-01",
+        minerCommitment: "m".repeat(64),
+        grossWeightGrams: 50.0,
+        assayedFineness: 0.90,
+        spectrometerSignature: "sig_xrf",
+      });
+
+      expect(res.success).toBe(true);
+      expect(fetchMock).toHaveBeenCalledOnce();
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe("https://passport.example.com/api/v1/reserves/artisanal/intake");
+      expect(init.method).toBe("POST");
+      expect(JSON.parse(init.body as string)).toEqual({
+        receipt_number: "ORE-01",
+        station_code: "STN-KEN-01",
+        miner_commitment: "m".repeat(64),
+        gross_weight_grams: 50.0,
+        assayed_fineness: 0.90,
+        spectrometer_signature: "sig_xrf",
+      });
+    });
+
+    it("listStations GETs /api/v1/reserves/artisanal/stations", async () => {
+      fetchMock.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            stations: [{ station_code: "STN-KEN-01" }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      );
+
+      const res = await client.artisanal.listStations();
+      expect(res.success).toBe(true);
+      const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe("https://passport.example.com/api/v1/reserves/artisanal/stations");
+    });
+
+    it("bridgeDoré POSTs /api/v1/reserves/artisanal/bridge", async () => {
+      fetchMock.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            batch: { batch_number: "BKO-AU-REFINED-01" },
+          }),
+          { status: 201, headers: { "Content-Type": "application/json" } }
+        )
+      );
+
+      const res = await client.artisanal.bridgeDoré({
+        receiptNumbers: ["ORE-01", "ORE-02"],
+        targetBatchNumber: "BKO-AU-REFINED-01",
+        vaultId: "VAULT-BKO",
+        custodianName: "SOREM",
+        locationCity: "Bamako",
+        locationCountry: "ML",
+        barSerials: ["BAR-01"],
+        refinedGrossGrams: 100.0,
+        refinedFineness: 0.9999,
+      });
+
+      expect(res.success).toBe(true);
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe("https://passport.example.com/api/v1/reserves/artisanal/bridge");
+      expect(init.method).toBe("POST");
+    });
   });
 });

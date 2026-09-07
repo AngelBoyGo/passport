@@ -232,4 +232,158 @@ describe("MCP tool handlers", () => {
       publicKey: undefined,
     });
   });
+
+  it("passport_query_por and passport_get_regime_state delegate to client.reserves", async () => {
+    const getPoR = vi.fn().mockResolvedValue({
+      success: true,
+      reserve: { total_fine_grams: 50000 },
+    });
+    const getRegimeState = vi.fn().mockResolvedValue({
+      success: true,
+      regime: "SOLID",
+      belief_score: 0.05,
+    });
+
+    const client = {
+      reserves: { getPoR, getRegimeState },
+    } as unknown as PassportClient;
+    const handlers = createToolHandlers(client);
+
+    const porResult = await handlers.queryPoR({ commodity: "GOLD", batchNumber: "BKO-01" });
+    expect(porResult.success).toBe(true);
+    expect(getPoR).toHaveBeenCalledWith({ commodity: "GOLD", batchNumber: "BKO-01" });
+
+    const regimeResult = await handlers.getRegimeState();
+    expect(regimeResult.regime).toBe("SOLID");
+    expect(getRegimeState).toHaveBeenCalledOnce();
+  });
+
+  it("escrow handlers delegate to client.escrow with full argument passthrough", async () => {
+    const createCommodityEscrow = vi.fn().mockResolvedValue({ success: true, escrow: { escrowId: "esc_1" } });
+    const releaseEscrowOnAssay = vi.fn().mockResolvedValue({ success: true, escrow: { escrowId: "esc_1", status: "RELEASED" } });
+    const refundEscrowOnTimeout = vi.fn().mockResolvedValue({ success: true, escrow: { escrowId: "esc_1", status: "REFUNDED" } });
+
+    const client = {
+      escrow: { createCommodityEscrow, releaseEscrowOnAssay, refundEscrowOnTimeout },
+    } as unknown as PassportClient;
+    const handlers = createToolHandlers(client);
+
+    await handlers.createCommodityEscrow({
+      escrowId: "esc_1",
+      buyerCommitment: "a".repeat(64),
+      sellerCommitment: "b".repeat(64),
+      batchNumber: "BKO-01",
+      fineGrams: 100,
+      unitPriceUsd: 75,
+      lockedAngel: 100,
+      timeoutHours: 72,
+    });
+    expect(createCommodityEscrow).toHaveBeenCalledWith({
+      escrowId: "esc_1",
+      buyerCommitment: "a".repeat(64),
+      sellerCommitment: "b".repeat(64),
+      batchNumber: "BKO-01",
+      fineGrams: 100,
+      unitPriceUsd: 75,
+      lockedAngel: 100,
+      commodityType: undefined,
+      timeoutHours: 72,
+    });
+
+    await handlers.releaseCommodityEscrow({
+      escrowId: "esc_1",
+      assayCertificationNumber: "CERT-1",
+      releaseSignature: "sig",
+    });
+    expect(releaseEscrowOnAssay).toHaveBeenCalledWith({
+      escrowId: "esc_1",
+      assayCertificationNumber: "CERT-1",
+      releaseSignature: "sig",
+    });
+
+    await handlers.refundCommodityEscrow({ escrowId: "esc_1" });
+    expect(refundEscrowOnTimeout).toHaveBeenCalledWith("esc_1");
+  });
+
+  it("passport_get_sovereign_dividends delegates to client.reserves.getDividends", async () => {
+    const getDividends = vi.fn().mockResolvedValue({
+      success: true,
+      totals: { national_treasury_angel: 50 },
+    });
+
+    const client = {
+      reserves: { getDividends },
+    } as unknown as PassportClient;
+    const handlers = createToolHandlers(client);
+
+    const result = await handlers.getSovereignDividends({ limit: 5 });
+    expect(result.success).toBe(true);
+    expect(getDividends).toHaveBeenCalledWith({ limit: 5 });
+  });
+
+  it("artisanal handlers delegate to client.artisanal", async () => {
+    const intakeOre = vi.fn().mockResolvedValue({
+      success: true,
+      receipt: { receipt_number: "ORE-1", payout_angel: 95 },
+    });
+    const listStations = vi.fn().mockResolvedValue({
+      success: true,
+      stations: [{ station_code: "STN-1" }],
+    });
+
+    const client = {
+      artisanal: { intakeOre, listStations },
+    } as unknown as PassportClient;
+    const handlers = createToolHandlers(client);
+
+    const intakeResult = await handlers.recordOreIntake({
+      receiptNumber: "ORE-1",
+      stationCode: "STN-1",
+      minerCommitment: "m".repeat(64),
+      grossWeightGrams: 50.0,
+      assayedFineness: 0.90,
+      spectrometerSignature: "sig",
+    });
+    expect(intakeResult.success).toBe(true);
+    expect(intakeOre).toHaveBeenCalledOnce();
+
+    const stationsResult = await handlers.listArtisanalStations();
+    expect(stationsResult.success).toBe(true);
+    expect(listStations).toHaveBeenCalledOnce();
+  });
+
+  it("quorum handlers delegate to client.reserves", async () => {
+    const signQuorum = vi.fn().mockResolvedValue({
+      success: true,
+      proposal_id: "PROP-1",
+      executed: true,
+    });
+    const listQuorumProposals = vi.fn().mockResolvedValue({
+      success: true,
+      count: 1,
+      proposals: [{ proposal_id: "PROP-1" }],
+    });
+
+    const client = {
+      reserves: { signQuorum, listQuorumProposals },
+    } as unknown as PassportClient;
+    const handlers = createToolHandlers(client);
+
+    const signResult = await handlers.submitQuorumSignature({
+      proposalId: "PROP-1",
+      signerState: "ML",
+      signature: "sig_ml",
+    });
+    expect(signResult.success).toBe(true);
+    expect(signQuorum).toHaveBeenCalledWith({
+      proposalId: "PROP-1",
+      signerState: "ML",
+      signature: "sig_ml",
+      signerPublicKey: undefined,
+    });
+
+    const listResult = await handlers.listQuorumProposals({ limit: 5 });
+    expect(listResult.success).toBe(true);
+    expect(listQuorumProposals).toHaveBeenCalledWith({ limit: 5 });
+  });
 });

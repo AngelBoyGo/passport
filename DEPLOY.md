@@ -229,6 +229,44 @@ Complete Sections 2–5 after deploy to obtain real execution proof.
 
 ---
 
+## 8. ASMC-3 Sovereign Haven RWA & Governance Configuration
+
+Passport includes full physical commodity Proof-of-Reserves, bilateral escrow clearing, and 2-of-3 trilateral sovereign governance.
+
+### 8.1 Database Migrations
+When the production container boots, the entrypoint automatically executes `prisma migrate deploy`, applying the four sovereign migrations:
+1. `20260906000000_rwa_commodity_reserves_and_escrow`: `CommodityReserve`, `VaultBatch`, `AssayerCertification`, `CommodityEscrow`.
+2. `20260906120000_add_sovereign_dividend_disbursement`: `SovereignDisbursement` (statutory revenue-sharing waterfall).
+3. `20260907000000_add_artisanal_sourcing_and_intake`: `ArtisanalBuyingStation`, `OreIntakeReceipt` (orpailleurs field sourcing).
+4. `20260907120000_add_sovereign_quorum_and_heartbeats`: `SovereignQuorumProposal`, `QuorumSignature`, `SovereignStateHeartbeat` (AES 2-of-3 governance).
+
+### 8.2 Sovereign Keys Environment
+In Railway Variables, set the Ed25519 64-hex public keys of the state ministries (defaults to verified benchmarks if unset):
+
+| Variable | Value | Description |
+|---|---|---|
+| `SOVEREIGN_KEY_ML` | 64-hex Ed25519 public key | Mali Ministry of Mines / SOREM |
+| `SOVEREIGN_KEY_BF` | 64-hex Ed25519 public key | Burkina Faso SONAMIG / Ministry |
+| `SOVEREIGN_KEY_NE` | 64-hex Ed25519 public key | Niger SOPAMIN / Ministry |
+
+### 8.3 Post-Deploy Sovereign Verification
+After deployment, verify that the sovereign haven endpoints initialize:
+```bash
+# Verify Proof-of-Reserves & Merkle root:
+curl -sS https://passport.metis.gold/api/v1/reserves/por
+
+# Verify Dual-State Governor regime (SOLID vs GHOST):
+curl -sS https://passport.metis.gold/api/v1/reserves/state
+
+# Verify Sovereign Dividends waterfall:
+curl -sS https://passport.metis.gold/api/v1/reserves/dividends
+
+# Run closed-loop smoke test against staging/dev DB:
+PASSPORT_SMOKE_ALLOW=1 npm run smoke:rwa
+```
+
+---
+
 ## Troubleshooting
 
 | Symptom | Likely cause |

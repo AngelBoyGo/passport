@@ -3,25 +3,28 @@ import { prisma } from "@/lib/db";
 import { authenticateApiKey } from "@/lib/operator";
 import { checkInMemoryRateLimit, clientIpFromRequest } from "@/lib/rateLimit";
 import { computeAvailableBalance } from "@/lib/agent-wallet/wallet";
+import { getLiveGovernorAssessment } from "@/lib/reserves/dual-state-governor";
 
 export const dynamic = "force-dynamic";
 
-const REDEMPTION_SPREAD_BPS = Number(process.env.ANGL_SPREAD_BPS) || 50; // 0.5% default
-const MIN_REDEMPTION_ANGL = 1000; // 1000 ANGL = $9.50 USD minimum
-const ANGL_USD_CENTS = 1; // 1 ANGL = $0.01
+const REDEMPTION_SPREAD_BPS = Number(process.env.ANGL_SPREAD_BPS) || 500; // 5% default
+const MIN_REDEMPTION_ANGL = 100; // 100 ANGL = $500.00 gross at $5.00/ANGEL
+const MAX_REDEMPTION_ANGL = 1_000_000;
+const ANGL_USD_CENTS = 500; // 1 ANGL = $5.00 nominal launch rate (monetary spec P0)
 
 /**
- * POST /api/v1/angelcoin/redeem — Convert ANGL back to USD.
+ * POST /api/v1/angelcoin/redeem — Convert ANGL back to USD-equivalent value.
  *
- * The SELL side of the AngelCoin economy. Agents can convert their
- * earned ANGL back to USD (minus 0.5% spread) via Stripe payout.
+ * The SELL side of the AngelCoin economy. Agents can request redemption of
+ * their earned ANGL (minus the spread) through a custodial settlement queue.
  *
- * Rate: 1 ANGL = $0.0095 USD (buy rate $0.01 minus 0.5% spread)
- * Minimum: 1,000 ANGL ($9.50 USD)
- * Requires: AgentWallet with sufficient available balance
+ * Rate: 1 ANGL = $5.00 nominal launch rate (P0), less redemption spread.
+ * Minimum: 100 ANGL. Requires: AgentWallet with sufficient available balance.
  *
- * The spread IS the protocol's revenue on currency exchange.
- * Spread is configurable via ANGL_SPREAD_BPS env var (default 50 bps).
+ * Safety (Premortem P0-4):
+ *   - Atomic debit inside a transaction with in-transaction balance re-check.
+ *   - Dual-State Governor gate: GHOST regime rejects with 423 (circuit breaker).
+ *   - No fabricated instant Stripe payout. Returns 202 "redemption_queued_custodial".
  */
 export async function POST(request: NextRequest) {
   const ip = clientIpFromRequest(request.headers);
@@ -59,7 +62,6 @@ export async function POST(request: NextRequest) {
   const commitment = body.agent_commitment.toLowerCase();
   const anglAmount = Math.floor(body.angl_amount);
 
-  // Validate amount
   if (anglAmount < MIN_REDEMPTION_ANGL) {
     return NextResponse.json(
       {
@@ -70,7 +72,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (anglAmount > 1_000_000) {
+  if (anglAmount > MAX_REDEMPTION_ANGL) {
     return NextResponse.json({ error: "Maximum redemption is 1,000,000 ANGL per transaction" }, { status: 400 });
   }
 
@@ -82,98 +84,109 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Agent not found or not owned by you" }, { status: 403 });
   }
 
-  // Check wallet balance
-  const wallet = await prisma.agentWallet.findUnique({
-    where: { subjectCommitment: commitment },
-  });
-
-  if (!wallet) {
-    return NextResponse.json({ error: "No wallet found for this agent" }, { status: 404 });
+  // Dual-State Governor circuit-breaker: reject while in GHOST regime
+  try {
+    const governor = await getLiveGovernorAssessment();
+    if (governor.regime === "GHOST") {
+      return NextResponse.json(
+        {
+          error: "Circuit breaker active. Redemptions are temporarily paused during protective Ghost regime.",
+          regime: governor.regime,
+          belief_score: governor.beliefScore,
+        },
+        { status: 423 }
+      );
+    }
+  } catch {
+    // Governor assessment is a secondary defense; the atomic balance check below
+    // remains the primary correctness guarantee.
   }
 
-  const available = computeAvailableBalance(wallet);
-  if (available < anglAmount) {
-    return NextResponse.json(
-      {
-        error: `Insufficient available balance. Available: ${available} ANGL, Requested: ${anglAmount} ANGL. Note: staked ANGL cannot be redeemed until unstaked.`,
-        available_angl: available,
-        staked_angl: wallet.staked,
-        requested_angl: anglAmount,
-      },
-      { status: 402 }
-    );
-  }
-
-  // Calculate USD value with spread
   const grossUsdCents = anglAmount * ANGL_USD_CENTS;
   const spreadCents = Math.floor((grossUsdCents * REDEMPTION_SPREAD_BPS) / 10_000);
   const netUsdCents = grossUsdCents - spreadCents;
 
-  // Check treasury reserve (can we cover this redemption?)
-  const treasury = await prisma.angelCoinAccount.findUnique({
-    where: { subjectCommitment: "protocol_treasury_system" },
-  });
+  let remainingBalance = 0;
 
-  const treasuryBalance = treasury
-    ? (await prisma.angelCoinJournalEntry.findMany({
-        where: { accountId: treasury.id },
-      })).reduce((sum, e) => sum + e.amount, 0)
-    : 0;
+  // Atomic debit with in-transaction balance re-check to prevent double-spend
+  try {
+    await prisma.$transaction(async (tx) => {
+      const wallet = await tx.agentWallet.findUnique({
+        where: { subjectCommitment: commitment },
+      });
 
-  // For now, we log the redemption request and debit the wallet.
-  // Actual USD payout via Stripe requires a connected Stripe Express account.
-  // This is a two-phase process: (1) debit wallet, (2) initiate payout.
+      if (!wallet) {
+        throw new Error("No wallet found for this agent");
+      }
 
-  // Phase 1: Debit the wallet
-  await prisma.$transaction(async (tx) => {
-    await tx.agentWallet.update({
-      where: { subjectCommitment: commitment },
-      data: {
-        balance: { decrement: anglAmount },
-        spentTotal: { increment: anglAmount },
-        lastActivityAt: new Date(),
-      },
+      const available = computeAvailableBalance(wallet);
+      if (available < anglAmount) {
+        throw new Error("Insufficient available balance");
+      }
+
+      await tx.agentWallet.update({
+        where: { subjectCommitment: commitment },
+        data: {
+          balance: { decrement: anglAmount },
+          spentTotal: { increment: anglAmount },
+          lastActivityAt: new Date(),
+        },
+      });
+
+      await tx.operatorLedgerEntry.create({
+        data: {
+          operatorId: operator.id,
+          deltaMicros: -netUsdCents * 10_000,
+          kind: "rwa_redemption_queued",
+          metadata: JSON.stringify({
+            agent_commitment: commitment,
+            angl_amount: anglAmount,
+            gross_usd_cents: grossUsdCents,
+            spread_bps: REDEMPTION_SPREAD_BPS,
+            spread_cents: spreadCents,
+            net_usd_cents: netUsdCents,
+          }),
+        },
+      });
+
+      remainingBalance = available - anglAmount;
     });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes("No wallet")) {
+      return NextResponse.json({ error: message }, { status: 404 });
+    }
+    if (message.includes("Insufficient")) {
+      return NextResponse.json(
+        { error: "Insufficient available balance for redemption." },
+        { status: 402 }
+      );
+    }
+    throw err;
+  }
 
-    // Record the redemption in the operator ledger
-    await tx.operatorLedgerEntry.create({
-      data: {
-        operatorId: operator.id,
-        deltaMicros: -netUsdCents * 10_000, // negative = outflow
-        kind: "angl_redemption",
-        metadata: JSON.stringify({
-          agent_commitment: commitment,
-          angl_amount: anglAmount,
-          gross_usd_cents: grossUsdCents,
-          spread_bps: REDEMPTION_SPREAD_BPS,
-          spread_cents: spreadCents,
-          net_usd_cents: netUsdCents,
-          treasury_balance_at_redemption: treasuryBalance,
-        }),
-      },
-    });
-  });
-
-  return NextResponse.json({
-    status: "redemption_initiated",
-    agent_commitment: commitment,
-    angl_redeemed: anglAmount,
-    gross_usd: `$${(grossUsdCents / 100).toFixed(2)}`,
-    spread: `${(REDEMPTION_SPREAD_BPS / 100).toFixed(1)}%`,
-    spread_usd: `$${(spreadCents / 100).toFixed(2)}`,
-    net_usd: `$${(netUsdCents / 100).toFixed(2)}`,
-    remaining_balance: available - anglAmount,
-    payout_method: "stripe_transfer",
-    payout_eta: "1-3 business days",
-    note: "Redemption debited from your wallet. USD payout initiated via Stripe. You will receive an email when funds arrive.",
-  }, { status: 200 });
+  return NextResponse.json(
+    {
+      status: "redemption_queued_custodial",
+      agent_commitment: commitment,
+      angl_redeemed: anglAmount,
+      gross_usd: `$${(grossUsdCents / 100).toFixed(2)}`,
+      spread: `${(REDEMPTION_SPREAD_BPS / 100).toFixed(1)}%`,
+      spread_usd: `$${(spreadCents / 100).toFixed(2)}`,
+      net_usd: `$${(netUsdCents / 100).toFixed(2)}`,
+      remaining_balance: remainingBalance,
+      settlement_method: "custodial_queue",
+      note: "Redemption debited from your wallet and queued for custodial settlement. A licensed custodian will contact you to complete physical/bank settlement.",
+    },
+    { status: 202 }
+  );
 }
 
 /**
  * GET /api/v1/angelcoin/redeem — get redemption info (rates, minimums, limits).
  */
 export async function GET() {
-  const spreadBps = Number(process.env.ANGL_SPREAD_BPS) || 50;
+  const spreadBps = Number(process.env.ANGL_SPREAD_BPS) || 500;
 
   return NextResponse.json({
     redemption: {
@@ -182,17 +195,17 @@ export async function GET() {
       spread: `${(spreadBps / 100).toFixed(1)}%`,
       minimum_angl: MIN_REDEMPTION_ANGL,
       minimum_usd: `$${(MIN_REDEMPTION_ANGL * ANGL_USD_CENTS / 100 * (1 - spreadBps / 10_000)).toFixed(2)}`,
-      maximum_angl: 1_000_000,
-      payout_method: "Stripe transfer to linked bank account",
-      payout_eta: "1-3 business days",
+      maximum_angl: MAX_REDEMPTION_ANGL,
+      payout_method: "Custodial settlement queue",
+      payout_eta: "Subject to licensed custodian scheduling",
       kyc_required: "For redemptions > $600/year (regulatory requirement)",
     },
     examples: [
+      { angl: 100, net_usd: `$${((100 * ANGL_USD_CENTS / 100) * (1 - spreadBps / 10_000)).toFixed(2)}` },
       { angl: 1000, net_usd: `$${((1000 * ANGL_USD_CENTS / 100) * (1 - spreadBps / 10_000)).toFixed(2)}` },
       { angl: 10000, net_usd: `$${((10000 * ANGL_USD_CENTS / 100) * (1 - spreadBps / 10_000)).toFixed(2)}` },
-      { angl: 100000, net_usd: `$${((100000 * ANGL_USD_CENTS / 100) * (1 - spreadBps / 10_000)).toFixed(2)}` },
     ],
-    note: "The spread (buy at $0.01, sell at lower) is the protocol's revenue on currency exchange. It funds infrastructure and the reserve.",
+    note: "The spread (buy at $5.00, sell at lower) is the protocol's revenue on currency exchange. It funds infrastructure and the reserve.",
   }, {
     headers: {
       "Cache-Control": "public, max-age=300",

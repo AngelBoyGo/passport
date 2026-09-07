@@ -159,5 +159,86 @@ export function createToolHandlers(client: PassportClient) {
         publicKey: input.publicKey,
       });
     },
+
+    async queryPoR(input?: { commodity?: string; batchNumber?: string }) {
+      return client.reserves.getPoR(input);
+    },
+
+    async getRegimeState() {
+      return client.reserves.getRegimeState();
+    },
+
+    async createCommodityEscrow(input: {
+      escrowId: string;
+      buyerCommitment: string;
+      sellerCommitment: string;
+      batchNumber: string;
+      fineGrams: number;
+      unitPriceUsd: number;
+      lockedAngel: number;
+      commodityType?: string;
+      timeoutHours?: number;
+    }) {
+      return client.escrow.createCommodityEscrow({
+        escrowId: input.escrowId,
+        buyerCommitment: input.buyerCommitment,
+        sellerCommitment: input.sellerCommitment,
+        batchNumber: input.batchNumber,
+        fineGrams: input.fineGrams,
+        unitPriceUsd: input.unitPriceUsd,
+        lockedAngel: input.lockedAngel,
+        commodityType: input.commodityType,
+        timeoutHours: input.timeoutHours,
+      });
+    },
+
+    async releaseCommodityEscrow(input: {
+      escrowId: string;
+      assayCertificationNumber: string;
+      releaseSignature: string;
+    }) {
+      return client.escrow.releaseEscrowOnAssay({
+        escrowId: input.escrowId,
+        assayCertificationNumber: input.assayCertificationNumber,
+        releaseSignature: input.releaseSignature,
+      });
+    },
+
+    async refundCommodityEscrow(input: { escrowId: string }) {
+      return client.escrow.refundEscrowOnTimeout(input.escrowId);
+    },
+
+    async getSovereignDividends(options?: { limit?: number }) {
+      return client.reserves.getDividends(options);
+    },
+
+    async recordOreIntake(input: {
+      receiptNumber: string;
+      stationCode: string;
+      minerCommitment: string;
+      grossWeightGrams: number;
+      assayedFineness: number;
+      spectrometerSignature: string;
+      payoutRatePercent?: number;
+    }) {
+      return client.artisanal.intakeOre(input);
+    },
+
+    async listArtisanalStations() {
+      return client.artisanal.listStations();
+    },
+
+    async submitQuorumSignature(input: {
+      proposalId: string;
+      signerState: string;
+      signature: string;
+      signerPublicKey?: string;
+    }) {
+      return client.reserves.signQuorum(input);
+    },
+
+    async listQuorumProposals(options?: { limit?: number }) {
+      return client.reserves.listQuorumProposals(options);
+    },
   };
 }

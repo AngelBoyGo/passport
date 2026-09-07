@@ -76,6 +76,12 @@ export async function POST(request: NextRequest) {
   const stripe = getStripe();
 
   if (!stripe) {
+    if (process.env.NODE_ENV === "production") {
+      return NextResponse.json(
+        { error: "Payment processor is temporarily unavailable" },
+        { status: 503 }
+      );
+    }
     return NextResponse.json({
       mock: true,
       bundle_id: bundle.bundle_id,

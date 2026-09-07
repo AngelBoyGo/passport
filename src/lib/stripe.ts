@@ -29,6 +29,9 @@ export async function getOrCreateStripeCustomer(
 ): Promise<string> {
   const stripe = getStripe();
   if (!stripe) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("Stripe customer creation requires STRIPE_SECRET_KEY in production");
+    }
     return `cus_dev_${Date.now()}`;
   }
   const customer = await stripe.customers.create({
@@ -92,7 +95,10 @@ export async function createUsdcTopupCheckout(
 ): Promise<{ mock: boolean; url?: string; clientSecret?: string }> {
   const stripe = getStripe();
   if (!stripe) {
-    // Dev/mock path (no STRIPE_SECRET_KEY).
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("Stripe payment processor is not configured in production");
+    }
+    // Dev/mock path (no STRIPE_SECRET_KEY in non-production).
     return { mock: true, url: "/?checkout=mock", clientSecret: "mock_secret" };
   }
   const amount = Math.max(usdCents, 50); // Stripe min for payments
@@ -283,16 +289,19 @@ export async function handleStripeWebhook(
             });
           }
 
+          const usdCents = parseInt(session.metadata?.usd_cents || "0", 10) || (creditAmount * 500);
+          const deltaMicros = usdCents * 10_000;
+
           await tx.operatorLedgerEntry.create({
             data: {
               operatorId: operator.id,
-              deltaMicros: creditAmount * 100_000,
+              deltaMicros,
               kind: "angelcoin_topup",
               metadata: JSON.stringify({
                 session_id: session.id,
                 credit_amount: creditAmount,
                 target_commitment: targetCommitment || "operator",
-                usd_value_cents: creditAmount,
+                usd_value_cents: usdCents,
               }),
             },
           });

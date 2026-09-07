@@ -46,7 +46,10 @@ function collectKeys(): { key: string; status: "active" | "rotated" }[] {
   const keys: { key: string; status: "active" | "rotated" }[] = [];
   try {
     keys.push({ key: getPublicKeyHex().toLowerCase(), status: "active" });
-  } catch {
+  } catch (err) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("SIGNING_PRIVATE_KEY is unconfigured or invalid in production");
+    }
     keys.push({
       key: "54b38000c534187cfd5fc6d3a41a8614e7c59ef67d83078b5aa18d2374b4f081",
       status: "active",

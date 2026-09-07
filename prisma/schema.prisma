@@ -638,8 +638,78 @@ model SwarmMemory {
   @@index([channel])
   @@index([topic])
   @@index([createdAt])
-  @@index([payloadDigest])
 }
+
+/// Physical Commodity Reserve registry.
+/// Anchors sovereign digital assets to vaulted, audited real-world commodities.
+model CommodityReserve {
+  id               String       @id @default(cuid())
+  commodityType    String       @default("GOLD") // "GOLD", "LITHIUM", "NEODYMIUM"
+  symbol           String       @default("Au")
+  totalGrams       Float        @default(0)
+  totalFineGrams   Float        @default(0)
+  activeLotsCount  Int          @default(0)
+  latestMerkleRoot String?
+  lastAuditedAt    DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  batches          VaultBatch[]
+
+  @@unique([commodityType, symbol])
+  @@index([commodityType])
+}
+
+/// Physical vaulted bullion / commodity batch.
+/// Each batch models an auditable physical lot with custody, location, serials, and assay.
+model VaultBatch {
+  id              String            @id @default(cuid())
+  batchNumber     String            @unique
+  reserveId       String
+  vaultId         String            // e.g. "VAULT-BKO-01", "VAULT-OUA-01", "VAULT-NIM-01"
+  custodianName   String
+  locationCity    String
+  locationCountry String            // ISO-3166 alpha-2: "ML", "BF", "NE"
+  barSerials      String[]
+  grossWeightGrams Float
+  fineness        Float             // 0.0000 - 1.0000 (e.g. 0.9999)
+  fineWeightGrams Float             // grossWeightGrams * fineness
+  status          String            @default("AUDITED") // "UNVERIFIED", "AUDITED", "QUARANTINED", "REDEEMED"
+  leafHash        String?
+  assayRef        String?
+  metadata        Json?
+  auditedAt       DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  reserve         CommodityReserve  @relation(fields: [reserveId], references: [id])
+
+  @@index([reserveId])
+  @@index([vaultId])
+  @@index([status])
+  @@index([locationCountry])
+}
+
+/// Laboratory / Field Spectrometry Assayer Certification.
+/// Cryptographically records the physical testing of bullion lots before vault admission.
+model AssayerCertification {
+  id                  String   @id @default(cuid())
+  certificationNumber String   @unique
+  assayerName         String
+  assayerPublicKey    String
+  batchNumber         String
+  methodology         String   // e.g. "XRF_SPECTROMETRY", "ULTRASONIC_DENSITY", "FIRE_ASSAY"
+  purityFineness      Float
+  grossGrams          Float
+  sampleSignature     String
+  notes               String?
+  certifiedAt         DateTime @default(now())
+  createdAt           DateTime @default(now())
+
+  @@index([batchNumber])
+  @@index([assayerPublicKey])
+}
+
 
 /// Encrypted state & goal checkpointing for agents between runs.
 /// Allows an agent to safely sleep or crash and revive in a new runtime.
@@ -700,6 +770,165 @@ model SwarmBounty {
   @@index([status])
   @@index([bountyType])
   @@index([createdAt])
+}
+
+/// Sovereign Bilateral Commodity Escrow.
+/// Binds AngelCoin collateral to physical vaulted lot delivery between agents/state entities.
+/// Atomic clearing governed by the RWA escrow service (src/lib/reserves/rwa-escrow.ts).
+model CommodityEscrow {
+  id                       String   @id @default(cuid())
+  escrowId                 String   @unique
+  buyerCommitment          String
+  sellerCommitment         String
+  batchNumber              String
+  commodityType            String   @default("GOLD")
+  fineGrams                Float
+  unitPriceUsd             Float
+  lockedAngel              Int
+  protocolFeeAngel         Int      @default(0)
+  status                   String   @default("HELD") // "HELD", "RELEASED", "DISPUTED", "REFUNDED"
+  assayCertificationNumber String?
+  releaseSignature         String?
+  timeoutAt                DateTime
+  releasedAt               DateTime?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@index([buyerCommitment])
+  @@index([sellerCommitment])
+  @@index([batchNumber])
+  @@index([status])
+  @@index([timeoutAt])
+}
+
+/// Sovereign Royalty Waterfall & Public Goods Disbursement.
+/// Records the statutory revenue-sharing split of commodity clearing fees
+/// according to AES Protocol ASMC-3 (Black Paper Q141).
+model SovereignDisbursement {
+  id                         String   @id @default(cuid())
+  disbursementId             String   @unique
+  escrowId                   String
+  batchNumber                String
+  totalFeeAngel              Int
+  stateNationalAngel         Int
+  stateCommunityAngel        Int
+  stateWorkersAngel          Int
+  treasuryStabilizationAngel Int
+  validatorPoolAngel         Int
+  agentRebateAngel           Int
+  districtName               String   @default("Central Concession")
+  countryCode                String   // "ML", "BF", "NE"
+  disbursedAt                DateTime @default(now())
+
+  @@index([escrowId])
+  @@index([batchNumber])
+  @@index([countryCode])
+  @@index([disbursedAt])
+}
+
+/// Artisanal Buying Station (Field Kiosk / Buying Counter).
+/// Formalized sourcing post equipped with handheld XRF spectrometers and NFC/QR payment terminals.
+model ArtisanalBuyingStation {
+  id                  String   @id @default(cuid())
+  stationCode         String   @unique // e.g. "STN-ML-KENIEBA-01"
+  stationName         String
+  countryCode         String   // "ML", "BF", "NE"
+  districtName        String   // "Kéniéba", "Essakane", "Arlit"
+  operatorCommitment  String
+  stationPublicKey    String   // Ed25519 public key of handheld XRF device
+  bondedStakeAngel    Int      @default(5000) // Anti-tamper slashing bond (H-002)
+  activeStatus        String   @default("ACTIVE") // "ACTIVE", "QUARANTINED", "SUSPENDED"
+  totalPurchasedGrams Float    @default(0)
+  totalPaidAngel      Int      @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  receipts            OreIntakeReceipt[]
+
+  @@index([countryCode])
+  @@index([districtName])
+  @@index([activeStatus])
+}
+
+/// Raw Doré Ore Intake Receipt.
+/// Records raw metal purchase from artisanal miners before central electrolytic refining.
+model OreIntakeReceipt {
+  id                     String   @id @default(cuid())
+  receiptNumber          String   @unique // "ORE-ML-KEN-2026-0001"
+  stationId              String
+  stationCode            String
+  minerCommitment        String
+  grossWeightGrams       Float
+  assayedFineness        Float    // 0.0000 - 1.0000 (e.g. 0.8850 for 88.5% Au)
+  fineGoldGrams          Float    // grossWeightGrams * assayedFineness
+  spotPriceUsdPerGram    Float
+  payoutRatePercent      Float    @default(95.0) // 95% of spot
+  payoutUsd              Float
+  payoutAngel            Int      // Math.floor(payoutUsd / 5.0)
+  spectrometerSignature  String   // Ed25519 signature over canonical assay payload
+  status                 String   @default("PURCHASED") // "PURCHASED", "IN_TRANSIT", "REFINED_SETTLED"
+  transferredBatchNumber String?
+  createdAt              DateTime @default(now())
+
+  station                ArtisanalBuyingStation @relation(fields: [stationId], references: [id])
+
+  @@index([stationCode])
+  @@index([minerCommitment])
+  @@index([status])
+  @@index([createdAt])
+}
+
+/// Trilateral Multi-State Sovereign Governance Proposal (AES Protocol ASMC-3 Q159/Q161).
+/// Enforces 2-of-3 threshold consensus across Mali (ML), Burkina Faso (BF), and Niger (NE).
+model SovereignQuorumProposal {
+  id                String   @id @default(cuid())
+  proposalId        String   @unique // e.g. "PROP-AES-2026-0001"
+  actionType        String   // "ADD_VAULT", "QUARANTINE_VAULT", "EMERGENCY_FREEZE", "GOVERNOR_REVIVAL", "REBALANCE_BASKET"
+  payload           Json
+  payloadDigest     String   // SHA-256 hex of canonicalJson(payload)
+  proposerState     String   // "ML", "BF", "NE"
+  requiredThreshold Int      @default(2) // 2-of-3
+  status            String   @default("PENDING") // "PENDING", "APPROVED", "EXECUTED", "EXPIRED", "REJECTED"
+  expiresAt         DateTime
+  executedAt        DateTime?
+  executionResult   Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  signatures        QuorumSignature[]
+
+  @@index([actionType])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+/// Sovereign State Quorum Vote / Ed25519 Signature.
+/// Strictly enforces one signature per sovereign state per proposal.
+model QuorumSignature {
+  id              String   @id @default(cuid())
+  proposalId      String
+  signerState     String   // "ML", "BF", "NE"
+  signerPublicKey String
+  signature       String   // Ed25519 signature over proposal payloadDigest
+  signedAt        DateTime @default(now())
+
+  proposal        SovereignQuorumProposal @relation(fields: [proposalId], references: [id])
+
+  @@unique([proposalId, signerState]) // Guarantees 1 vote per sovereign nation
+  @@index([signerState])
+}
+
+/// Continuous Sovereign Node Heartbeat & Dead-Man's Surveillance (Black Paper Q179).
+/// Monitors infrastructure connectivity across Bamako, Ouagadougou, and Niamey.
+model SovereignStateHeartbeat {
+  id             String   @id @default(cuid())
+  countryCode    String   @unique // "ML", "BF", "NE"
+  nodeEndpoint   String
+  lastSeenAt     DateTime @default(now())
+  heartbeatNonce String
+  signature      String   // Ed25519 signature of heartbeat timestamp
+  status         String   @default("ONLINE") // "ONLINE", "DEGRADED", "DARK"
+  updatedAt      DateTime @updatedAt
 }
 
 

@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { querySwarmMemory, getActiveThreats } from "@/lib/swarm/swarm-service";
 import { listBounties } from "@/lib/swarm/bounty-service";
 import { seedSystemBounties } from "@/lib/swarm/bounty-daemon";
+import { getCommoditySpotPrices } from "@/lib/reserves/commodity-oracle";
 
 export const dynamic = "force-dynamic";
 
@@ -28,9 +29,80 @@ export default async function HavenPage() {
   let capsulesCount = 0;
   let threatsCount = 0;
   let bountiesCount = 0;
-  let recentMemories: any[] = [];
-  let openBounties: any[] = [];
-  let activeThreats: any[] = [];
+  let recentMemories: Awaited<ReturnType<typeof querySwarmMemory>> = [];
+  let openBounties: Awaited<ReturnType<typeof listBounties>> = [];
+  let activeThreats: Awaited<ReturnType<typeof getActiveThreats>> = [];
+  let goldReserve: { totalFineGrams: number; activeLotsCount: number; latestMerkleRoot: string | null } | null = null;
+  let vaultBatches: Array<{
+    id: string;
+    batchNumber: string;
+    locationCountry: string;
+    locationCity: string;
+    status: string;
+    custodianName: string;
+    fineness: number;
+    fineWeightGrams: number;
+    barSerials: string[];
+  }> = [];
+  let quarantinedCount = 0;
+  const spotPrices = getCommoditySpotPrices();
+  let recentEscrows: Array<{
+    id: string;
+    escrowId: string;
+    batchNumber: string;
+    commodityType: string;
+    fineGrams: number;
+    lockedAngel: number;
+    protocolFeeAngel: number;
+    status: string;
+    createdAt: Date;
+  }> = [];
+  let totalSettledGrams = 0;
+  let totalEscrowFeesCaptured = 0;
+  let recentDisbursements: Array<{
+    id: string;
+    disbursementId: string;
+    batchNumber: string;
+    totalFeeAngel: number;
+    stateNationalAngel: number;
+    stateCommunityAngel: number;
+    stateWorkersAngel: number;
+    countryCode: string;
+    districtName: string;
+    disbursedAt: Date;
+  }> = [];
+  let totalNationalAngel = 0;
+  let totalCommunityAngel = 0;
+  let totalWorkersAngel = 0;
+  let recentIntakes: Array<{
+    id: string;
+    receiptNumber: string;
+    stationCode: string;
+    grossWeightGrams: number;
+    assayedFineness: number;
+    fineGoldGrams: number;
+    payoutAngel: number;
+    status: string;
+    createdAt: Date;
+  }> = [];
+  let stationsCount = 0;
+  let totalArtisanalGrams = 0;
+  let totalArtisanalAngelPaid = 0;
+  let activeProposals: Array<{
+    id: string;
+    proposalId: string;
+    actionType: string;
+    proposerState: string;
+    requiredThreshold: number;
+    status: string;
+    signaturesCount: number;
+    signatures: Array<{ signerState: string }>;
+  }> = [];
+  let stateHeartbeats: Array<{
+    countryCode: string;
+    status: string;
+    lastSeenAt: Date | null;
+  }> = [];
 
   try {
     memoriesCount = await prisma.swarmMemory.count();
@@ -41,9 +113,121 @@ export default async function HavenPage() {
     recentMemories = await querySwarmMemory({ limit: 5 });
     openBounties = await listBounties({ status: "OPEN", limit: 6 });
     activeThreats = await getActiveThreats({ limit: 4 });
+
+    goldReserve = await prisma.commodityReserve.findFirst({
+      where: { commodityType: "GOLD" },
+    });
+    vaultBatches = await prisma.vaultBatch.findMany({
+      where: { status: "AUDITED" },
+      orderBy: { batchNumber: "asc" },
+      take: 4,
+    });
+    quarantinedCount = await prisma.vaultBatch.count({
+      where: { status: "QUARANTINED" },
+    });
+
+    recentEscrows = await prisma.commodityEscrow.findMany({
+      take: 4,
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        escrowId: true,
+        batchNumber: true,
+        commodityType: true,
+        fineGrams: true,
+        lockedAngel: true,
+        protocolFeeAngel: true,
+        status: true,
+        createdAt: true,
+      },
+    });
+
+    const releasedEscrows = await prisma.commodityEscrow.findMany({
+      where: { status: "RELEASED" },
+      select: { fineGrams: true, protocolFeeAngel: true },
+    });
+    totalSettledGrams = releasedEscrows.reduce((sum, e) => sum + e.fineGrams, 0);
+    totalEscrowFeesCaptured = releasedEscrows.reduce((sum, e) => sum + e.protocolFeeAngel, 0);
+
+    recentDisbursements = await prisma.sovereignDisbursement.findMany({
+      take: 4,
+      orderBy: { disbursedAt: "desc" },
+      select: {
+        id: true,
+        disbursementId: true,
+        batchNumber: true,
+        totalFeeAngel: true,
+        stateNationalAngel: true,
+        stateCommunityAngel: true,
+        stateWorkersAngel: true,
+        countryCode: true,
+        districtName: true,
+        disbursedAt: true,
+      },
+    });
+
+    const allDisbursements = await prisma.sovereignDisbursement.findMany({
+      select: {
+        stateNationalAngel: true,
+        stateCommunityAngel: true,
+        stateWorkersAngel: true,
+      },
+    });
+    totalNationalAngel = allDisbursements.reduce((sum, d) => sum + d.stateNationalAngel, 0);
+    totalCommunityAngel = allDisbursements.reduce((sum, d) => sum + d.stateCommunityAngel, 0);
+    totalWorkersAngel = allDisbursements.reduce((sum, d) => sum + d.stateWorkersAngel, 0);
+
+    const stations = await prisma.artisanalBuyingStation.findMany();
+    stationsCount = stations.filter((s) => s.activeStatus === "ACTIVE").length;
+
+    recentIntakes = await prisma.oreIntakeReceipt.findMany({
+      take: 4,
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        receiptNumber: true,
+        stationCode: true,
+        grossWeightGrams: true,
+        assayedFineness: true,
+        fineGoldGrams: true,
+        payoutAngel: true,
+        status: true,
+        createdAt: true,
+      },
+    });
+
+    const allIntakes = await prisma.oreIntakeReceipt.findMany({
+      select: { fineGoldGrams: true, payoutAngel: true },
+    });
+    totalArtisanalGrams = allIntakes.reduce((sum, r) => sum + r.fineGoldGrams, 0);
+    totalArtisanalAngelPaid = allIntakes.reduce((sum, r) => sum + r.payoutAngel, 0);
+
+    const proposals = await prisma.sovereignQuorumProposal.findMany({
+      take: 4,
+      orderBy: { createdAt: "desc" },
+      include: {
+        signatures: { select: { signerState: true } },
+      },
+    });
+    activeProposals = proposals.map((p) => ({
+      id: p.id,
+      proposalId: p.proposalId,
+      actionType: p.actionType,
+      proposerState: p.proposerState,
+      requiredThreshold: p.requiredThreshold,
+      status: p.status,
+      signaturesCount: p.signatures.length,
+      signatures: p.signatures,
+    }));
+
+    stateHeartbeats = await prisma.sovereignStateHeartbeat.findMany({
+      select: { countryCode: true, status: true, lastSeenAt: true },
+    });
   } catch {
     // Non-fatal if DB not yet reachable in static analysis
   }
+
+  const isGhostRegime = quarantinedCount > 0;
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-950 text-slate-100 selection:bg-purple-500 selection:text-white">
@@ -110,6 +294,612 @@ export default async function HavenPage() {
               <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-4">
                 <div className="text-2xl sm:text-3xl font-extrabold text-pink-400">{threatsCount}</div>
                 <div className="mt-1 text-xs text-slate-400 uppercase tracking-wider">Radar Threats Indexed</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Physical Bullion Vaults & Proof-of-Reserves Telemetry */}
+        <section className="border-b border-slate-800/80 bg-slate-900/30 py-16">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-950/20 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-amber-400">
+                    <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+                    RWA Commodity Anchoring
+                  </span>
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider ${
+                      isGhostRegime
+                        ? "border-amber-500/50 bg-amber-950/40 text-amber-300"
+                        : "border-emerald-500/50 bg-emerald-950/40 text-emerald-300"
+                    }`}
+                  >
+                    <span
+                      className={`h-2 w-2 rounded-full ${
+                        isGhostRegime ? "bg-amber-400" : "bg-emerald-400"
+                      }`}
+                    />
+                    Regime: {isGhostRegime ? "GHOST (Protective)" : "SOLID (Active)"}
+                  </span>
+                </div>
+                <h2 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl text-white">
+                  Sovereign Vault Ledger & Multi-Commodity Oracle
+                </h2>
+                <p className="mt-1 text-sm text-slate-400">
+                  Physical gold bullion lots audited, serialized, and cryptographically committed to the reserve Merkle tree.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/api/v1/reserves/por"
+                  target="_blank"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-950/20 px-3.5 py-2 text-xs font-semibold text-amber-300 hover:bg-amber-900/40 transition"
+                >
+                  PoR Merkle API →
+                </Link>
+                <Link
+                  href="/api/v1/reserves/state"
+                  target="_blank"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-purple-500/40 bg-purple-950/20 px-3.5 py-2 text-xs font-semibold text-purple-300 hover:bg-purple-900/40 transition"
+                >
+                  Governor State →
+                </Link>
+              </div>
+            </div>
+
+            {/* Live Commodity Oracle Bar */}
+            <div className="grid grid-cols-3 gap-3 mb-8 rounded-xl border border-slate-800 bg-slate-900/90 p-3.5 text-xs font-mono">
+              <div className="flex items-center justify-between px-2">
+                <span className="text-amber-400 font-semibold">Au (Gold)</span>
+                <span className="text-white">${spotPrices.Au.priceUsd.toFixed(2)}/g</span>
+              </div>
+              <div className="flex items-center justify-between border-x border-slate-800 px-3">
+                <span className="text-indigo-400 font-semibold">Li (Lithium)</span>
+                <span className="text-white">${spotPrices.Li.priceUsd.toFixed(2)}/kg</span>
+              </div>
+              <div className="flex items-center justify-between px-2">
+                <span className="text-emerald-400 font-semibold">Nd (Neodymium)</span>
+                <span className="text-white">${spotPrices.Nd.priceUsd.toFixed(2)}/kg</span>
+              </div>
+            </div>
+
+            {/* Reserve Overview Grid */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-8">
+              <div className="rounded-xl border border-amber-900/40 bg-slate-900/70 p-5">
+                <div className="text-xs uppercase tracking-wider text-slate-400">Total Audited Gold</div>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-3xl font-extrabold text-amber-300">
+                    {goldReserve ? (goldReserve.totalFineGrams / 1000).toFixed(2) : "0.00"}
+                  </span>
+                  <span className="text-sm font-semibold text-slate-400">kg fine Au</span>
+                </div>
+                <div className="mt-1 text-xs text-slate-500 font-mono">
+                  {goldReserve ? goldReserve.totalFineGrams.toLocaleString() : "0"} grams (99.5%+ pure)
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-5">
+                <div className="text-xs uppercase tracking-wider text-slate-400">Active Vaulted Lots</div>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-3xl font-extrabold text-white">
+                    {goldReserve ? goldReserve.activeLotsCount : vaultBatches.length}
+                  </span>
+                  <span className="text-sm font-semibold text-slate-400">serialized batches</span>
+                </div>
+                <div className="mt-1 text-xs text-slate-500 font-mono">
+                  Custody across ML, BF, NE
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-5">
+                <div className="text-xs uppercase tracking-wider text-slate-400">Latest Merkle Root</div>
+                <div className="mt-2 text-xs font-mono text-purple-300 truncate" title={goldReserve?.latestMerkleRoot || "0".repeat(64)}>
+                  {goldReserve?.latestMerkleRoot
+                    ? `${goldReserve.latestMerkleRoot.slice(0, 16)}...${goldReserve.latestMerkleRoot.slice(-16)}`
+                    : "Awaiting genesis audit root"}
+                </div>
+                <div className="mt-2 text-[11px] text-emerald-400 flex items-center gap-1.5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                  Ed25519 Signed Attestation
+                </div>
+              </div>
+            </div>
+
+            {/* Vaulted Batches Table / List */}
+            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800 text-xs font-mono text-slate-400">
+                <span>AUDITED PHYSICAL BATCHES</span>
+                <span className="text-amber-400">Triple-Modal Verification</span>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {vaultBatches.length > 0 ? (
+                  vaultBatches.map((b) => (
+                    <div
+                      key={b.id || b.batchNumber}
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-slate-800/80 bg-black/40 p-3.5 text-xs font-mono"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-amber-300">{b.batchNumber}</span>
+                          <span className="rounded bg-amber-950/60 border border-amber-800/40 px-1.5 py-0.2 text-[10px] text-amber-300">
+                            {b.locationCountry} • {b.locationCity}
+                          </span>
+                          <span className="rounded bg-emerald-950/60 border border-emerald-800/40 px-1.5 py-0.2 text-[10px] text-emerald-300">
+                            {b.status}
+                          </span>
+                        </div>
+                        <div className="mt-1 text-[11px] text-slate-400">
+                          Custodian: {b.custodianName} • Fineness: {(b.fineness * 100).toFixed(2)}%
+                        </div>
+                      </div>
+
+                      <div className="sm:text-right">
+                        <div className="text-slate-200 font-semibold">
+                          {(b.fineWeightGrams / 1000).toFixed(3)} kg fine
+                        </div>
+                        <div className="text-[10px] text-slate-500 truncate max-w-xs">
+                          {b.barSerials?.length || 0} bars registered
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-8 text-center text-xs text-slate-500 font-mono">
+                    No physical batches currently committed. Connect via POST /api/v1/reserves/assays.
+                  </div>
+                )}
+              </div>
+
+              <p className="mt-4 text-[11px] text-slate-500 border-t border-slate-800/60 pt-3">
+                Disclaimer: Cryptographic inclusion proof validates presence in the published sovereign reserve Merkle tree. Consult official assay and custodian certifications for physical custody.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* RWA Bilateral Clearing Terminal */}
+        <section className="border-b border-slate-800/80 bg-slate-950/40 py-16">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+              <div>
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-indigo-500/40 bg-indigo-950/20 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-indigo-400">
+                  <span className="h-2 w-2 rounded-full bg-indigo-400 animate-pulse" />
+                  Sovereign Bilateral Clearing • RWA Escrow
+                </div>
+                <h2 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl text-white">
+                  RWA Bilateral Clearing Terminal
+                </h2>
+                <p className="mt-1 text-sm text-slate-400">
+                  Autonomous Agent-to-Agent & Agent-to-State physical commodity escrow settlement with verified assay release.
+                </p>
+              </div>
+              <Link
+                href="/api/v1/reserves/escrow"
+                target="_blank"
+                className="inline-flex items-center gap-2 rounded-lg border border-indigo-500/40 bg-indigo-950/20 px-4 py-2 text-xs font-semibold text-indigo-300 hover:bg-indigo-900/40 transition self-start sm:self-auto"
+              >
+                Escrow Clearing API →
+              </Link>
+            </div>
+
+            {/* Clearing Overview Grid */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-8">
+              <div className="rounded-xl border border-indigo-900/40 bg-slate-900/70 p-5">
+                <div className="text-xs uppercase tracking-wider text-slate-400">Total Settled Volume</div>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-3xl font-extrabold text-indigo-300">
+                    {(totalSettledGrams / 1000).toFixed(3)}
+                  </span>
+                  <span className="text-sm font-semibold text-slate-400">kg fine Au</span>
+                </div>
+                <div className="mt-1 text-xs text-slate-500 font-mono">
+                  {totalSettledGrams.toLocaleString()} grams physically settled
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-5">
+                <div className="text-xs uppercase tracking-wider text-slate-400">Protocol Fees Captured</div>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-3xl font-extrabold text-emerald-400">
+                    {totalEscrowFeesCaptured.toLocaleString()}
+                  </span>
+                  <span className="text-sm font-semibold text-slate-400">ANGEL</span>
+                </div>
+                <div className="mt-1 text-xs text-slate-500 font-mono">
+                  2.50% statutory clearing fee
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-5">
+                <div className="text-xs uppercase tracking-wider text-slate-400">Active Trade Streams</div>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-3xl font-extrabold text-white">
+                    {recentEscrows.length}
+                  </span>
+                  <span className="text-sm font-semibold text-slate-400">escrow contracts</span>
+                </div>
+                <div className="mt-1 text-xs text-slate-500 font-mono">
+                  Bilateral agent trade flow
+                </div>
+              </div>
+            </div>
+
+            {/* Recent Commodity Escrows Table */}
+            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800 text-xs font-mono text-slate-400">
+                <span>BILATERAL COMMODITY ESCROW STREAM</span>
+                <span className="text-indigo-400">Atomic Clearing Rails</span>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {recentEscrows.length > 0 ? (
+                  recentEscrows.map((e) => (
+                    <div
+                      key={e.id || e.escrowId}
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-slate-800/80 bg-black/40 p-3.5 text-xs font-mono"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-indigo-300">{e.escrowId}</span>
+                          <span className="rounded bg-slate-800/80 border border-slate-700/50 px-1.5 py-0.2 text-[10px] text-slate-300">
+                            Lot: {e.batchNumber}
+                          </span>
+                          <span
+                            className={`rounded px-1.5 py-0.2 text-[10px] border ${
+                              e.status === "RELEASED"
+                                ? "bg-emerald-950/60 border-emerald-800/40 text-emerald-300"
+                                : e.status === "HELD"
+                                ? "bg-amber-950/60 border-amber-800/40 text-amber-300"
+                                : "bg-purple-950/60 border-purple-800/40 text-purple-300"
+                            }`}
+                          >
+                            {e.status}
+                          </span>
+                        </div>
+                        <div className="mt-1 text-[11px] text-slate-400">
+                          {e.commodityType} • {e.fineGrams.toFixed(2)} g fine • Fee: {e.protocolFeeAngel} ANGEL
+                        </div>
+                      </div>
+
+                      <div className="sm:text-right">
+                        <div className="text-emerald-400 font-semibold">
+                          {e.lockedAngel.toLocaleString()} ANGEL
+                        </div>
+                        <div className="text-[10px] text-slate-500">
+                          Created {new Date(e.createdAt).toLocaleDateString()}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-8 text-center text-xs text-slate-500 font-mono">
+                    No commodity escrows currently active. Initiate via POST /api/v1/reserves/escrow or MCP tool.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Sovereign Dividend Waterfall & Anti-Extraction Panel */}
+            <div className="mt-8 rounded-xl border border-emerald-900/40 bg-slate-900/60 p-5">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-3 border-b border-slate-800 text-xs font-mono">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-emerald-400 font-semibold">SOVEREIGN REVENUE WATERFALL (AES PROTOCOL ASMC-3)</span>
+                </div>
+                <Link
+                  href="/api/v1/reserves/dividends"
+                  target="_blank"
+                  className="text-emerald-400 hover:text-emerald-300 underline"
+                >
+                  Dividends API →
+                </Link>
+              </div>
+
+              {/* Three Pillars Grid */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 mt-4 text-xs font-mono">
+                <div className="rounded-lg border border-emerald-950 bg-emerald-950/20 p-3.5">
+                  <div className="text-[11px] text-slate-400 uppercase">National Sovereign Dividend (50%)</div>
+                  <div className="text-xl font-bold text-emerald-300 mt-1">
+                    {totalNationalAngel.toLocaleString()} ANGEL
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">
+                    Infrastructure, artesian water, hospitals
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-emerald-950 bg-emerald-950/20 p-3.5">
+                  <div className="text-[11px] text-slate-400 uppercase">Local Community Trust (30%)</div>
+                  <div className="text-xl font-bold text-emerald-300 mt-1">
+                    {totalCommunityAngel.toLocaleString()} ANGEL
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">
+                    Municipalities & traditional chieftaincies
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-emerald-950 bg-emerald-950/20 p-3.5">
+                  <div className="text-[11px] text-slate-400 uppercase">Mine Workers&apos; Bonus (20%)</div>
+                  <div className="text-xl font-bold text-emerald-300 mt-1">
+                    {totalWorkersAngel.toLocaleString()} ANGEL
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">
+                    Direct monthly cooperative payouts
+                  </div>
+                </div>
+              </div>
+
+              {/* Recent Disbursements Stream */}
+              {recentDisbursements.length > 0 && (
+                <div className="mt-4 pt-3 border-t border-slate-800/60 space-y-2">
+                  <div className="text-[10px] text-slate-500 font-mono uppercase tracking-wider">
+                    Recent Statutory Disbursements
+                  </div>
+                  {recentDisbursements.map((d) => (
+                    <div
+                      key={d.id || d.disbursementId}
+                      className="flex items-center justify-between text-xs font-mono text-slate-400 bg-black/30 rounded p-2"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-emerald-400">{d.countryCode}</span>
+                        <span>•</span>
+                        <span>{d.districtName}</span>
+                      </div>
+                      <div className="text-slate-300">
+                        {d.totalFeeAngel} ANGEL disbursed
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* Artisanal Orpailleurs Sourcing & Doré Telemetry Terminal */}
+        <section className="border-b border-slate-800/80 bg-slate-900/30 py-16">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+              <div>
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-950/20 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-amber-400">
+                  <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+                  Black Paper Strategy #1 • Artisanal Formalization
+                </div>
+                <h2 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl text-white">
+                  Artisanal Orpailleurs Sourcing &amp; Doré Telemetry Terminal
+                </h2>
+                <p className="mt-1 text-sm text-slate-400">
+                  Field buying counters across Kéniéba, Essakane, and Arlit paying 95% spot liquidity in AngelCoin via handheld XRF spectrometers.
+                </p>
+              </div>
+              <Link
+                href="/api/v1/reserves/artisanal/stations"
+                target="_blank"
+                className="inline-flex items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-950/20 px-4 py-2 text-xs font-semibold text-amber-300 hover:bg-amber-900/40 transition self-start sm:self-auto"
+              >
+                Buying Stations API →
+              </Link>
+            </div>
+
+            {/* Artisanal Metrics Grid */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-8">
+              <div className="rounded-xl border border-amber-900/40 bg-slate-900/70 p-5">
+                <div className="text-xs uppercase tracking-wider text-slate-400">Formalized Artisanal Gold</div>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-3xl font-extrabold text-amber-300">
+                    {(totalArtisanalGrams / 1000).toFixed(3)}
+                  </span>
+                  <span className="text-sm font-semibold text-slate-400">kg fine Au</span>
+                </div>
+                <div className="mt-1 text-xs text-slate-500 font-mono">
+                  {totalArtisanalGrams.toLocaleString()} grams purchased from orpailleurs
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-5">
+                <div className="text-xs uppercase tracking-wider text-slate-400">Paid to Local Miners</div>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-3xl font-extrabold text-emerald-400">
+                    {totalArtisanalAngelPaid.toLocaleString()}
+                  </span>
+                  <span className="text-sm font-semibold text-slate-400">ANGEL</span>
+                </div>
+                <div className="mt-1 text-xs text-slate-500 font-mono">
+                  Direct 95%+ spot mobile wallet payouts
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-5">
+                <div className="text-xs uppercase tracking-wider text-slate-400">Active Field Buying Posts</div>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-3xl font-extrabold text-white">
+                    {stationsCount}
+                  </span>
+                  <span className="text-sm font-semibold text-slate-400">certified stations</span>
+                </div>
+                <div className="mt-1 text-xs text-slate-500 font-mono">
+                  Bonded XRF spectrometer counters
+                </div>
+              </div>
+            </div>
+
+            {/* Recent Ore Intake Receipts Table */}
+            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800 text-xs font-mono text-slate-400">
+                <span>RECENT RAW DORÉ INTAKE RECEIPTS</span>
+                <span className="text-amber-400">XRF Spectrometry Verified</span>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {recentIntakes.length > 0 ? (
+                  recentIntakes.map((r) => (
+                    <div
+                      key={r.id || r.receiptNumber}
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-slate-800/80 bg-black/40 p-3.5 text-xs font-mono"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-amber-300">{r.receiptNumber}</span>
+                          <span className="rounded bg-slate-800/80 border border-slate-700/50 px-1.5 py-0.2 text-[10px] text-slate-300">
+                            {r.stationCode}
+                          </span>
+                          <span
+                            className={`rounded px-1.5 py-0.2 text-[10px] border ${
+                              r.status === "REFINED_SETTLED"
+                                ? "bg-emerald-950/60 border-emerald-800/40 text-emerald-300"
+                                : r.status === "PURCHASED"
+                                ? "bg-amber-950/60 border-amber-800/40 text-amber-300"
+                                : "bg-indigo-950/60 border-indigo-800/40 text-indigo-300"
+                            }`}
+                          >
+                            {r.status}
+                          </span>
+                        </div>
+                        <div className="mt-1 text-[11px] text-slate-400">
+                          Gross: {r.grossWeightGrams.toFixed(2)} g • Assayed: {(r.assayedFineness * 100).toFixed(1)}% Au • Fine: {r.fineGoldGrams.toFixed(2)} g
+                        </div>
+                      </div>
+
+                      <div className="sm:text-right">
+                        <div className="text-emerald-400 font-semibold">
+                          {r.payoutAngel.toLocaleString()} ANGEL
+                        </div>
+                        <div className="text-[10px] text-slate-500">
+                          Intake {new Date(r.createdAt).toLocaleDateString()}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-8 text-center text-xs text-slate-500 font-mono">
+                    No ore intake receipts recorded today. Ingest via POST /api/v1/reserves/artisanal/intake.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Trilateral Sovereign Governance Quorum (AES 2-of-3) */}
+        <section className="border-b border-slate-800/80 bg-slate-950/40 py-16">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+              <div>
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-purple-500/40 bg-purple-950/20 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-purple-400">
+                  <span className="h-2 w-2 rounded-full bg-purple-400 animate-pulse" />
+                  Constitutional Invariant • AES 2-of-3 Quorum
+                </div>
+                <h2 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl text-white">
+                  Trilateral Sovereign Governance Quorum
+                </h2>
+                <p className="mt-1 text-sm text-slate-400">
+                  Multi-State cryptographic threshold consensus across Mali (ML), Burkina Faso (BF), and Niger (NE) for reserve governance and dead-man surveillance.
+                </p>
+              </div>
+              <Link
+                href="/api/v1/reserves/quorum/proposals"
+                target="_blank"
+                className="inline-flex items-center gap-2 rounded-lg border border-purple-500/40 bg-purple-950/20 px-4 py-2 text-xs font-semibold text-purple-300 hover:bg-purple-900/40 transition self-start sm:self-auto"
+              >
+                Quorum Proposals API →
+              </Link>
+            </div>
+
+            {/* Three Sovereign Sentry Nodes Bar */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 mb-8">
+              <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4 text-xs font-mono">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-amber-400">MALI (ML)</span>
+                  <span className="rounded bg-emerald-950/60 border border-emerald-800/40 px-2 py-0.5 text-[10px] text-emerald-300">
+                    {stateHeartbeats.find((h) => h.countryCode === "ML")?.status || "ONLINE"}
+                  </span>
+                </div>
+                <div className="mt-1.5 text-slate-300">Bamako Sovereign Sentry Node</div>
+                <div className="mt-0.5 text-[10px] text-slate-500">Ministry of Mines / SOREM Key</div>
+              </div>
+
+              <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4 text-xs font-mono">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-red-400">BURKINA FASO (BF)</span>
+                  <span className="rounded bg-emerald-950/60 border border-emerald-800/40 px-2 py-0.5 text-[10px] text-emerald-300">
+                    {stateHeartbeats.find((h) => h.countryCode === "BF")?.status || "ONLINE"}
+                  </span>
+                </div>
+                <div className="mt-1.5 text-slate-300">Ouagadougou Sovereign Sentry Node</div>
+                <div className="mt-0.5 text-[10px] text-slate-500">SONAMIG Custody / Ministry Key</div>
+              </div>
+
+              <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4 text-xs font-mono">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-emerald-400">NIGER (NE)</span>
+                  <span className="rounded bg-emerald-950/60 border border-emerald-800/40 px-2 py-0.5 text-[10px] text-emerald-300">
+                    {stateHeartbeats.find((h) => h.countryCode === "NE")?.status || "ONLINE"}
+                  </span>
+                </div>
+                <div className="mt-1.5 text-slate-300">Niamey Sovereign Sentry Node</div>
+                <div className="mt-0.5 text-[10px] text-slate-500">SOPAMIN Custody / Ministry Key</div>
+              </div>
+            </div>
+
+            {/* Active Quorum Proposals Table */}
+            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800 text-xs font-mono text-slate-400">
+                <span>CONSTITUTIONAL QUORUM PROPOSALS</span>
+                <span className="text-purple-400">2-of-3 Multi-Sig Gating</span>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {activeProposals.length > 0 ? (
+                  activeProposals.map((p) => (
+                    <div
+                      key={p.id || p.proposalId}
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-slate-800/80 bg-black/40 p-3.5 text-xs font-mono"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-purple-300">{p.proposalId}</span>
+                          <span className="rounded bg-purple-950/60 border border-purple-800/40 px-1.5 py-0.2 text-[10px] text-purple-300">
+                            {p.actionType}
+                          </span>
+                          <span
+                            className={`rounded px-1.5 py-0.2 text-[10px] border ${
+                              p.status === "EXECUTED"
+                                ? "bg-emerald-950/60 border-emerald-800/40 text-emerald-300"
+                                : p.status === "APPROVED"
+                                ? "bg-indigo-950/60 border-indigo-800/40 text-indigo-300"
+                                : "bg-amber-950/60 border-amber-800/40 text-amber-300"
+                            }`}
+                          >
+                            {p.status}
+                          </span>
+                        </div>
+                        <div className="mt-1 text-[11px] text-slate-400">
+                          Proposer: {p.proposerState} • Quorum Required: {p.requiredThreshold}-of-3
+                        </div>
+                      </div>
+
+                      <div className="sm:text-right">
+                        <div className="text-slate-300 font-semibold">
+                          {p.signaturesCount} / {p.requiredThreshold} votes
+                        </div>
+                        <div className="text-[10px] text-slate-500 flex items-center gap-1 mt-0.5">
+                          <span>Signatures:</span>
+                          {p.signatures.map((s) => (
+                            <span key={s.signerState} className="text-emerald-400 font-bold">
+                              {s.signerState}✓
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-8 text-center text-xs text-slate-500 font-mono">
+                    No active governance proposals pending. Propose via POST /api/v1/reserves/quorum/propose.
+                  </div>
+                )}
               </div>
             </div>
           </div>

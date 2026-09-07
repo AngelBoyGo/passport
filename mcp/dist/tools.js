@@ -81,5 +81,49 @@ export function createToolHandlers(client) {
                 publicKey: input.publicKey,
             });
         },
+        async queryPoR(input) {
+            return client.reserves.getPoR(input);
+        },
+        async getRegimeState() {
+            return client.reserves.getRegimeState();
+        },
+        async createCommodityEscrow(input) {
+            return client.escrow.createCommodityEscrow({
+                escrowId: input.escrowId,
+                buyerCommitment: input.buyerCommitment,
+                sellerCommitment: input.sellerCommitment,
+                batchNumber: input.batchNumber,
+                fineGrams: input.fineGrams,
+                unitPriceUsd: input.unitPriceUsd,
+                lockedAngel: input.lockedAngel,
+                commodityType: input.commodityType,
+                timeoutHours: input.timeoutHours,
+            });
+        },
+        async releaseCommodityEscrow(input) {
+            return client.escrow.releaseEscrowOnAssay({
+                escrowId: input.escrowId,
+                assayCertificationNumber: input.assayCertificationNumber,
+                releaseSignature: input.releaseSignature,
+            });
+        },
+        async refundCommodityEscrow(input) {
+            return client.escrow.refundEscrowOnTimeout(input.escrowId);
+        },
+        async getSovereignDividends(options) {
+            return client.reserves.getDividends(options);
+        },
+        async recordOreIntake(input) {
+            return client.artisanal.intakeOre(input);
+        },
+        async listArtisanalStations() {
+            return client.artisanal.listStations();
+        },
+        async submitQuorumSignature(input) {
+            return client.reserves.signQuorum(input);
+        },
+        async listQuorumProposals(options) {
+            return client.reserves.listQuorumProposals(options);
+        },
     };
 }

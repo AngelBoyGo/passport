@@ -151,6 +151,129 @@ export function createPassportMcpServer(client) {
             content: [{ type: "text", text: JSON.stringify(result) }],
         };
     });
+    server.tool("passport_query_por", "Query live physical commodity Proof-of-Reserves (PoR), Merkle root, and audited lot inclusion proofs", {
+        commodity: z.string().optional(),
+        batchNumber: z.string().optional(),
+    }, async (args) => {
+        const result = await handlers.queryPoR(args);
+        return {
+            content: [{ type: "text", text: JSON.stringify(result) }],
+        };
+    });
+    server.tool("passport_get_regime_state", "Query Dual-State Governor regime (SOLID vs GHOST), Bayesian stress metrics, dynamic damping fees, and multi-commodity spot prices", {}, async () => {
+        const result = await handlers.getRegimeState();
+        return {
+            content: [{ type: "text", text: JSON.stringify(result) }],
+        };
+    });
+    server.tool("passport_create_commodity_escrow", "Create a bilateral physical-commodity escrow, locking AngelCoin collateral against a vaulted lot", {
+        escrow_id: z.string().min(1),
+        buyer_commitment: z.string().min(1),
+        seller_commitment: z.string().min(1),
+        batch_number: z.string().min(1),
+        fine_grams: z.number().positive(),
+        unit_price_usd: z.number().positive(),
+        locked_angel: z.number().positive(),
+        commodity_type: z.string().optional(),
+        timeout_hours: z.number().optional(),
+    }, async (args) => {
+        const result = await handlers.createCommodityEscrow({
+            escrowId: args.escrow_id,
+            buyerCommitment: args.buyer_commitment,
+            sellerCommitment: args.seller_commitment,
+            batchNumber: args.batch_number,
+            fineGrams: args.fine_grams,
+            unitPriceUsd: args.unit_price_usd,
+            lockedAngel: args.locked_angel,
+            commodityType: args.commodity_type,
+            timeoutHours: args.timeout_hours,
+        });
+        return {
+            content: [{ type: "text", text: JSON.stringify(result) }],
+        };
+    });
+    server.tool("passport_release_commodity_escrow", "Release a held commodity escrow to the seller after verified assay certification", {
+        escrow_id: z.string().min(1),
+        assay_certification_number: z.string().min(1),
+        release_signature: z.string().min(1),
+    }, async (args) => {
+        const result = await handlers.releaseCommodityEscrow({
+            escrowId: args.escrow_id,
+            assayCertificationNumber: args.assay_certification_number,
+            releaseSignature: args.release_signature,
+        });
+        return {
+            content: [{ type: "text", text: JSON.stringify(result) }],
+        };
+    });
+    server.tool("passport_refund_commodity_escrow", "Refund the buyer's collateral for a commodity escrow that has timed out", {
+        escrow_id: z.string().min(1),
+    }, async (args) => {
+        const result = await handlers.refundCommodityEscrow({ escrowId: args.escrow_id });
+        return {
+            content: [{ type: "text", text: JSON.stringify(result) }],
+        };
+    });
+    server.tool("passport_get_sovereign_dividends", "Query macroeconomic Sovereign Dividend Waterfall & Anti-Extraction distributions across national treasury, community trusts, and mine workers", {
+        limit: z.number().optional(),
+    }, async (args) => {
+        const result = await handlers.getSovereignDividends(args);
+        return {
+            content: [{ type: "text", text: JSON.stringify(result) }],
+        };
+    });
+    server.tool("passport_record_ore_intake", "Record verified raw doré gold intake from an artisanal miner at a field buying counter with 95% spot payout", {
+        receipt_number: z.string().min(1),
+        station_code: z.string().min(1),
+        miner_commitment: z.string().min(1),
+        gross_weight_grams: z.number().positive(),
+        assayed_fineness: z.number().min(0.50).max(1.00),
+        spectrometer_signature: z.string().min(1),
+        payout_rate_percent: z.number().optional(),
+    }, async (args) => {
+        const result = await handlers.recordOreIntake({
+            receiptNumber: args.receipt_number,
+            stationCode: args.station_code,
+            minerCommitment: args.miner_commitment,
+            grossWeightGrams: args.gross_weight_grams,
+            assayedFineness: args.assayed_fineness,
+            spectrometerSignature: args.spectrometer_signature,
+            payoutRatePercent: args.payout_rate_percent,
+        });
+        return {
+            content: [{ type: "text", text: JSON.stringify(result) }],
+        };
+    });
+    server.tool("passport_list_artisanal_stations", "List active artisanal gold buying stations, district locations, bonded assayer stakes, and formalization metrics across the Sahel", {}, async () => {
+        const result = await handlers.listArtisanalStations();
+        return {
+            content: [{ type: "text", text: JSON.stringify(result) }],
+        };
+    });
+    server.tool("passport_submit_quorum_signature", "Submit an Ed25519 signature from a sovereign state ministry (ML, BF, NE) for a 2-of-3 governance proposal", {
+        proposal_id: z.string().min(1),
+        signer_state: z.string().min(1),
+        signature: z.string().min(1),
+        signer_public_key: z.string().optional(),
+    }, async (args) => {
+        const result = await handlers.submitQuorumSignature({
+            proposalId: args.proposal_id,
+            signerState: args.signer_state,
+            signature: args.signature,
+            signerPublicKey: args.signer_public_key,
+        });
+        return {
+            content: [{ type: "text", text: JSON.stringify(result) }],
+        };
+    });
+    server.tool("passport_list_quorum_proposals", "List active and historical Trilateral Sovereign Governance (AES 2-of-3) proposals, voting progress, and dead-man heartbeats", {
+        limit: z.number().optional(),
+    }, async (args) => {
+        const result = await handlers.listQuorumProposals(args);
+        return {
+            content: [{ type: "text", text: JSON.stringify(result) }],
+        };
+    });
     return server;
 }
 /**

@@ -12,10 +12,8 @@
  *   - Platform settlement at P_red = P(t) × (1 − σ), σ = 10%
  */
 
-import { sha256 } from "@noble/hashes/sha2.js";
-import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
+import { bytesToHex, utf8ToBytes, hexToBytes } from "@noble/hashes/utils.js";
 import { sign } from "@noble/ed25519";
-import { hexToBytes } from "@noble/hashes/utils.js";
 import "@/lib/receipt/crypto";
 
 // ── Launch Parameters (Moderate Scenario, Spec §8.5) ──
@@ -108,7 +106,7 @@ export function gridRound(
   }
 
   // Hysteresis: if there's a posted price and it's within the band, keep it
-  if (postedAngelPrice !== undefined && grid.includes(postedAngelPrice as any)) {
+  if (postedAngelPrice !== undefined && grid.includes(postedAngelPrice)) {
     const postedUsd = postedAngelPrice * currentRate;
     const deviation = Math.abs(postedUsd - usdPrice) / usdPrice;
     if (deviation <= MONETARY_PARAMS.hysteresisBand) {
@@ -123,15 +121,30 @@ export function gridRound(
 /**
  * Runs one epoch of the revaluation algorithm (Spec §6.3).
  * Pure function — deterministic, testable.
+ *
+ * Solvency gating (Premortem P0-3): the redemption rate is bounded by the
+ * physical reserve floor and never quoted above what the audited reserve can
+ * cover. When backing drops below 100%, the engine flags undercollateralization
+ * instead of silently fabricating redemption value.
  */
 export function revalue(params: {
   previousRate: number;
   reserveBalance: number;
   previousReserveBalance: number;
   circulatingSupply: number;
-}): { P: number; P_red: number; g: number; clamped: boolean; floored: boolean } {
+}): {
+  P: number;
+  P_red: number;
+  g: number;
+  clamped: boolean;
+  floored: boolean;
+  backingRatio: number;
+  solvencyDeficitUsd: number;
+  quarantineRecommended: boolean;
+} {
   const { previousRate, reserveBalance, previousReserveBalance, circulatingSupply } = params;
 
+  const supply = Math.max(circulatingSupply, 1);
   const netInflow = reserveBalance - previousReserveBalance;
   const g = netInflow / Math.max(previousReserveBalance, 1);
 
@@ -145,15 +158,39 @@ export function revalue(params: {
   if (P < bandLow) { P = bandLow; clamped = true; }
   if (P > bandHigh) { P = bandHigh; clamped = true; }
 
-  // Reserve floor: P_red = ρR/S — P never drops below the redemption floor
-  const P_red_floor = (MONETARY_PARAMS.reserveRatio * reserveBalance) / Math.max(circulatingSupply, 1);
+  // Nominal redemption rate (before solvency bound)
+  const nominalPRed = P * (1 - MONETARY_PARAMS.redemptionSpread);
+
+  // Solvency floor: the maximum redemption rate the audited reserve can cover
+  const reserveFloor = (MONETARY_PARAMS.reserveRatio * reserveBalance) / supply;
+
+  // Total redemption liability at the nominal rate
+  const nominalLiability = supply * nominalPRed;
+  const backingRatio = nominalLiability > 0 ? reserveBalance / nominalLiability : 0;
+  const solvencyDeficitUsd = Math.max(0, nominalLiability - reserveBalance);
+
   let floored = false;
-  if (P < P_red_floor) { P = P_red_floor; floored = true; }
+  let quarantineRecommended = false;
+  let P_red = nominalPRed;
 
-  // Redemption rate
-  const P_red = P * (1 - MONETARY_PARAMS.redemptionSpread);
+  if (reserveBalance < nominalLiability) {
+    // Undercollateralized: bound redemption to the reserve floor, do NOT haircut
+    // circulating token value via P (that preserves unit price confidence).
+    P_red = reserveFloor;
+    floored = true;
+    quarantineRecommended = true;
+  }
 
-  return { P, P_red, g, clamped, floored };
+  return {
+    P,
+    P_red,
+    g,
+    clamped,
+    floored,
+    backingRatio: Number(backingRatio.toFixed(6)),
+    solvencyDeficitUsd: Number(solvencyDeficitUsd.toFixed(2)),
+    quarantineRecommended,
+  };
 }
 
 /**

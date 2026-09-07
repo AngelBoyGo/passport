@@ -76,6 +76,9 @@ function printReport(): void {
     "AGENTIC_PAY_RAIL_SECRET",
     "NOTARY_ANCHOR_URL",
     "ALLOW_DEV_PROVISION",
+    "SOVEREIGN_KEY_ML",
+    "SOVEREIGN_KEY_BF",
+    "SOVEREIGN_KEY_NE",
   ]) {
     console.log(`  ${name}: ${report.presence[name] ? "set" : "unset"}`);
   }

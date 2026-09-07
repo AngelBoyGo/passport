@@ -3,7 +3,6 @@ import {
   MONETARY_PARAMS,
   ANGEL_BUNDLES,
   FEATURE_GRID,
-  FEATURE_USD_PRICES,
   gridRound,
   revalue,
   computeStranded,
@@ -127,9 +126,40 @@ describe("ANGEL Monetary System — Spec v1.1", () => {
         previousReserveBalance: 1000,
         circulatingSupply: 100000, // huge supply
       });
-      // P_red = 1.0 × 1000 / 100000 = 0.01 — but P started at 5.0 so band keeps it high
-      // The floor only kicks in when reserve per coin drops below P
+      // P_red = 1.0 × 1000 / 100000 = 0.01 — bounded by reserve floor
       expect(result.P).toBeGreaterThanOrEqual(5.0 * 0.98);
+    });
+
+    it("bounds redemption liability to the reserve floor when undercollateralized", () => {
+      const result = revalue({
+        previousRate: 5.0,
+        reserveBalance: 1000,
+        previousReserveBalance: 1000,
+        circulatingSupply: 100000,
+      });
+
+      expect(result.floored).toBe(true);
+      expect(result.quarantineRecommended).toBe(true);
+      expect(result.backingRatio).toBeLessThan(1.0);
+      expect(result.solvencyDeficitUsd).toBeGreaterThan(0);
+
+      // Redemption rate bounded to reserve/supply, liability never exceeds reserve
+      expect(result.P_red).toBeCloseTo(0.01);
+      expect(result.P_red * 100000).toBeLessThanOrEqual(1000 + 0.01);
+    });
+
+    it("leaves redemption at nominal spread when fully funded", () => {
+      const result = revalue({
+        previousRate: 5.0,
+        reserveBalance: 10000,
+        previousReserveBalance: 10000,
+        circulatingSupply: 2000,
+      });
+
+      expect(result.floored).toBe(false);
+      expect(result.quarantineRecommended).toBe(false);
+      expect(result.backingRatio).toBeGreaterThanOrEqual(1.0);
+      expect(result.P_red).toBeCloseTo(5.0 * 0.90);
     });
 
     it("redemption rate is always below mint rate", () => {
