@@ -5,6 +5,7 @@ import { getStripe } from "@/lib/stripe";
 import { ensureOperator } from "@/lib/operator";
 import { checkInMemoryRateLimit, clientIpFromRequest } from "@/lib/rateLimit";
 import { ANGEL_BUNDLES, MONETARY_PARAMS } from "@/lib/angelcoin/monetary";
+import { sha256Hex } from "@/lib/receipt/canonical";
 
 export const dynamic = "force-dynamic";
 
@@ -58,7 +59,7 @@ export async function POST(request: NextRequest) {
   }
 
   const priceUsdCents = Math.round(bundle.angl * MONETARY_PARAMS.P0 * 100);
-  const targetCommitment = body.agent_commitment?.toLowerCase() || null;
+  let targetCommitment = body.agent_commitment?.toLowerCase() || null;
   if (targetCommitment && !/^[0-9a-f]{64}$/i.test(targetCommitment)) {
     return NextResponse.json({ error: "Invalid agent commitment hash" }, { status: 400 });
   }
@@ -70,6 +71,13 @@ export async function POST(request: NextRequest) {
     if (!agent) {
       return NextResponse.json({ error: "Agent not found or not owned by you" }, { status: 403 });
     }
+  } else {
+    // If agent_commitment omitted, auto-resolve to operator's primary agent or deterministic wallet
+    const primaryAgent = await prisma.agent.findFirst({
+      where: { operatorId: session.operator.id },
+      select: { agentId: true },
+    });
+    targetCommitment = primaryAgent?.agentId || sha256Hex(`operator:wallet:${session.operator.id}`);
   }
 
   const operator = await ensureOperator(session.operator.stripeCustomerId, session.operator.email);

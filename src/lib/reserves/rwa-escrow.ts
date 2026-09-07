@@ -144,6 +144,10 @@ export async function createCommodityEscrow(input: CreateEscrowInput) {
  * Marks the vaulted lot as SETTLED_DELIVERY and deducts the protocol fee.
  */
 export async function releaseEscrowOnAssay(input: ReleaseEscrowInput) {
+  if (!input.releaseSignature || typeof input.releaseSignature !== "string" || input.releaseSignature.trim().length === 0) {
+    throw new Error("Valid release signature is required for settlement release");
+  }
+
   const escrow = await prisma.$transaction(async (tx) => {
     const held = await tx.commodityEscrow.findUnique({
       where: { escrowId: input.escrowId },

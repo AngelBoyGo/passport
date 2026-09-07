@@ -20,6 +20,8 @@ describe("Reserves API Endpoints", () => {
           symbol: "Au",
           totalGrams: 50000,
           totalFineGrams: 49950,
+          encumberedFineGrams: 0,
+          unencumberedFineGrams: 49950,
           activeLotsCount: 2,
           merkleRoot: "mockroot123",
           lastAuditedAt: new Date("2026-09-05T12:00:00Z"),

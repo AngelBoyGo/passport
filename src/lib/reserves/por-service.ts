@@ -307,6 +307,8 @@ export async function generateLivePoR(commodityType = "GOLD"): Promise<{
     symbol: string;
     totalGrams: number;
     totalFineGrams: number;
+    encumberedFineGrams: number;
+    unencumberedFineGrams: number;
     activeLotsCount: number;
     merkleRoot: string;
     lastAuditedAt: Date;
@@ -344,6 +346,14 @@ export async function generateLivePoR(commodityType = "GOLD"): Promise<{
   const totalGrossGrams = activeBatches.reduce((sum, b) => sum + b.grossWeightGrams, 0);
   const totalFineGrams = activeBatches.reduce((sum, b) => sum + b.fineWeightGrams, 0);
   const now = new Date();
+
+  // Calculate encumbered grams in active HELD escrows (Premortem P0-2)
+  const heldEscrows = await prisma.commodityEscrow.findMany({
+    where: { status: "HELD", commodityType },
+    select: { fineGrams: true },
+  });
+  const encumberedFineGrams = heldEscrows.reduce((sum, e) => sum + e.fineGrams, 0);
+  const unencumberedFineGrams = Math.max(0, Number((totalFineGrams - encumberedFineGrams).toFixed(4)));
 
   // Update reserve record in DB if it exists
   const reserveRecord = await prisma.commodityReserve.upsert({
@@ -391,6 +401,8 @@ export async function generateLivePoR(commodityType = "GOLD"): Promise<{
       symbol: reserveRecord.symbol,
       totalGrams: reserveRecord.totalGrams,
       totalFineGrams: reserveRecord.totalFineGrams,
+      encumberedFineGrams,
+      unencumberedFineGrams,
       activeLotsCount: reserveRecord.activeLotsCount,
       merkleRoot: tree.root,
       lastAuditedAt: now,

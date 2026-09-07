@@ -35,9 +35,10 @@ export async function GET() {
   const circulatingSupply = wallets.reduce((sum, w) => sum + w.balance, 0);
   const stakedSupply = wallets.reduce((sum, w) => sum + w.staked, 0);
 
-  // Physical commodity reserve valuation (fine grams × live gold spot price)
+  // Physical commodity reserve valuation (unencumbered fine grams × live gold spot price)
   const goldSpotUsd = spotPrices.Au?.priceUsd ?? 0;
-  const physicalGoldGrams = goldPoR?.reserve?.totalFineGrams ?? 0;
+  const physicalGoldGrams =
+    goldPoR?.reserve?.unencumberedFineGrams ?? goldPoR?.reserve?.totalFineGrams ?? 0;
   const commodityReserveUsd = Number((physicalGoldGrams * goldSpotUsd).toFixed(2));
 
   // Fiat treasury component: sum inflows and subtract redemption outflows

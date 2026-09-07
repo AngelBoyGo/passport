@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { VaultBatch, CommodityReserve } from "@prisma/client";
+import type { VaultBatch, CommodityReserve, CommodityEscrow } from "@prisma/client";
 import {
   computeBatchLeafHash,
   buildReserveMerkleTree,
@@ -278,6 +278,7 @@ describe("Proof-of-Reserves (PoR) Service", () => {
         },
       ] as unknown as VaultBatch[]);
 
+      vi.spyOn(prisma.commodityEscrow, "findMany").mockResolvedValue([]);
       vi.spyOn(prisma.commodityReserve, "upsert").mockResolvedValue({
         id: "res_1",
         commodityType: "GOLD",
@@ -295,8 +296,54 @@ describe("Proof-of-Reserves (PoR) Service", () => {
 
       expect(result.reserve.commodityType).toBe("GOLD");
       expect(result.reserve.totalFineGrams).toBeCloseTo(999.9);
+      expect(result.reserve.unencumberedFineGrams).toBeCloseTo(999.9);
+      expect(result.reserve.encumberedFineGrams).toBe(0);
       expect(result.attestation.active_lots_count).toBe(1);
       expect(result.attestation.signature).toBeTruthy();
+    });
+
+    it("deducts active HELD escrow grams from unencumbered reserves", async () => {
+      vi.spyOn(prisma.vaultBatch, "findMany").mockResolvedValue([
+        {
+          id: "vb_1",
+          batchNumber: "BKO-001",
+          reserveId: "res_1",
+          vaultId: "V-1",
+          custodianName: "Custodian 1",
+          locationCity: "Bamako",
+          locationCountry: "ML",
+          barSerials: ["S1"],
+          grossWeightGrams: 1000,
+          fineness: 1.0,
+          fineWeightGrams: 1000.0,
+          status: "AUDITED",
+          metadata: null,
+          auditedAt: new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ] as unknown as VaultBatch[]);
+
+      // 300g locked in active HELD escrows
+      vi.spyOn(prisma.commodityEscrow, "findMany").mockResolvedValue([
+        { fineGrams: 300.0 },
+      ] as unknown as CommodityEscrow[]);
+
+      vi.spyOn(prisma.commodityReserve, "upsert").mockResolvedValue({
+        id: "res_1",
+        commodityType: "GOLD",
+        symbol: "Au",
+        totalGrams: 1000,
+        totalFineGrams: 1000.0,
+        activeLotsCount: 1,
+        latestMerkleRoot: "mockroot",
+      } as unknown as CommodityReserve);
+
+      const result = await generateLivePoR("GOLD");
+
+      expect(result.reserve.totalFineGrams).toBe(1000.0);
+      expect(result.reserve.encumberedFineGrams).toBe(300.0);
+      expect(result.reserve.unencumberedFineGrams).toBe(700.0);
     });
 
     it("retrieves valid inclusion proof for an audited batch", async () => {

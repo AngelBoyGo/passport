@@ -64,6 +64,8 @@ export async function GET(request: NextRequest) {
           commodity_type: reserve.commodityType,
           symbol: reserve.symbol,
           total_fine_grams: reserve.totalFineGrams,
+          encumbered_fine_grams: reserve.encumberedFineGrams,
+          unencumbered_fine_grams: reserve.unencumberedFineGrams,
           total_gross_grams: reserve.totalGrams,
           active_lots_count: reserve.activeLotsCount,
           merkle_root: reserve.merkleRoot,

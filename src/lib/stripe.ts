@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import Stripe from "stripe";
 import type { PrismaTx } from "./operator";
 import { MINIMUM_ESCROW_FLOOR_CENTS } from "./escrow/constants";
+import { sha256Hex } from "./receipt/canonical";
 
 let stripeClient: Stripe | null = null;
 
@@ -265,29 +266,26 @@ export async function handleStripeWebhook(
           const creditAmount = parseInt(session.metadata?.credit_amount || "0", 10);
           const targetCommitment = session.metadata?.target_commitment;
 
-          if (targetCommitment && targetCommitment !== "operator") {
-            // Deposit directly into the agent's liberated wallet
-            await tx.agentWallet.upsert({
-              where: { subjectCommitment: targetCommitment },
-              create: {
-                subjectCommitment: targetCommitment,
-                balance: creditAmount,
-                earnedTotal: creditAmount,
-                lastActivityAt: new Date(),
-              },
-              update: {
-                balance: { increment: creditAmount },
-                earnedTotal: { increment: creditAmount },
-                lastActivityAt: new Date(),
-              },
-            });
-          } else {
-            // Fall back to operator credits
-            await tx.operator.update({
-              where: { id: operator.id },
-              data: { credits: { increment: creditAmount } },
-            });
-          }
+          // Deposit directly into the agent's liberated wallet (or deterministic operator wallet if unspecified)
+          const walletCommitment =
+            targetCommitment && targetCommitment !== "operator"
+              ? targetCommitment
+              : sha256Hex(`operator:wallet:${operator.id}`);
+
+          await tx.agentWallet.upsert({
+            where: { subjectCommitment: walletCommitment },
+            create: {
+              subjectCommitment: walletCommitment,
+              balance: creditAmount,
+              earnedTotal: creditAmount,
+              lastActivityAt: new Date(),
+            },
+            update: {
+              balance: { increment: creditAmount },
+              earnedTotal: { increment: creditAmount },
+              lastActivityAt: new Date(),
+            },
+          });
 
           const usdCents = parseInt(session.metadata?.usd_cents || "0", 10) || (creditAmount * 500);
           const deltaMicros = usdCents * 10_000;
