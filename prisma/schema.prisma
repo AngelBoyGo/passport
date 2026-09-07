@@ -1087,6 +1087,76 @@ model StabilizationDisbursement {
   @@index([status])
 }
 
+/// Diplomatic Corridor Transit Shipment (Phase 16 Automated Customs Clearing).
+/// Cryptographically sealed mineral convoy manifest traversing the Sahel
+/// diplomatic corridor from landlocked AES states to coastal jurisdictions.
+model TransitShipment {
+  id                      String   @id @default(cuid())
+  shipmentId              String   @unique // "SHIP-AES-LOME-2026-0001"
+  manifestNumber          String
+  commodityType           String   @default("GOLD") // "GOLD", "LITHIUM", "NEODYMIUM"
+  fineUnits               Float    // grams (Au) or kg (Li/Nd) of cargo
+  originJurisdiction      String   // "ML", "BF", "NE"
+  destinationJurisdiction String   // "GN", "TG", "CI"
+  routeCode               String   // "CORRIDOR-BAMAKO-LOME"
+  escortPublicKey         String   // Ed25519 public key of convoy escort officer HSM
+  containerSealDigest     String   // SHA-256 hex of tamper-mesh diplomatic e-seal
+  status                  String   @default("IN_TRANSIT") // "IN_TRANSIT", "CHECKPOINT_CLEARED", "DESTINATION_ARRIVED", "IMPOUNDED"
+  checkpointsCleared      String[]
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  settlements             BorderTaxSettlement[]
+
+  @@index([commodityType])
+  @@index([originJurisdiction])
+  @@index([status])
+  @@index([createdAt])
+}
+
+/// Customs Checkpoint on the diplomatic corridor.
+/// Instrumented with the Ed25519 public key of the on-site customs inspector.
+model CustomsCheckpoint {
+  id                     String   @id @default(cuid())
+  checkpointCode         String   @unique // "CP-SIKASSO-ML", "CP-OUAGA-BF", "CP-CINKASSE-TG"
+  checkpointName         String
+  jurisdiction           String   // "ML", "BF", "NE", "GN", "TG"
+  inspectorPublicKey     String   // Ed25519 public key of customs inspector
+  activeStatus           String   @default("ACTIVE") // "ACTIVE", "MAINTENANCE"
+  totalFeesCollectedAngel Int     @default(0)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  settlements            BorderTaxSettlement[]
+
+  @@index([jurisdiction])
+  @@index([activeStatus])
+}
+
+/// Ad-Valorem Border Tax Settlement (Phase 16 70/20/10 corridor waterfall).
+/// Records the statutory transit tariff split across the host jurisdiction
+/// customs wallet, the corridor infrastructure pool, and the stabilization treasury.
+model BorderTaxSettlement {
+  id                 String   @id @default(cuid())
+  settlementId       String   @unique // "SETTLE-AES-2026-0001"
+  shipmentId         String
+  checkpointId       String
+  grossValueUsd      Float
+  tariffAngel        Int
+  hostCustomsAngel   Int
+  corridorPoolAngel  Int
+  treasuryAngel      Int
+  tariffRateBps      Int      @default(75) // 0.75% ad valorem
+  clearedAt          DateTime @default(now())
+
+  shipment           TransitShipment  @relation(fields: [shipmentId], references: [id])
+  checkpoint         CustomsCheckpoint @relation(fields: [checkpointId], references: [id])
+
+  @@index([shipmentId])
+  @@index([checkpointId])
+  @@index([clearedAt])
+}
+
 
 
 
