@@ -128,6 +128,7 @@ var PassportClient = class {
   artisanal;
   transit;
   industrial;
+  fund;
   constructor(options) {
     this.apiKey = options.apiKey;
     this.baseUrl = options.baseUrl.replace(/\/$/, "");
@@ -673,6 +674,59 @@ var PassportClient = class {
           headers: {
             Authorization: `Bearer ${this.apiKey}`
           }
+        });
+        return this.parseJsonResponse(response);
+      }
+    };
+    this.fund = {
+      registerProject: async (input) => {
+        const response = await fetchWithRetry(`${this.baseUrl}/api/v1/reserves/fund/projects`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${this.apiKey}`
+          },
+          body: JSON.stringify({
+            project_code: input.projectCode,
+            project_name: input.projectName,
+            category: input.category,
+            country_code: input.countryCode,
+            district_name: input.districtName,
+            operator_commitment: input.operatorCommitment,
+            allocated_angel: input.allocatedAngel,
+            total_milestones: input.totalMilestones,
+            expected_jobs: input.expectedJobs,
+            declared_impact_kwh: input.declaredImpactKwh
+          })
+        });
+        return this.parseJsonResponse(response);
+      },
+      listProjects: async () => {
+        const url = `${this.baseUrl}/api/v1/reserves/fund/projects`;
+        const response = await fetchWithRetry(url, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`
+          }
+        });
+        return this.parseJsonResponse(response);
+      },
+      verifyMilestone: async (input) => {
+        const response = await fetchWithRetry(`${this.baseUrl}/api/v1/reserves/fund/milestones`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${this.apiKey}`
+          },
+          body: JSON.stringify({
+            disbursement_id: input.disbursementId,
+            verifier_signature: input.verifierSignature,
+            verifier_public_key: input.verifierPublicKey,
+            media_digest: input.mediaDigest,
+            verification_description: input.verificationDescription,
+            jobs_created: input.jobsCreated,
+            realized_impact_kwh: input.realizedImpactKwh
+          })
         });
         return this.parseJsonResponse(response);
       }

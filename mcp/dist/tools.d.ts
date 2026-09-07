@@ -200,4 +200,29 @@ export declare function createToolHandlers(client: PassportClient): {
         hsmPublicKey?: string;
     }): Promise<import("@passport7/sdk").SmeltingRunResponse>;
     listIndustrialConcessions(): Promise<import("@passport7/sdk").IndustrialConcessionsResponse>;
+    registerIndustrializationProject(input: {
+        projectCode: string;
+        projectName: string;
+        category: string;
+        countryCode: string;
+        districtName: string;
+        operatorCommitment: string;
+        allocatedAngel: number;
+        totalMilestones?: number;
+        expectedJobs?: number;
+        declaredImpactKwh?: number;
+    }): Promise<import("@passport7/sdk").RegisterProjectResponse>;
+    listFundProjects(): Promise<import("@passport7/sdk").FundProjectsListResponse>;
+    verifyFundMilestone(input: {
+        disbursementId: string;
+        verifierSignature: string;
+        verifierPublicKey: string;
+        mediaDigest: string;
+        verificationDescription?: string;
+        jobsCreated?: number;
+        realizedImpactKwh?: number;
+    }): Promise<{
+        success: boolean;
+        is_complete: boolean;
+    }>;
 };

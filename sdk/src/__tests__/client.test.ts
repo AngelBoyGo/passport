@@ -833,4 +833,83 @@ describe("PassportClient", () => {
       expect(url).toBe("https://passport.example.com/api/v1/reserves/industrial/concessions");
     });
   });
+
+  describe("client.fund namespace", () => {
+    it("registerProject POSTs to /api/v1/reserves/fund/projects", async () => {
+      fetchMock.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            project: { project_code: "PROJ-1" },
+          }),
+          { status: 201, headers: { "Content-Type": "application/json" } }
+        )
+      );
+
+      const res = await client.fund.registerProject({
+        projectCode: "PROJ-1",
+        projectName: "Solar Irrigation",
+        category: "WATER_IRRIGATION",
+        countryCode: "NE",
+        districtName: "Tillabéri",
+        operatorCommitment: "o".repeat(64),
+        allocatedAngel: 5000,
+      });
+
+      expect(res.success).toBe(true);
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe("https://passport.example.com/api/v1/reserves/fund/projects");
+      expect(init.method).toBe("POST");
+      expect(JSON.parse(init.body as string)).toEqual({
+        project_code: "PROJ-1",
+        project_name: "Solar Irrigation",
+        category: "WATER_IRRIGATION",
+        country_code: "NE",
+        district_name: "Tillabéri",
+        operator_commitment: "o".repeat(64),
+        allocated_angel: 5000,
+      });
+    });
+
+    it("listProjects GETs /api/v1/reserves/fund/projects", async () => {
+      fetchMock.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            metrics: { activeProjectsCount: 1 },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      );
+
+      const res = await client.fund.listProjects();
+      expect(res.success).toBe(true);
+      const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe("https://passport.example.com/api/v1/reserves/fund/projects");
+    });
+
+    it("verifyMilestone POSTs to /api/v1/reserves/fund/milestones", async () => {
+      fetchMock.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            is_complete: false,
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      );
+
+      const res = await client.fund.verifyMilestone({
+        disbursementId: "DISB-1",
+        verifierSignature: "sig",
+        verifierPublicKey: "pk",
+        mediaDigest: "d".repeat(64),
+      });
+
+      expect(res.success).toBe(true);
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe("https://passport.example.com/api/v1/reserves/fund/milestones");
+      expect(init.method).toBe("POST");
+    });
+  });
 });

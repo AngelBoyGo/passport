@@ -282,5 +282,36 @@ export function createToolHandlers(client: PassportClient) {
     async listIndustrialConcessions() {
       return client.industrial.listConcessions();
     },
+
+    async registerIndustrializationProject(input: {
+      projectCode: string;
+      projectName: string;
+      category: string;
+      countryCode: string;
+      districtName: string;
+      operatorCommitment: string;
+      allocatedAngel: number;
+      totalMilestones?: number;
+      expectedJobs?: number;
+      declaredImpactKwh?: number;
+    }) {
+      return client.fund.registerProject(input);
+    },
+
+    async listFundProjects() {
+      return client.fund.listProjects();
+    },
+
+    async verifyFundMilestone(input: {
+      disbursementId: string;
+      verifierSignature: string;
+      verifierPublicKey: string;
+      mediaDigest: string;
+      verificationDescription?: string;
+      jobsCreated?: number;
+      realizedImpactKwh?: number;
+    }) {
+      return client.fund.verifyMilestone(input);
+    },
   };
 }

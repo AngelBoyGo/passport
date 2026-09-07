@@ -1039,6 +1039,54 @@ model SmeltingRunTelemetry {
   @@index([pouredAt])
 }
 
+/// Sovereign Industrialization Project (Counter-Cyclical Stabilization Fund, Black Paper Q142).
+/// Automates deployment of the 30% stabilization treasury share into verifiable domestic industrialization.
+model SovereignIndustrialProject {
+  id                  String   @id @default(cuid())
+  projectCode         String   @unique // "PROJ-IRR-NIGER-0001"
+  projectName         String
+  category            String   // "WATER_IRRIGATION", "SOLAR_ELECTRIFICATION", "FERTILIZER_PRODUCTION", "TECH_VOCATIONAL"
+  countryCode         String   // "ML", "BF", "NE"
+  districtName        String
+  status              String   @default("FUNDED") // "FUNDED", "ACTIVE", "COMPLETED"
+  allocatedAngel      Int
+  totalMilestones     Int      @default(3)
+  completedMilestones Int      @default(0)
+  expectedJobs        Int      @default(10)
+  jobsCreated         Int      @default(0)
+  declaredImpactKwh   Float    @default(0)
+  realizedImpactKwh   Float    @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  disbursements       StabilizationDisbursement[]
+
+  @@index([category])
+  @@index([countryCode])
+  @@index([status])
+}
+
+/// Stabilization Milestone Disbursement.
+/// Released only upon credible neutral verifier signature over drone/satellite/LiDAR imagery digest.
+model StabilizationDisbursement {
+  id                      String   @id @default(cuid())
+  disbursementId          String   @unique // "DISB-FUND-NIGER-0001"
+  projectId               String
+  milestoneNumber         Int      @default(1)
+  amountAngel             Int
+  status                  String   @default("PENDING") // "PENDING", "VERIFIED", "PAID"
+  verificationMediaDigest String   // Hash of drone/satellite imagery or IoT sensor data
+  verificationDescription String?
+  verifierSignature       String
+  disbursedAt             DateTime?
+  createdAt               DateTime @default(now())
+
+  project                 SovereignIndustrialProject @relation(fields: [projectId], references: [id])
+
+  @@index([projectId])
+  @@index([status])
+}
+
 
 
 

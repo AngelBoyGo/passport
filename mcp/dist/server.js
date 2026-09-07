@@ -348,6 +348,62 @@ export function createPassportMcpServer(client) {
             content: [{ type: "text", text: JSON.stringify(result) }],
         };
     });
+    server.tool("passport_register_industrialization_project", "Register a sovereign industrialization project funded by the 30% counter-cyclical stabilization treasury (Q142)", {
+        project_code: z.string().min(1),
+        project_name: z.string().min(1),
+        category: z.string().min(1),
+        country_code: z.string().min(1),
+        district_name: z.string().min(1),
+        operator_commitment: z.string().min(1),
+        allocated_angel: z.number().positive(),
+        total_milestones: z.number().optional(),
+        expected_jobs: z.number().optional(),
+        declared_impact_kwh: z.number().optional(),
+    }, async (args) => {
+        const result = await handlers.registerIndustrializationProject({
+            projectCode: args.project_code,
+            projectName: args.project_name,
+            category: args.category,
+            countryCode: args.country_code,
+            districtName: args.district_name,
+            operatorCommitment: args.operator_commitment,
+            allocatedAngel: args.allocated_angel,
+            totalMilestones: args.total_milestones,
+            expectedJobs: args.expected_jobs,
+            declaredImpactKwh: args.declared_impact_kwh,
+        });
+        return {
+            content: [{ type: "text", text: JSON.stringify(result) }],
+        };
+    });
+    server.tool("passport_list_fund_projects", "List sovereign industrialization fund projects, stabilization balance, counter-cyclical solvency metrics, and deployed capital", {}, async () => {
+        const result = await handlers.listFundProjects();
+        return {
+            content: [{ type: "text", text: JSON.stringify(result) }],
+        };
+    });
+    server.tool("passport_verify_fund_milestone", "Verify and release a stabilization fund milestone disbursement upon credible neutral verifier signature over drone/satellite imagery digest", {
+        disbursement_id: z.string().min(1),
+        verifier_signature: z.string().min(1),
+        verifier_public_key: z.string().min(1),
+        media_digest: z.string().min(1),
+        verification_description: z.string().optional(),
+        jobs_created: z.number().optional(),
+        realized_impact_kwh: z.number().optional(),
+    }, async (args) => {
+        const result = await handlers.verifyFundMilestone({
+            disbursementId: args.disbursement_id,
+            verifierSignature: args.verifier_signature,
+            verifierPublicKey: args.verifier_public_key,
+            mediaDigest: args.media_digest,
+            verificationDescription: args.verification_description,
+            jobsCreated: args.jobs_created,
+            realizedImpactKwh: args.realized_impact_kwh,
+        });
+        return {
+            content: [{ type: "text", text: JSON.stringify(result) }],
+        };
+    });
     return server;
 }
 /**

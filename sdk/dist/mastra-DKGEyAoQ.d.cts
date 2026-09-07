@@ -745,6 +745,97 @@ interface IndustrialClient {
     bridgeDoré(input: BridgeIndustrialClientInput): Promise<BridgeDoreResponse>;
     listConcessions(): Promise<IndustrialConcessionsResponse>;
 }
+interface VerifyMilestoneClientInput {
+    disbursementId: string;
+    verifierSignature: string;
+    verifierPublicKey: string;
+    mediaDigest: string;
+    verificationDescription?: string;
+    jobsCreated?: number;
+    realizedImpactKwh?: number;
+}
+interface RegFundClientInput {
+    projectCode: string;
+    projectName: string;
+    category: string;
+    countryCode: string;
+    districtName: string;
+    operatorCommitment: string;
+    allocatedAngel: number;
+    totalMilestones?: number;
+    expectedJobs?: number;
+    declaredImpactKwh?: number;
+}
+interface RegisterProjectResponse {
+    success: boolean;
+    project: {
+        project_code: string;
+        project_name: string;
+        category: string;
+        country_code: string;
+        status: string;
+        allocated_angel: number;
+        total_milestones: number;
+    };
+}
+interface RegisterProjectResponse {
+    success: boolean;
+    project: {
+        project_code: string;
+        project_name: string;
+        category: string;
+        country_code: string;
+        status: string;
+        allocated_angel: number;
+        total_milestones: number;
+    };
+}
+interface FundProjectsListResponse {
+    success: boolean;
+    metrics: {
+        activeProjectsCount: number;
+        totalProjects: number;
+        totalDeployedAngel: number;
+        totalJobsCreated: number;
+        totalCompletedMilestones: number;
+        totalRealizedImpactKwh: number;
+        balance: {
+            totalBalance: number;
+            coldHibernationReserve: number;
+            deployableBalance: number;
+        };
+        solvency: {
+            totalBalance: number;
+            coldHibernationReserve: number;
+            deployableBalance: number;
+            totalAllocatedAngel: number;
+            deployedInRolling365d: number;
+            bufferSolvent: boolean;
+        };
+    };
+    projects: Array<{
+        project_code: string;
+        project_name: string;
+        category: string;
+        country_code: string;
+        district_name: string;
+        status: string;
+        allocated_angel: number;
+        total_milestones: number;
+        completed_milestones: number;
+        jobs_created: number;
+        realized_impact_kwh: number;
+    }>;
+    timestamp: string;
+}
+interface FundClient {
+    registerProject(input: RegFundClientInput): Promise<RegisterProjectResponse>;
+    listProjects(): Promise<FundProjectsListResponse>;
+    verifyMilestone(input: VerifyMilestoneClientInput): Promise<{
+        success: boolean;
+        is_complete: boolean;
+    }>;
+}
 interface EvidencePayload {
     task_id?: string;
     digest?: string;
@@ -769,6 +860,7 @@ declare class PassportClient {
     readonly artisanal: ArtisanalClient;
     readonly transit: TransitClient;
     readonly industrial: IndustrialClient;
+    readonly fund: FundClient;
     constructor(options: PassportClientOptions);
     /**
      * Issue a pending signed receipt (Bearer auth required).
@@ -839,4 +931,4 @@ declare function createMastraPassportMiddleware(client: PassportClient, options:
     wrapWorkflow<T extends MastraWorkflowLike>(workflow: T): T;
 };
 
-export { type TransitCheckpointClientInput as $, type ArtisanalClient as A, type BridgeDoreClientInput as B, type CommodityEscrowRecord as C, type DispatchTransitClientInput as D, type ErrorTranche as E, type FinalizeReceiptInput as F, type GateVerifyResult as G, type ReleaseEscrowInput as H, type IndustrialClient as I, type ReportThreatInput as J, type ReservesClient as K, type ReservesEscrowClient as L, type MastraAgentLike as M, type SignEvidenceResult as N, OPERATIONAL_DOMAINS as O, PassportClient as P, type QuorumProposalInput as Q, type RecordSmeltInput as R, type SaveCapsuleInput as S, type SignedReceipt as T, type SmeltingRunResponse as U, type SwarmBountyItem as V, type SwarmClient as W, type SwarmMemoryItem as X, type SwarmPublishInput as Y, type SwarmQueryInput as Z, type TransitArrivalClientInput as _, type ArtisanalStationsResponse as a, type TransitClient as a0, type TransitCorridorsResponse as a1, type VaultsResponse as a2, classifyMastraError as a3, createMastraPassportMiddleware as a4, isErrorTranche as a5, isOperationalDomain as a6, type AssaysResponse as b, type BridgeDoreResponse as c, type BridgeIndustrialClientInput as d, type CommodityEscrowStatus as e, type CreateBountyParams as f, type CreateEscrowInput as g, type DispatchTransitResponse as h, type DividendsResponse as i, ERROR_TRANCHES as j, type EvidencePayload as k, type FinalizeStatus as l, type IndustrialConcessionsResponse as m, type IssueReceiptInput as n, type MastraPassportMiddlewareOptions as o, type MastraWorkflowLike as p, type OperationalDomain as q, type OreIntakeInput as r, type OreIntakeResponse as s, type PassportClientOptions as t, type PoRResponse as u, type QuorumProposalResponse as v, type QuorumProposalsListResponse as w, type QuorumSignInput as x, type QuorumSignResponse as y, type RegimeStateResponse as z };
+export { type SwarmMemoryItem as $, type ArtisanalClient as A, type BridgeDoreClientInput as B, type CommodityEscrowRecord as C, type DispatchTransitClientInput as D, type ErrorTranche as E, type FinalizeReceiptInput as F, type GateVerifyResult as G, type QuorumSignResponse as H, type IndustrialClient as I, type RegFundClientInput as J, type RegimeStateResponse as K, type RegisterProjectResponse as L, type MastraAgentLike as M, type ReleaseEscrowInput as N, OPERATIONAL_DOMAINS as O, PassportClient as P, type QuorumProposalInput as Q, type RecordSmeltInput as R, type ReportThreatInput as S, type ReservesClient as T, type ReservesEscrowClient as U, type SaveCapsuleInput as V, type SignEvidenceResult as W, type SignedReceipt as X, type SmeltingRunResponse as Y, type SwarmBountyItem as Z, type SwarmClient as _, type ArtisanalStationsResponse as a, type SwarmPublishInput as a0, type SwarmQueryInput as a1, type TransitArrivalClientInput as a2, type TransitCheckpointClientInput as a3, type TransitClient as a4, type TransitCorridorsResponse as a5, type VaultsResponse as a6, type VerifyMilestoneClientInput as a7, classifyMastraError as a8, createMastraPassportMiddleware as a9, isErrorTranche as aa, isOperationalDomain as ab, type AssaysResponse as b, type BridgeDoreResponse as c, type BridgeIndustrialClientInput as d, type CommodityEscrowStatus as e, type CreateBountyParams as f, type CreateEscrowInput as g, type DispatchTransitResponse as h, type DividendsResponse as i, ERROR_TRANCHES as j, type EvidencePayload as k, type FinalizeStatus as l, type FundClient as m, type FundProjectsListResponse as n, type IndustrialConcessionsResponse as o, type IssueReceiptInput as p, type MastraPassportMiddlewareOptions as q, type MastraWorkflowLike as r, type OperationalDomain as s, type OreIntakeInput as t, type OreIntakeResponse as u, type PassportClientOptions as v, type PoRResponse as w, type QuorumProposalResponse as x, type QuorumProposalsListResponse as y, type QuorumSignInput as z };

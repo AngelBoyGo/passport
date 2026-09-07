@@ -460,4 +460,49 @@ describe("MCP tool handlers", () => {
     expect(concRes.success).toBe(true);
     expect(listConcessions).toHaveBeenCalledOnce();
   });
+
+  it("fund handlers delegate to client.fund", async () => {
+    const registerProject = vi.fn().mockResolvedValue({
+      success: true,
+      project: { project_code: "PROJ-1" },
+    });
+    const listProjects = vi.fn().mockResolvedValue({
+      success: true,
+      projects: [],
+    });
+    const verifyMilestone = vi.fn().mockResolvedValue({
+      success: true,
+      is_complete: false,
+    });
+
+    const client = {
+      fund: { registerProject, listProjects, verifyMilestone },
+    } as unknown as PassportClient;
+    const handlers = createToolHandlers(client);
+
+    const regRes = await handlers.registerIndustrializationProject({
+      projectCode: "PROJ-1",
+      projectName: "Solar Irrigation",
+      category: "WATER_IRRIGATION",
+      countryCode: "NE",
+      districtName: "Tillabéri",
+      operatorCommitment: "o".repeat(64),
+      allocatedAngel: 5000,
+    });
+    expect(regRes.success).toBe(true);
+    expect(registerProject).toHaveBeenCalledOnce();
+
+    const listRes = await handlers.listFundProjects();
+    expect(listRes.success).toBe(true);
+    expect(listProjects).toHaveBeenCalledOnce();
+
+    const milRes = await handlers.verifyFundMilestone({
+      disbursementId: "DISB-1",
+      verifierSignature: "sig",
+      verifierPublicKey: "pk",
+      mediaDigest: "d".repeat(64),
+    });
+    expect(milRes.success).toBe(true);
+    expect(verifyMilestone).toHaveBeenCalledOnce();
+  });
 });

@@ -49,6 +49,11 @@ export type {
   SmeltingRunResponse,
   BridgeIndustrialClientInput,
   IndustrialConcessionsResponse,
+  FundClient,
+  RegFundClientInput,
+  RegisterProjectResponse,
+  VerifyMilestoneClientInput,
+  FundProjectsListResponse,
 } from "./client.js";
 export {
   OPERATIONAL_DOMAINS,

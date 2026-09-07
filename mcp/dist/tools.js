@@ -140,5 +140,14 @@ export function createToolHandlers(client) {
         async listIndustrialConcessions() {
             return client.industrial.listConcessions();
         },
+        async registerIndustrializationProject(input) {
+            return client.fund.registerProject(input);
+        },
+        async listFundProjects() {
+            return client.fund.listProjects();
+        },
+        async verifyFundMilestone(input) {
+            return client.fund.verifyMilestone(input);
+        },
     };
 }

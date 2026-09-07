@@ -17,6 +17,7 @@ import type {
   BondedTransitWaybill,
   IndustrialMiningConcession,
   SmeltingRunTelemetry,
+  SovereignIndustrialProject,
 } from "@prisma/client";
 
 describe("HavenPage Server Component", () => {
@@ -309,6 +310,27 @@ describe("HavenPage Server Component", () => {
         refinedBatchNumber: null,
         pouredAt: new Date(),
       } as unknown as SmeltingRunTelemetry,
+    ]);
+
+    vi.spyOn(prisma.sovereignIndustrialProject, "findMany").mockResolvedValue([
+      {
+        id: "proj_1",
+        projectCode: "PROJ-IRR-NIGER-0001",
+        projectName: "Solar-Powered Drip Irrigation",
+        category: "WATER_IRRIGATION",
+        countryCode: "NE",
+        districtName: "Tillabéri",
+        status: "ACTIVE",
+        allocatedAngel: 5000,
+        totalMilestones: 3,
+        completedMilestones: 1,
+        expectedJobs: 10,
+        jobsCreated: 3,
+        declaredImpactKwh: 1000,
+        realizedImpactKwh: 250,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as unknown as SovereignIndustrialProject,
     ]);
   });
 

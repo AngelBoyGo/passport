@@ -141,6 +141,23 @@ export default async function HavenPage() {
   let concessionsCount = 0;
   let totalIndustrialPouredGrams = 0;
   let totalIndustrialRoyaltiesAngel = 0;
+  let recentFundProjects: Array<{
+    id: string;
+    projectCode: string;
+    projectName: string;
+    category: string;
+    countryCode: string;
+    districtName: string;
+    status: string;
+    allocatedAngel: number;
+    totalMilestones: number;
+    completedMilestones: number;
+    jobsCreated: number;
+    realizedImpactKwh: number;
+  }> = [];
+  let totalFundProjects = 0;
+  let totalFundDeployedAngel = 0;
+  let totalFundJobsCreated = 0;
 
   try {
     memoriesCount = await prisma.swarmMemory.count();
@@ -323,6 +340,30 @@ export default async function HavenPage() {
     });
     totalIndustrialPouredGrams = allRuns.reduce((sum, r) => sum + r.grossPouredGrams, 0);
     totalIndustrialRoyaltiesAngel = allRuns.reduce((sum, r) => sum + r.royaltyDueAngel, 0);
+
+    // Sovereign Industrialization Fund (Q142 counter-cyclical stabilization)
+    const fundProjects = await prisma.sovereignIndustrialProject.findMany({
+      take: 6,
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        projectCode: true,
+        projectName: true,
+        category: true,
+        countryCode: true,
+        districtName: true,
+        status: true,
+        allocatedAngel: true,
+        totalMilestones: true,
+        completedMilestones: true,
+        jobsCreated: true,
+        realizedImpactKwh: true,
+      },
+    });
+    recentFundProjects = fundProjects;
+    totalFundProjects = fundProjects.length;
+    totalFundDeployedAngel = fundProjects.reduce((sum, p) => sum + p.allocatedAngel, 0);
+    totalFundJobsCreated = fundProjects.reduce((sum, p) => sum + p.jobsCreated, 0);
   } catch {
     // Non-fatal if DB not yet reachable in static analysis
   }
@@ -1248,6 +1289,130 @@ export default async function HavenPage() {
                 ) : (
                   <div className="py-8 text-center text-xs text-slate-500 font-mono">
                     No industrial smelter telemetry recorded. Ingest via POST /api/v1/reserves/industrial/smelt.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Sovereign Industrialization & Counter-Cyclical Stabilization Fund */}
+        <section className="border-b border-slate-800/80 bg-slate-900/40 py-16">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+              <div>
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-950/20 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-emerald-400">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                  Q142 Counter-Cyclical Sterilization • AES Stabilization Fund
+                </div>
+                <h2 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl text-white">
+                  Sovereign Industrialization &amp; Stabilization Fund
+                </h2>
+                <p className="mt-1 text-sm text-slate-400">
+                  Automatically deploys surplus 30% stabilization revenue into verifiable irrigation, solar, fertilizer, and vocational projects across the AES confederation.
+                </p>
+              </div>
+              <Link
+                href="/api/v1/reserves/fund/projects"
+                target="_blank"
+                className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-950/20 px-4 py-2 text-xs font-semibold text-emerald-300 hover:bg-emerald-900/40 transition self-start sm:self-auto"
+              >
+                Fund Projects API →
+              </Link>
+            </div>
+
+            {/* Fund Metrics Grid */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-8">
+              <div className="rounded-xl border border-emerald-900/40 bg-slate-900/70 p-5">
+                <div className="text-xs uppercase tracking-wider text-slate-400">Deployed Indust. Capital</div>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-3xl font-extrabold text-emerald-300">
+                    {totalFundDeployedAngel.toLocaleString()}
+                  </span>
+                  <span className="text-sm font-semibold text-slate-400">ANGEL</span>
+                </div>
+                <div className="mt-1 text-xs text-slate-500 font-mono">
+                  30% stabilization share deployed
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-5">
+                <div className="text-xs uppercase tracking-wider text-slate-400">Active Funded Projects</div>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-3xl font-extrabold text-white">
+                    {totalFundProjects}
+                  </span>
+                  <span className="text-sm font-semibold text-slate-400">protojects</span>
+                </div>
+                <div className="mt-1 text-xs text-slate-500 font-mono">
+                  Irrigation • Solar • Fertilizer • Vocation
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-5">
+                <div className="text-xs uppercase tracking-wider text-slate-400">Sovereign Jobs Created</div>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-3xl font-extrabold text-emerald-400">
+                    {totalFundJobsCreated.toLocaleString()}
+                  </span>
+                  <span className="text-sm font-semibold text-slate-400">jobs</span>
+                </div>
+                <div className="mt-1 text-xs text-slate-500 font-mono">
+                  Machine-verified milestone delivery
+                </div>
+              </div>
+            </div>
+
+            {/* Recent Fund Projects Stream */}
+            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800 text-xs font-mono text-slate-400">
+                <span>INDUSTRIALIZATION PROTOJECTS</span>
+                <span className="text-emerald-400">Milestone-Verified Deployment</span>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {recentFundProjects.length > 0 ? (
+                  recentFundProjects.map((p) => (
+                    <div
+                      key={p.id || p.projectCode}
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-slate-800/80 bg-black/40 p-3.5 text-xs font-mono"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-emerald-300">{p.projectCode}</span>
+                          <span className="rounded bg-slate-800/80 border border-slate-700/50 px-1.5 py-0.2 text-[10px] text-slate-300">
+                            {p.countryCode} • {p.districtName}
+                          </span>
+                          <span
+                            className={`rounded px-1.5 py-0.2 text-[10px] border ${
+                              p.status === "COMPLETED"
+                                ? "bg-emerald-950/60 border-emerald-800/40 text-emerald-300"
+                                : p.status === "ACTIVE"
+                                ? "bg-indigo-950/60 border-indigo-800/40 text-indigo-300"
+                                : "bg-amber-950/60 border-amber-800/40 text-amber-300"
+                            }`}
+                          >
+                            {p.status}
+                          </span>
+                        </div>
+                        <div className="mt-1 text-[11px] text-slate-400">
+                          {p.projectName} • {p.category.replace("_", " ")}
+                        </div>
+                      </div>
+
+                      <div className="sm:text-right">
+                        <div className="text-emerald-400 font-semibold">
+                          {p.allocatedAngel.toLocaleString()} ANGEL
+                        </div>
+                        <div className="text-[10px] text-slate-500">
+                          {p.completedMilestones}/{p.totalMilestones} milestones • {p.jobsCreated} jobs
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-8 text-center text-xs text-slate-500 font-mono">
+                    No industrialization projects deployed. Register via POST /api/v1/reserves/fund/projects.
                   </div>
                 )}
               </div>

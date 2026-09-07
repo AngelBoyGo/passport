@@ -742,6 +742,113 @@ export interface IndustrialClient {
   listConcessions(): Promise<IndustrialConcessionsResponse>;
 }
 
+export interface RegisterProjectInput {
+  projectCode: string;
+  projectName: string;
+  category: string;
+  countryCode: string;
+  districtName: string;
+  operatorCommitment: string;
+  allocatedAngel: number;
+  totalMilestones?: number;
+  expectedJobs?: number;
+  declaredImpactKwh?: number;
+}
+
+export interface RegisterProjectResponse {
+  success: boolean;
+  project: {
+    project_code: string;
+    project_name: string;
+    category: string;
+    country_code: string;
+    status: string;
+    allocated_angel: number;
+    total_milestones: number;
+  };
+}
+
+export interface VerifyMilestoneClientInput {
+  disbursementId: string;
+  verifierSignature: string;
+  verifierPublicKey: string;
+  mediaDigest: string;
+  verificationDescription?: string;
+  jobsCreated?: number;
+  realizedImpactKwh?: number;
+}
+
+export interface RegFundClientInput {
+  projectCode: string;
+  projectName: string;
+  category: string;
+  countryCode: string;
+  districtName: string;
+  operatorCommitment: string;
+  allocatedAngel: number;
+  totalMilestones?: number;
+  expectedJobs?: number;
+  declaredImpactKwh?: number;
+}
+
+export interface RegisterProjectResponse {
+  success: boolean;
+  project: {
+    project_code: string;
+    project_name: string;
+    category: string;
+    country_code: string;
+    status: string;
+    allocated_angel: number;
+    total_milestones: number;
+  };
+}
+
+export interface FundProjectsListResponse {
+  success: boolean;
+  metrics: {
+    activeProjectsCount: number;
+    totalProjects: number;
+    totalDeployedAngel: number;
+    totalJobsCreated: number;
+    totalCompletedMilestones: number;
+    totalRealizedImpactKwh: number;
+    balance: {
+      totalBalance: number;
+      coldHibernationReserve: number;
+      deployableBalance: number;
+    };
+    solvency: {
+      totalBalance: number;
+      coldHibernationReserve: number;
+      deployableBalance: number;
+      totalAllocatedAngel: number;
+      deployedInRolling365d: number;
+      bufferSolvent: boolean;
+    };
+  };
+  projects: Array<{
+    project_code: string;
+    project_name: string;
+    category: string;
+    country_code: string;
+    district_name: string;
+    status: string;
+    allocated_angel: number;
+    total_milestones: number;
+    completed_milestones: number;
+    jobs_created: number;
+    realized_impact_kwh: number;
+  }>;
+  timestamp: string;
+}
+
+export interface FundClient {
+  registerProject(input: RegFundClientInput): Promise<RegisterProjectResponse>;
+  listProjects(): Promise<FundProjectsListResponse>;
+  verifyMilestone(input: VerifyMilestoneClientInput): Promise<{ success: boolean; is_complete: boolean }>;
+}
+
 export interface EvidencePayload {
   task_id?: string;
   digest?: string;
@@ -793,6 +900,7 @@ export class PassportClient {
   public readonly artisanal: ArtisanalClient;
   public readonly transit: TransitClient;
   public readonly industrial: IndustrialClient;
+  public readonly fund: FundClient;
 
   constructor(options: PassportClientOptions) {
     this.apiKey = options.apiKey;
@@ -1398,6 +1506,62 @@ export class PassportClient {
           headers: {
             Authorization: `Bearer ${this.apiKey}`,
           },
+        });
+        return this.parseJsonResponse(response);
+      },
+    };
+
+    this.fund = {
+      registerProject: async (input: RegFundClientInput) => {
+        const response = await fetchWithRetry(`${this.baseUrl}/api/v1/reserves/fund/projects`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${this.apiKey}`,
+          },
+          body: JSON.stringify({
+            project_code: input.projectCode,
+            project_name: input.projectName,
+            category: input.category,
+            country_code: input.countryCode,
+            district_name: input.districtName,
+            operator_commitment: input.operatorCommitment,
+            allocated_angel: input.allocatedAngel,
+            total_milestones: input.totalMilestones,
+            expected_jobs: input.expectedJobs,
+            declared_impact_kwh: input.declaredImpactKwh,
+          }),
+        });
+        return this.parseJsonResponse(response);
+      },
+
+      listProjects: async () => {
+        const url = `${this.baseUrl}/api/v1/reserves/fund/projects`;
+        const response = await fetchWithRetry(url, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`,
+          },
+        });
+        return this.parseJsonResponse(response);
+      },
+
+      verifyMilestone: async (input: VerifyMilestoneClientInput) => {
+        const response = await fetchWithRetry(`${this.baseUrl}/api/v1/reserves/fund/milestones`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${this.apiKey}`,
+          },
+          body: JSON.stringify({
+            disbursement_id: input.disbursementId,
+            verifier_signature: input.verifierSignature,
+            verifier_public_key: input.verifierPublicKey,
+            media_digest: input.mediaDigest,
+            verification_description: input.verificationDescription,
+            jobs_created: input.jobsCreated,
+            realized_impact_kwh: input.realizedImpactKwh,
+          }),
         });
         return this.parseJsonResponse(response);
       },
