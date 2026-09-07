@@ -10,9 +10,14 @@
  */
 
 import { prisma } from "@/lib/db";
-import { canonicalJson } from "@/lib/receipt/canonical";
+import { canonicalJson, sha256Hex } from "@/lib/receipt/canonical";
 import { verify } from "@noble/ed25519";
 import { hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
+
+/** Deterministic 64-hex wallet commitment for a host-nation stabilization account. */
+export function stateStabilizationWalletCommitment(countryCode: string): string {
+  return sha256Hex(`state:stabilization:${countryCode.toUpperCase()}`);
+}
 
 export const STABILIZATION_COLD_BUFFER_PERCENT = 0.25; // 25% reserve never deployable
 export const STABILIZATION_TREASURY = "protocol_treasury_system";
@@ -74,6 +79,23 @@ export async function getStabilizationFundBalance(): Promise<FundBalance> {
 }
 
 /**
+ * Computes exact milestone amounts that sum to the full allocatedAngel (no remainder leak).
+ */
+export function distributeMilestoneAmounts(allocatedAngel: number, totalMilestones: number): number[] {
+  if (totalMilestones < 1) {
+    throw new Error("totalMilestones must be at least 1");
+  }
+  const base = Math.floor(allocatedAngel / totalMilestones);
+  const last = allocatedAngel - base * (totalMilestones - 1);
+  const amounts: number[] = [];
+  for (let i = 0; i < totalMilestones - 1; i++) {
+    amounts.push(Math.max(base, 1));
+  }
+  amounts.push(Math.max(last, 1));
+  return amounts;
+}
+
+/**
  * Registers a new eligible industrialization project, allocating stabilization funds.
  */
 export async function registerIndustrialProject(input: RegisterProjectInput) {
@@ -85,6 +107,7 @@ export async function registerIndustrialProject(input: RegisterProjectInput) {
   if (!Number.isFinite(input.allocatedAngel) || input.allocatedAngel <= 0) {
     throw new Error("allocatedAngel must be a positive integer");
   }
+  const totalMilestones = input.totalMilestones ?? 3;
 
   // 1. Verify deployable stabilization balance (net of 25% cold buffer)
   const { deployableBalance } = await getStabilizationFundBalance();
@@ -94,16 +117,27 @@ export async function registerIndustrialProject(input: RegisterProjectInput) {
     );
   }
 
-  // 2. Execute allocation transaction
+  // Pre-compute exact milestone amounts (sum == allocatedAngel)
+  const milestoneAmounts = distributeMilestoneAmounts(input.allocatedAngel, totalMilestones);
+
+  // 2. Execute allocation transaction with an atomic balance guard (TOCTOU-safe)
   return prisma.$transaction(async (tx) => {
-    // Debit stabilization treasury
-    await tx.agentWallet.update({
-      where: { subjectCommitment: STABILIZATION_TREASURY },
+    // Atomically debit only if the treasury holds sufficient balance
+    const debit = await tx.agentWallet.updateMany({
+      where: {
+        subjectCommitment: STABILIZATION_TREASURY,
+        balance: { gte: input.allocatedAngel },
+      },
       data: {
         balance: { decrement: input.allocatedAngel },
         lastActivityAt: new Date(),
       },
     });
+    if (debit.count !== 1) {
+      throw new Error(
+        `Stabilization treasury does not hold sufficient deployable balance (${input.allocatedAngel} ANGEL requested)`
+      );
+    }
 
     // Create the industrialization project
     const project = await tx.sovereignIndustrialProject.create({
@@ -115,20 +149,19 @@ export async function registerIndustrialProject(input: RegisterProjectInput) {
         districtName: input.districtName,
         status: "FUNDED",
         allocatedAngel: input.allocatedAngel,
-        totalMilestones: input.totalMilestones ?? 3,
+        totalMilestones,
         expectedJobs: input.expectedJobs ?? 10,
         declaredImpactKwh: input.declaredImpactKwh ?? 0,
       },
     });
 
-    // Create the first PENDING milestone disbursement
-    const firstMilestoneAmount = Math.floor(input.allocatedAngel / (input.totalMilestones ?? 3));
+    // Create the first PENDING milestone disbursement with an exact amount
     await tx.stabilizationDisbursement.create({
       data: {
         disbursementId: `DISB-${input.projectCode}-M1`,
         projectId: project.id,
         milestoneNumber: 1,
-        amountAngel: Math.max(firstMilestoneAmount, 1),
+        amountAngel: milestoneAmounts[0],
         status: "PENDING",
         verificationMediaDigest: "PENDING_VERIFICATION",
         verifierSignature: "PENDING",
@@ -180,11 +213,27 @@ export async function verifyMilestoneCompletion(input: VerifyMilestoneInput) {
   }
 
   return prisma.$transaction(async (tx) => {
-    // 1. Credit milestone amount to project operator wallet
+    // 0. Atomic guard: transition PENDING -> PAID; abort if already claimed (concurrency-safe)
+    const transitioned = await tx.stabilizationDisbursement.updateMany({
+      where: { disbursementId: input.disbursementId, status: "PENDING" },
+      data: {
+        status: "PAID",
+        verificationMediaDigest: input.mediaDigest,
+        verificationDescription: input.verificationDescription,
+        verifierSignature: input.verifierSignature,
+        disbursedAt: new Date(),
+      },
+    });
+    if (transitioned.count !== 1) {
+      throw new Error(`Disbursement '${input.disbursementId}' is no longer in PENDING state`);
+    }
+
+    // 1. Credit milestone amount to the host-nation stabilization wallet (64-hex commitment)
+    const stateCommitment = stateStabilizationWalletCommitment(disbursement.project.countryCode);
     await tx.agentWallet.upsert({
-      where: { subjectCommitment: disbursement.project.countryCode },
+      where: { subjectCommitment: stateCommitment },
       create: {
-        subjectCommitment: disbursement.project.countryCode,
+        subjectCommitment: stateCommitment,
         balance: disbursement.amountAngel,
         earnedTotal: disbursement.amountAngel,
         lastActivityAt: new Date(),
@@ -196,17 +245,13 @@ export async function verifyMilestoneCompletion(input: VerifyMilestoneInput) {
       },
     });
 
-    // 2. Mark disbursement paid
-    const paid = await tx.stabilizationDisbursement.update({
+    // 2. Mark disbursement paid (fetch the updated row for the response)
+    const paid = await tx.stabilizationDisbursement.findUnique({
       where: { disbursementId: input.disbursementId },
-      data: {
-        status: "PAID",
-        verificationMediaDigest: input.mediaDigest,
-        verificationDescription: input.verificationDescription,
-        verifierSignature: input.verifierSignature,
-        disbursedAt: new Date(),
-      },
     });
+    if (!paid) {
+      throw new Error(`Disbursement '${input.disbursementId}' not found after transition`);
+    }
 
     // 3. Update project progress
     const nextMilestone = disbursement.milestoneNumber + 1;
@@ -221,17 +266,19 @@ export async function verifyMilestoneCompletion(input: VerifyMilestoneInput) {
       },
     });
 
-    // 4. Create the next milestone if project is not complete
+    // 4. Create the next milestone with an exact amount if the project is not complete
     if (!isComplete) {
-      const nextAmount = Math.floor(
-        updatedProject.allocatedAngel / updatedProject.totalMilestones
+      const milestoneAmounts = distributeMilestoneAmounts(
+        updatedProject.allocatedAngel,
+        updatedProject.totalMilestones
       );
+      const nextAmount = milestoneAmounts[nextMilestone - 1];
       await tx.stabilizationDisbursement.create({
         data: {
           disbursementId: `DISB-${disbursement.project.projectCode}-M${nextMilestone}`,
           projectId: updatedProject.id,
           milestoneNumber: nextMilestone,
-          amountAngel: Math.max(nextAmount, 1),
+          amountAngel: nextAmount,
           status: "PENDING",
           verificationMediaDigest: "PENDING_VERIFICATION",
           verifierSignature: "PENDING",

@@ -5,10 +5,11 @@ const { prismaMock } = vi.hoisted(() => ({
     agentWallet: {
       findUnique: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
       upsert: vi.fn(),
     },
     sovereignIndustrialProject: { create: vi.fn(), findMany: vi.fn(), update: vi.fn() },
-    stabilizationDisbursement: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn(), findMany: vi.fn() },
+    stabilizationDisbursement: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn(), findMany: vi.fn() },
     $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(prismaMock)),
   },
 }));
@@ -20,6 +21,8 @@ import {
   registerIndustrialProject,
   checkFundSolvencyCeiling,
   verifyMilestoneCompletion,
+  stateStabilizationWalletCommitment,
+  distributeMilestoneAmounts,
   STABILIZATION_COLD_BUFFER_PERCENT,
   STABILIZATION_TREASURY,
 } from "../industrialization-fund";
@@ -30,6 +33,19 @@ import { canonicalJson } from "@/lib/receipt/canonical";
 describe("Sovereign Industrialization & Counter-Cyclical Stabilization Fund", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+  });
+
+  describe("distributeMilestoneAmounts (Exact-Allocation Invariant)", () => {
+    it("distributes milestones whose sum exactly equals allocatedAngel", () => {
+      const amounts = distributeMilestoneAmounts(5000, 3);
+      expect(amounts).toEqual([1666, 1666, 1668]);
+      expect(amounts.reduce((a, b) => a + b, 0)).toBe(5000);
+    });
+
+    it("handles small allocations with a single milestone", () => {
+      const amounts = distributeMilestoneAmounts(7, 3);
+      expect(amounts.reduce((a, b) => a + b, 0)).toBe(7);
+    });
   });
 
   describe("getStabilizationFundBalance", () => {
@@ -93,7 +109,7 @@ describe("Sovereign Industrialization & Counter-Cyclical Stabilization Fund", ()
         subjectCommitment: STABILIZATION_TREASURY,
         balance: 100000, // deployable = 75000
       });
-      prismaMock.agentWallet.update.mockResolvedValue({});
+      prismaMock.agentWallet.updateMany.mockResolvedValue({ count: 1 });
       prismaMock.sovereignIndustrialProject.create.mockResolvedValue({
         projectCode: "PROJ-IRR-ML-001",
         projectName: "Solar Irrigation",
@@ -120,10 +136,13 @@ describe("Sovereign Industrialization & Counter-Cyclical Stabilization Fund", ()
       });
 
       expect(project.status).toBe("FUNDED");
-      // Treasury debited
-      expect(prismaMock.agentWallet.update).toHaveBeenCalledWith(
+      // Treasury atomically debited only when balance >= allocation
+      expect(prismaMock.agentWallet.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { subjectCommitment: STABILIZATION_TREASURY },
+          where: expect.objectContaining({
+            subjectCommitment: STABILIZATION_TREASURY,
+            balance: { gte: 5000 },
+          }),
           data: expect.objectContaining({ balance: { decrement: 5000 } }),
         })
       );
@@ -185,22 +204,25 @@ describe("Sovereign Industrialization & Counter-Cyclical Stabilization Fund", ()
       const canonicalPayload = canonicalJson(payload);
       const signatureBytes = await sign(utf8ToBytes(canonicalPayload), verifierPrivateKey);
 
-      prismaMock.stabilizationDisbursement.findUnique.mockResolvedValue({
+      const pendingDisbursement = {
         disbursementId: "DISB-PROJ-1",
         milestoneNumber: 1,
         status: "PENDING",
         amountAngel: 500,
         projectId: "proj_1",
-        project: { projectCode: "PROJ-1", totalMilestones: 1 },
-      });
-      prismaMock.agentWallet.upsert.mockResolvedValue({});
-      prismaMock.stabilizationDisbursement.update.mockResolvedValue({
-        disbursementId: "DISB-PROJ-1",
-        milestoneNumber: 1,
+        project: { projectCode: "PROJ-1", countryCode: "ML", totalMilestones: 1 },
+      };
+      const paidDisbursement = {
+        ...pendingDisbursement,
         status: "PAID",
-        amountAngel: 500,
         disbursedAt: new Date(),
-      });
+      };
+
+      prismaMock.stabilizationDisbursement.findUnique
+        .mockResolvedValueOnce(pendingDisbursement)
+        .mockResolvedValueOnce(paidDisbursement);
+      prismaMock.stabilizationDisbursement.updateMany.mockResolvedValue({ count: 1 });
+      prismaMock.agentWallet.upsert.mockResolvedValue({});
       prismaMock.sovereignIndustrialProject.update.mockResolvedValue({
         id: "proj_1",
         completedMilestones: 1,
@@ -208,6 +230,16 @@ describe("Sovereign Industrialization & Counter-Cyclical Stabilization Fund", ()
         allocatedAngel: 500,
         status: "COMPLETED",
         projectCode: "PROJ-1",
+        countryCode: "ML",
+        districtName: "Sikasso",
+        projectName: "Solar Irrigation",
+        category: "WATER_IRRIGATION",
+        expectedJobs: 10,
+        jobsCreated: 1,
+        declaredImpactKwh: 1000,
+        realizedImpactKwh: 100,
+        createdAt: new Date(),
+        updatedAt: new Date(),
       });
 
       const result = await verifyMilestoneCompletion({
@@ -219,10 +251,18 @@ describe("Sovereign Industrialization & Counter-Cyclical Stabilization Fund", ()
 
       expect(result.disbursement.status).toBe("PAID");
       expect(result.isComplete).toBe(true);
-      // Milestone amount credited to host-nation operator wallet
+      // Atomic PENDING -> PAID transition used
+      expect(prismaMock.stabilizationDisbursement.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ status: "PENDING" }),
+        })
+      );
+      // Milestone amount credited to the deterministic 64-hex state stabilization wallet
       expect(prismaMock.agentWallet.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({}),
+          where: expect.objectContaining({
+            subjectCommitment: stateStabilizationWalletCommitment("ML"),
+          }),
           update: expect.objectContaining({ balance: { increment: 500 } }),
         })
       );
