@@ -400,6 +400,68 @@ export function createPassportMcpServer(
     }
   );
 
+  server.tool(
+    "passport_dispatch_transit_waybill",
+    "Dispatch physical bullion convoy under diplomatic bonded seal to a coastal port enclave (Lomé/Conakry)",
+    {
+      waybill_number: z.string().min(1),
+      batch_number: z.string().min(1),
+      destination_port_code: z.string().min(1),
+      origin_vault_id: z.string().min(1),
+      carrier_commitment: z.string().min(1),
+      diplomatic_seal_digest: z.string().min(1),
+      carrier_bond_angel: z.number().optional(),
+    },
+    async (args) => {
+      const result = await handlers.dispatchTransitWaybill({
+        waybillNumber: args.waybill_number,
+        batchNumber: args.batch_number,
+        destinationPortCode: args.destination_port_code,
+        originVaultId: args.origin_vault_id,
+        carrierCommitment: args.carrier_commitment,
+        diplomaticSealDigest: args.diplomatic_seal_digest,
+        carrierBondAngel: args.carrier_bond_angel,
+      });
+      return {
+        content: [{ type: "text", text: JSON.stringify(result) }],
+      };
+    }
+  );
+
+  server.tool(
+    "passport_record_port_arrival",
+    "Confirm arrival of diplomatic bonded bullion convoy at coastal port customs enclave and release carrier bond",
+    {
+      waybill_number: z.string().min(1),
+      port_code: z.string().min(1),
+      enclave_signature: z.string().min(1),
+      enclave_public_key: z.string().optional(),
+    },
+    async (args) => {
+      const result = await handlers.recordPortArrival({
+        waybillNumber: args.waybill_number,
+        portCode: args.port_code,
+        enclaveSignature: args.enclave_signature,
+        enclavePublicKey: args.enclave_public_key,
+      });
+      return {
+        content: [{ type: "text", text: JSON.stringify(result) }],
+      };
+    }
+  );
+
+  server.tool(
+    "passport_list_transit_corridors",
+    "List coastal port customs enclaves (Lomé & Conakry), active diplomatic transit waybills, and logistics metrics",
+    {},
+    async () => {
+      const result = await handlers.listTransitCorridors();
+      return {
+        content: [{ type: "text", text: JSON.stringify(result) }],
+      };
+    }
+  );
+
   return server;
 }
 

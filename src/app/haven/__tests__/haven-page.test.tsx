@@ -13,6 +13,8 @@ import type {
   OreIntakeReceipt,
   SovereignQuorumProposal,
   SovereignStateHeartbeat,
+  CoastalPortEnclave,
+  BondedTransitWaybill,
 } from "@prisma/client";
 
 describe("HavenPage Server Component", () => {
@@ -222,6 +224,45 @@ describe("HavenPage Server Component", () => {
         status: "ONLINE",
         updatedAt: new Date(),
       } as unknown as SovereignStateHeartbeat,
+    ]);
+
+    vi.spyOn(prisma.coastalPortEnclave, "findMany").mockResolvedValue([
+      {
+        id: "port_1",
+        portCode: "PORT-LOME-TG",
+        portName: "Port of Lomé",
+        countryCode: "TG",
+        customsAuthorityName: "OTR Customs",
+        enclavePublicKey: "pk_lome",
+        clearingFeeShareBps: 50,
+        totalTransitGrams: 5000.0,
+        totalFeesEarnedAngel: 50,
+        activeStatus: "ACTIVE",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as unknown as CoastalPortEnclave,
+    ]);
+
+    vi.spyOn(prisma.bondedTransitWaybill, "findMany").mockResolvedValue([
+      {
+        id: "wb_1",
+        waybillNumber: "WAYBILL-AES-LOME-2026-0001",
+        batchNumber: "BKO-AU-2026-001",
+        enclaveId: "port_1",
+        destinationPortCode: "PORT-LOME-TG",
+        originVaultId: "VAULT-BKO",
+        carrierCommitment: "c".repeat(64),
+        carrierBondAngel: 5000,
+        grossWeightGrams: 1000.0,
+        fineGoldGrams: 999.9,
+        diplomaticSealDigest: "d".repeat(64),
+        status: "DISPATCHED",
+        checkpointsVisited: ["SIKASSO", "OUAGA"],
+        dispatchedAt: new Date(),
+        arrivedAt: null,
+        clearedAt: null,
+        slashedAt: null,
+      } as unknown as BondedTransitWaybill,
     ]);
   });
 

@@ -8,6 +8,7 @@ const { prismaMock } = vi.hoisted(() => ({
     operatorLedgerEntry: { findMany: vi.fn() },
     commodityReserve: { findMany: vi.fn(), upsert: vi.fn() },
     vaultBatch: { findMany: vi.fn(), count: vi.fn() },
+    commodityEscrow: { findMany: vi.fn() },
     sovereignDisbursement: { findMany: vi.fn() },
     artisanalBuyingStation: { findMany: vi.fn() },
     oreIntakeReceipt: { findMany: vi.fn() },
@@ -36,8 +37,21 @@ describe("Production Route Integration & Pre-Flight Probe", () => {
     prismaMock.agentWallet.findMany.mockResolvedValue([]);
     prismaMock.operatorLedgerEntry.findMany.mockResolvedValue([]);
     prismaMock.commodityReserve.findMany.mockResolvedValue([]);
+    prismaMock.commodityReserve.upsert.mockResolvedValue({
+      id: "res_1",
+      commodityType: "GOLD",
+      symbol: "Au",
+      totalGrams: 0,
+      totalFineGrams: 0,
+      activeLotsCount: 0,
+      latestMerkleRoot: "0".repeat(64),
+      lastAuditedAt: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
     prismaMock.vaultBatch.findMany.mockResolvedValue([]);
     prismaMock.vaultBatch.count.mockResolvedValue(0);
+    prismaMock.commodityEscrow.findMany.mockResolvedValue([]);
     prismaMock.sovereignDisbursement.findMany.mockResolvedValue([]);
     prismaMock.artisanalBuyingStation.findMany.mockResolvedValue([]);
     prismaMock.oreIntakeReceipt.findMany.mockResolvedValue([]);

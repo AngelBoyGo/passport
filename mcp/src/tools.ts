@@ -240,5 +240,30 @@ export function createToolHandlers(client: PassportClient) {
     async listQuorumProposals(options?: { limit?: number }) {
       return client.reserves.listQuorumProposals(options);
     },
+
+    async dispatchTransitWaybill(input: {
+      waybillNumber: string;
+      batchNumber: string;
+      destinationPortCode: string;
+      originVaultId: string;
+      carrierCommitment: string;
+      diplomaticSealDigest: string;
+      carrierBondAngel?: number;
+    }) {
+      return client.transit.dispatch(input);
+    },
+
+    async recordPortArrival(input: {
+      waybillNumber: string;
+      portCode: string;
+      enclaveSignature: string;
+      enclavePublicKey?: string;
+    }) {
+      return client.transit.recordArrival(input);
+    },
+
+    async listTransitCorridors() {
+      return client.transit.listCorridors();
+    },
   };
 }

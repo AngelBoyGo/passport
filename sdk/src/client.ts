@@ -228,6 +228,8 @@ export interface PoRResponse {
     commodity_type: string;
     symbol: string;
     total_fine_grams: number;
+    encumbered_fine_grams?: number;
+    unencumbered_fine_grams?: number;
     total_gross_grams: number;
     active_lots_count: number;
     merkle_root: string;
@@ -585,6 +587,86 @@ export interface ArtisanalClient {
   bridgeDoré(input: BridgeDoreClientInput): Promise<BridgeDoreResponse>;
 }
 
+export interface DispatchTransitClientInput {
+  waybillNumber: string;
+  batchNumber: string;
+  destinationPortCode: string;
+  originVaultId: string;
+  carrierCommitment: string;
+  carrierBondAngel?: number;
+  diplomaticSealDigest: string;
+}
+
+export interface DispatchTransitResponse {
+  success: boolean;
+  waybill: {
+    waybill_number: string;
+    batch_number: string;
+    destination_port_code: string;
+    carrier_commitment: string;
+    carrier_bond_angel: number;
+    fine_gold_grams: number;
+    status: string;
+    dispatched_at: string;
+  };
+}
+
+export interface TransitCheckpointClientInput {
+  waybillNumber: string;
+  checkpointName: string;
+  inspectorSignature: string;
+  inspectorPublicKey: string;
+}
+
+export interface TransitArrivalClientInput {
+  waybillNumber: string;
+  portCode: string;
+  enclaveSignature: string;
+  enclavePublicKey?: string;
+}
+
+export interface TransitCorridorsResponse {
+  success: boolean;
+  metrics: {
+    activeEnclavesCount: number;
+    activeWaybillsCount: number;
+    transitFineGoldGrams: number;
+    totalCarrierBondsLockedAngel: number;
+    totalConvoysArrived: number;
+    totalBreachesDetected: number;
+  };
+  enclaves: Array<{
+    port_code: string;
+    port_name: string;
+    country_code: string;
+    customs_authority_name: string;
+    clearing_fee_share_bps: number;
+    total_transit_grams: number;
+    total_fees_earned_angel: number;
+    active_status: string;
+  }>;
+  recent_waybills: Array<{
+    waybill_number: string;
+    batch_number: string;
+    destination_port_code: string;
+    carrier_commitment: string;
+    carrier_bond_angel: number;
+    fine_gold_grams: number;
+    status: string;
+    checkpoints_visited: string[];
+    dispatched_at: string;
+    arrived_at?: string | null;
+  }>;
+  timestamp: string;
+}
+
+export interface TransitClient {
+  dispatch(input: DispatchTransitClientInput): Promise<DispatchTransitResponse>;
+  recordCheckpoint(input: TransitCheckpointClientInput): Promise<{ success: boolean; waybill: { waybill_number: string; status: string; checkpoints_visited: string[] } }>;
+  recordArrival(input: TransitArrivalClientInput): Promise<{ success: boolean; waybill: { waybill_number: string; status: string; arrived_at?: string | null } }>;
+  listCorridors(): Promise<TransitCorridorsResponse>;
+}
+
 export interface EvidencePayload {
   task_id?: string;
   digest?: string;
@@ -634,6 +716,7 @@ export class PassportClient {
   public readonly reserves: ReservesClient;
   public readonly escrow: ReservesEscrowClient;
   public readonly artisanal: ArtisanalClient;
+  public readonly transit: TransitClient;
 
   constructor(options: PassportClientOptions) {
     this.apiKey = options.apiKey;
@@ -1116,6 +1199,73 @@ export class PassportClient {
             refined_gross_grams: input.refinedGrossGrams,
             refined_fineness: input.refinedFineness,
           }),
+        });
+        return this.parseJsonResponse(response);
+      },
+    };
+
+    this.transit = {
+      dispatch: async (input: DispatchTransitClientInput) => {
+        const response = await fetchWithRetry(`${this.baseUrl}/api/v1/reserves/transit/dispatch`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${this.apiKey}`,
+          },
+          body: JSON.stringify({
+            waybill_number: input.waybillNumber,
+            batch_number: input.batchNumber,
+            destination_port_code: input.destinationPortCode,
+            origin_vault_id: input.originVaultId,
+            carrier_commitment: input.carrierCommitment,
+            carrier_bond_angel: input.carrierBondAngel,
+            diplomatic_seal_digest: input.diplomaticSealDigest,
+          }),
+        });
+        return this.parseJsonResponse(response);
+      },
+
+      recordCheckpoint: async (input: TransitCheckpointClientInput) => {
+        const response = await fetchWithRetry(`${this.baseUrl}/api/v1/reserves/transit/checkpoint`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${this.apiKey}`,
+          },
+          body: JSON.stringify({
+            waybill_number: input.waybillNumber,
+            checkpoint_name: input.checkpointName,
+            inspector_signature: input.inspectorSignature,
+            inspector_public_key: input.inspectorPublicKey,
+          }),
+        });
+        return this.parseJsonResponse(response);
+      },
+
+      recordArrival: async (input: TransitArrivalClientInput) => {
+        const response = await fetchWithRetry(`${this.baseUrl}/api/v1/reserves/transit/arrive`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${this.apiKey}`,
+          },
+          body: JSON.stringify({
+            waybill_number: input.waybillNumber,
+            port_code: input.portCode,
+            enclave_signature: input.enclaveSignature,
+            enclave_public_key: input.enclavePublicKey,
+          }),
+        });
+        return this.parseJsonResponse(response);
+      },
+
+      listCorridors: async () => {
+        const url = `${this.baseUrl}/api/v1/reserves/transit/corridors`;
+        const response = await fetchWithRetry(url, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`,
+          },
         });
         return this.parseJsonResponse(response);
       },

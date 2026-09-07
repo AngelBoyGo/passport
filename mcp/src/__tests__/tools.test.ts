@@ -386,4 +386,47 @@ describe("MCP tool handlers", () => {
     expect(listResult.success).toBe(true);
     expect(listQuorumProposals).toHaveBeenCalledWith({ limit: 5 });
   });
+
+  it("transit handlers delegate to client.transit", async () => {
+    const dispatch = vi.fn().mockResolvedValue({
+      success: true,
+      waybill: { waybill_number: "WAYBILL-1" },
+    });
+    const recordArrival = vi.fn().mockResolvedValue({
+      success: true,
+      waybill: { waybill_number: "WAYBILL-1", status: "PORT_ARRIVED" },
+    });
+    const listCorridors = vi.fn().mockResolvedValue({
+      success: true,
+      metrics: { activeEnclavesCount: 2 },
+    });
+
+    const client = {
+      transit: { dispatch, recordArrival, listCorridors },
+    } as unknown as PassportClient;
+    const handlers = createToolHandlers(client);
+
+    const dispatchRes = await handlers.dispatchTransitWaybill({
+      waybillNumber: "WAYBILL-1",
+      batchNumber: "BKO-01",
+      destinationPortCode: "PORT-LOME-TG",
+      originVaultId: "VAULT-BKO",
+      carrierCommitment: "c".repeat(64),
+      diplomaticSealDigest: "d".repeat(64),
+    });
+    expect(dispatchRes.success).toBe(true);
+    expect(dispatch).toHaveBeenCalledOnce();
+
+    const arrivalRes = await handlers.recordPortArrival({
+      waybillNumber: "WAYBILL-1",
+      portCode: "PORT-LOME-TG",
+      enclaveSignature: "sig",
+    });
+    expect(arrivalRes.success).toBe(true);
+    expect(recordArrival).toHaveBeenCalledOnce();
+
+    const corridorsRes = await handlers.listTransitCorridors();
+    expect(corridorsRes.success).toBe(true);
+    expect(listCorridors).toHaveBeenCalledOnce();
+  });
 });

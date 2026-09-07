@@ -38,6 +38,12 @@ export type {
   QuorumSignInput,
   QuorumSignResponse,
   QuorumProposalsListResponse,
+  TransitClient,
+  DispatchTransitClientInput,
+  DispatchTransitResponse,
+  TransitCheckpointClientInput,
+  TransitArrivalClientInput,
+  TransitCorridorsResponse,
 } from "./client.js";
 export {
   OPERATIONAL_DOMAINS,

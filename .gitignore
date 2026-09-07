@@ -17,6 +17,7 @@ mcp/node_modules/@passport/sdk
 # testing
 /coverage
 /.agoragentic/
+**/.vite/
 
 # next.js
 /.next/

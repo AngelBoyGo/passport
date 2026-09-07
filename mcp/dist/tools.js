@@ -125,5 +125,14 @@ export function createToolHandlers(client) {
         async listQuorumProposals(options) {
             return client.reserves.listQuorumProposals(options);
         },
+        async dispatchTransitWaybill(input) {
+            return client.transit.dispatch(input);
+        },
+        async recordPortArrival(input) {
+            return client.transit.recordArrival(input);
+        },
+        async listTransitCorridors() {
+            return client.transit.listCorridors();
+        },
     };
 }

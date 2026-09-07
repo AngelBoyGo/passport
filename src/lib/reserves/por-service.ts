@@ -17,7 +17,16 @@ import { prisma } from "@/lib/db";
 
 // ── Types ──
 
-export type BatchStatus = "UNVERIFIED" | "AUDITED" | "QUARANTINED" | "REDEEMED";
+export type BatchStatus =
+  | "UNVERIFIED"
+  | "AUDITED"
+  | "IN_TRANSIT"
+  | "PORT_VAULTED"
+  | "QUARANTINED"
+  | "REDEEMED"
+  | "SETTLED_DELIVERY";
+
+export const VALID_RESERVE_STATUSES: string[] = ["AUDITED", "IN_TRANSIT", "PORT_VAULTED"];
 
 export interface VaultBatchData {
   batchNumber: string;
@@ -116,9 +125,9 @@ export interface MerkleTreeResult {
  * Batches are sorted lexicographically by batchNumber to ensure tree determinism.
  */
 export function buildReserveMerkleTree(batches: VaultBatchData[]): MerkleTreeResult {
-  // Only include AUDITED batches in the reserve tree
+  // Include AUDITED, IN_TRANSIT, and PORT_VAULTED batches in the reserve tree
   const activeBatches = batches
-    .filter((b) => b.status === "AUDITED")
+    .filter((b) => VALID_RESERVE_STATUSES.includes(b.status))
     .sort((a, b) => a.batchNumber.localeCompare(b.batchNumber));
 
   if (activeBatches.length === 0) {
@@ -341,7 +350,7 @@ export async function generateLivePoR(commodityType = "GOLD"): Promise<{
   }));
 
   const tree = buildReserveMerkleTree(batches);
-  const activeBatches = batches.filter((b) => b.status === "AUDITED");
+  const activeBatches = batches.filter((b) => VALID_RESERVE_STATUSES.includes(b.status));
 
   const totalGrossGrams = activeBatches.reduce((sum, b) => sum + b.grossWeightGrams, 0);
   const totalFineGrams = activeBatches.reduce((sum, b) => sum + b.fineWeightGrams, 0);
@@ -444,8 +453,8 @@ export async function getBatchInclusionProof(
     assayRef: target.assayRef,
   };
 
-  // Quarantined, unverified or redeemed batches cannot produce active inclusion proofs
-  if (target.status !== "AUDITED") {
+  // Non-reserve status batches (e.g. quarantined, unverified, redeemed) cannot produce active inclusion proofs
+  if (!VALID_RESERVE_STATUSES.includes(target.status)) {
     const leafHash = computeBatchLeafHash(targetData);
     return {
       batchNumber,

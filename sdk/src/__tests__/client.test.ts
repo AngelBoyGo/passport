@@ -648,4 +648,106 @@ describe("PassportClient", () => {
       expect(init.method).toBe("POST");
     });
   });
+
+  describe("client.transit namespace", () => {
+    it("dispatch POSTs waybill to /api/v1/reserves/transit/dispatch", async () => {
+      fetchMock.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            waybill: { waybill_number: "WAYBILL-01", status: "DISPATCHED" },
+          }),
+          { status: 201, headers: { "Content-Type": "application/json" } }
+        )
+      );
+
+      const res = await client.transit.dispatch({
+        waybillNumber: "WAYBILL-01",
+        batchNumber: "BKO-01",
+        destinationPortCode: "PORT-LOME-TG",
+        originVaultId: "VAULT-BKO",
+        carrierCommitment: "c".repeat(64),
+        diplomaticSealDigest: "d".repeat(64),
+      });
+
+      expect(res.success).toBe(true);
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe("https://passport.example.com/api/v1/reserves/transit/dispatch");
+      expect(init.method).toBe("POST");
+      expect(JSON.parse(init.body as string)).toEqual({
+        waybill_number: "WAYBILL-01",
+        batch_number: "BKO-01",
+        destination_port_code: "PORT-LOME-TG",
+        origin_vault_id: "VAULT-BKO",
+        carrier_commitment: "c".repeat(64),
+        diplomatic_seal_digest: "d".repeat(64),
+      });
+    });
+
+    it("recordCheckpoint POSTs checkpoint to /api/v1/reserves/transit/checkpoint", async () => {
+      fetchMock.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            waybill: { waybill_number: "WAYBILL-01", status: "IN_TRANSIT", checkpoints_visited: ["SIKASSO"] },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      );
+
+      const res = await client.transit.recordCheckpoint({
+        waybillNumber: "WAYBILL-01",
+        checkpointName: "SIKASSO",
+        inspectorSignature: "sig",
+        inspectorPublicKey: "pk",
+      });
+
+      expect(res.success).toBe(true);
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe("https://passport.example.com/api/v1/reserves/transit/checkpoint");
+      expect(init.method).toBe("POST");
+    });
+
+    it("recordArrival POSTs arrival to /api/v1/reserves/transit/arrive", async () => {
+      fetchMock.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            waybill: { waybill_number: "WAYBILL-01", status: "PORT_ARRIVED" },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      );
+
+      const res = await client.transit.recordArrival({
+        waybillNumber: "WAYBILL-01",
+        portCode: "PORT-LOME-TG",
+        enclaveSignature: "sig_enclave",
+      });
+
+      expect(res.success).toBe(true);
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe("https://passport.example.com/api/v1/reserves/transit/arrive");
+      expect(init.method).toBe("POST");
+    });
+
+    it("listCorridors GETs /api/v1/reserves/transit/corridors", async () => {
+      fetchMock.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            metrics: { activeEnclavesCount: 2 },
+            enclaves: [{ port_code: "PORT-LOME-TG" }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      );
+
+      const res = await client.transit.listCorridors();
+      expect(res.success).toBe(true);
+      expect(res.metrics.activeEnclavesCount).toBe(2);
+      const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe("https://passport.example.com/api/v1/reserves/transit/corridors");
+    });
+  });
 });

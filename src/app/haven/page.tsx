@@ -103,6 +103,29 @@ export default async function HavenPage() {
     status: string;
     lastSeenAt: Date | null;
   }> = [];
+  let activeWaybills: Array<{
+    id: string;
+    waybillNumber: string;
+    batchNumber: string;
+    destinationPortCode: string;
+    originVaultId: string;
+    carrierCommitment: string;
+    carrierBondAngel: number;
+    fineGoldGrams: number;
+    status: string;
+    checkpointsVisited: string[];
+    dispatchedAt: Date;
+  }> = [];
+  let portEnclaves: Array<{
+    portCode: string;
+    portName: string;
+    countryCode: string;
+    activeStatus: string;
+    totalTransitGrams: number;
+    totalFeesEarnedAngel: number;
+  }> = [];
+  let totalTransitGoldGrams = 0;
+  let totalPortDividendsAngel = 0;
 
   try {
     memoriesCount = await prisma.swarmMemory.count();
@@ -223,6 +246,42 @@ export default async function HavenPage() {
     stateHeartbeats = await prisma.sovereignStateHeartbeat.findMany({
       select: { countryCode: true, status: true, lastSeenAt: true },
     });
+
+    portEnclaves = await prisma.coastalPortEnclave.findMany({
+      select: {
+        portCode: true,
+        portName: true,
+        countryCode: true,
+        activeStatus: true,
+        totalTransitGrams: true,
+        totalFeesEarnedAngel: true,
+      },
+    });
+
+    activeWaybills = await prisma.bondedTransitWaybill.findMany({
+      take: 4,
+      orderBy: { dispatchedAt: "desc" },
+      select: {
+        id: true,
+        waybillNumber: true,
+        batchNumber: true,
+        destinationPortCode: true,
+        originVaultId: true,
+        carrierCommitment: true,
+        carrierBondAngel: true,
+        fineGoldGrams: true,
+        status: true,
+        checkpointsVisited: true,
+        dispatchedAt: true,
+      },
+    });
+
+    const transitWaybills = await prisma.bondedTransitWaybill.findMany({
+      where: { status: { in: ["DISPATCHED", "IN_TRANSIT"] } },
+      select: { fineGoldGrams: true },
+    });
+    totalTransitGoldGrams = transitWaybills.reduce((sum, w) => sum + w.fineGoldGrams, 0);
+    totalPortDividendsAngel = portEnclaves.reduce((sum, e) => sum + e.totalFeesEarnedAngel, 0);
   } catch {
     // Non-fatal if DB not yet reachable in static analysis
   }
@@ -654,6 +713,132 @@ export default async function HavenPage() {
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        </section>
+
+        {/* Cross-Border Diplomatic Transit & Coastal Enclaves (Togo/Guinea) */}
+        <section className="border-b border-slate-800/80 bg-slate-900/30 py-16">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+              <div>
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-cyan-500/40 bg-cyan-950/20 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-cyan-400">
+                  <span className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse" />
+                  Black Paper Strategy #3 • Intermodal Customs Rails
+                </div>
+                <h2 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl text-white">
+                  Cross-Border Diplomatic Transit &amp; Coastal Enclaves
+                </h2>
+                <p className="mt-1 text-sm text-slate-400">
+                  Bonded customs corridors securing export of refined bullion from landlocked Mali, Burkina Faso, and Niger to sovereign berths at Port of Lomé and Port of Conakry.
+                </p>
+              </div>
+              <Link
+                href="/api/v1/reserves/transit/corridors"
+                target="_blank"
+                className="inline-flex items-center gap-2 rounded-lg border border-cyan-500/40 bg-cyan-950/20 px-4 py-2 text-xs font-semibold text-cyan-300 hover:bg-cyan-900/40 transition self-start sm:self-auto"
+              >
+                Transit Corridors API →
+              </Link>
+            </div>
+
+            {/* Logistics Metrics Grid */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-8">
+              <div className="rounded-xl border border-cyan-900/40 bg-slate-900/70 p-5">
+                <div className="text-xs uppercase tracking-wider text-slate-400">Gold in Diplomatic Transit</div>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-3xl font-extrabold text-cyan-300">
+                    {(totalTransitGoldGrams / 1000).toFixed(3)}
+                  </span>
+                  <span className="text-sm font-semibold text-slate-400">kg fine Au</span>
+                </div>
+                <div className="mt-1 text-xs text-slate-500 font-mono">
+                  {totalTransitGoldGrams.toLocaleString()} grams under bonded seal
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-5">
+                <div className="text-xs uppercase tracking-wider text-slate-400">Port Clearing Dividends</div>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-3xl font-extrabold text-emerald-400">
+                    {totalPortDividendsAngel.toLocaleString()}
+                  </span>
+                  <span className="text-sm font-semibold text-slate-400">ANGEL</span>
+                </div>
+                <div className="mt-1 text-xs text-slate-500 font-mono">
+                  0.50% port customs clearing dividend
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-5">
+                <div className="text-xs uppercase tracking-wider text-slate-400">Connected Coastal Enclaves</div>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-3xl font-extrabold text-white">
+                    {portEnclaves.length}
+                  </span>
+                  <span className="text-sm font-semibold text-slate-400">bonded ports</span>
+                </div>
+                <div className="mt-1 text-xs text-slate-500 font-mono">
+                  Autonomous Port of Lomé &amp; Conakry
+                </div>
+              </div>
+            </div>
+
+            {/* Active Waybills Stream */}
+            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800 text-xs font-mono text-slate-400">
+                <span>ACTIVE DIPLOMATIC BONDED WAYBILLS</span>
+                <span className="text-cyan-400">Tamper-Mesh E-Seals</span>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {activeWaybills.length > 0 ? (
+                  activeWaybills.map((w) => (
+                    <div
+                      key={w.id || w.waybillNumber}
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-slate-800/80 bg-black/40 p-3.5 text-xs font-mono"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-cyan-300">{w.waybillNumber}</span>
+                          <span className="rounded bg-slate-800/80 border border-slate-700/50 px-1.5 py-0.2 text-[10px] text-slate-300">
+                            {w.destinationPortCode}
+                          </span>
+                          <span
+                            className={`rounded px-1.5 py-0.2 text-[10px] border ${
+                              w.status === "PORT_ARRIVED"
+                                ? "bg-emerald-950/60 border-emerald-800/40 text-emerald-300"
+                                : w.status === "DISPATCHED"
+                                ? "bg-cyan-950/60 border-cyan-800/40 text-cyan-300"
+                                : w.status === "IN_TRANSIT"
+                                ? "bg-indigo-950/60 border-indigo-800/40 text-indigo-300"
+                                : "bg-red-950/60 border-red-800/40 text-red-300"
+                            }`}
+                          >
+                            {w.status}
+                          </span>
+                        </div>
+                        <div className="mt-1 text-[11px] text-slate-400">
+                          Origin: {w.originVaultId} • Gross: {w.fineGoldGrams.toFixed(2)} g Au • Bond: {w.carrierBondAngel} ANGEL
+                        </div>
+                      </div>
+
+                      <div className="sm:text-right">
+                        <div className="text-slate-300 font-semibold">
+                          {w.checkpointsVisited.length > 0 ? w.checkpointsVisited.join(" → ") : "En route"}
+                        </div>
+                        <div className="text-[10px] text-slate-500">
+                          Dispatched {new Date(w.dispatchedAt).toLocaleDateString()}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-8 text-center text-xs text-slate-500 font-mono">
+                    No active diplomatic transit waybills in flight. Dispatch via POST /api/v1/reserves/transit/dispatch.
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </section>

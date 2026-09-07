@@ -166,4 +166,27 @@ export declare function createToolHandlers(client: PassportClient): {
     listQuorumProposals(options?: {
         limit?: number;
     }): Promise<import("@passport7/sdk").QuorumProposalsListResponse>;
+    dispatchTransitWaybill(input: {
+        waybillNumber: string;
+        batchNumber: string;
+        destinationPortCode: string;
+        originVaultId: string;
+        carrierCommitment: string;
+        diplomaticSealDigest: string;
+        carrierBondAngel?: number;
+    }): Promise<import("@passport7/sdk").DispatchTransitResponse>;
+    recordPortArrival(input: {
+        waybillNumber: string;
+        portCode: string;
+        enclaveSignature: string;
+        enclavePublicKey?: string;
+    }): Promise<{
+        success: boolean;
+        waybill: {
+            waybill_number: string;
+            status: string;
+            arrived_at?: string | null;
+        };
+    }>;
+    listTransitCorridors(): Promise<import("@passport7/sdk").TransitCorridorsResponse>;
 };

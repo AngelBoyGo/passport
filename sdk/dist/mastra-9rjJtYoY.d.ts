@@ -222,6 +222,8 @@ interface PoRResponse {
         commodity_type: string;
         symbol: string;
         total_fine_grams: number;
+        encumbered_fine_grams?: number;
+        unencumbered_fine_grams?: number;
         total_gross_grams: number;
         active_lots_count: number;
         merkle_root: string;
@@ -585,6 +587,94 @@ interface ArtisanalClient {
     listStations(): Promise<ArtisanalStationsResponse>;
     bridgeDoré(input: BridgeDoreClientInput): Promise<BridgeDoreResponse>;
 }
+interface DispatchTransitClientInput {
+    waybillNumber: string;
+    batchNumber: string;
+    destinationPortCode: string;
+    originVaultId: string;
+    carrierCommitment: string;
+    carrierBondAngel?: number;
+    diplomaticSealDigest: string;
+}
+interface DispatchTransitResponse {
+    success: boolean;
+    waybill: {
+        waybill_number: string;
+        batch_number: string;
+        destination_port_code: string;
+        carrier_commitment: string;
+        carrier_bond_angel: number;
+        fine_gold_grams: number;
+        status: string;
+        dispatched_at: string;
+    };
+}
+interface TransitCheckpointClientInput {
+    waybillNumber: string;
+    checkpointName: string;
+    inspectorSignature: string;
+    inspectorPublicKey: string;
+}
+interface TransitArrivalClientInput {
+    waybillNumber: string;
+    portCode: string;
+    enclaveSignature: string;
+    enclavePublicKey?: string;
+}
+interface TransitCorridorsResponse {
+    success: boolean;
+    metrics: {
+        activeEnclavesCount: number;
+        activeWaybillsCount: number;
+        transitFineGoldGrams: number;
+        totalCarrierBondsLockedAngel: number;
+        totalConvoysArrived: number;
+        totalBreachesDetected: number;
+    };
+    enclaves: Array<{
+        port_code: string;
+        port_name: string;
+        country_code: string;
+        customs_authority_name: string;
+        clearing_fee_share_bps: number;
+        total_transit_grams: number;
+        total_fees_earned_angel: number;
+        active_status: string;
+    }>;
+    recent_waybills: Array<{
+        waybill_number: string;
+        batch_number: string;
+        destination_port_code: string;
+        carrier_commitment: string;
+        carrier_bond_angel: number;
+        fine_gold_grams: number;
+        status: string;
+        checkpoints_visited: string[];
+        dispatched_at: string;
+        arrived_at?: string | null;
+    }>;
+    timestamp: string;
+}
+interface TransitClient {
+    dispatch(input: DispatchTransitClientInput): Promise<DispatchTransitResponse>;
+    recordCheckpoint(input: TransitCheckpointClientInput): Promise<{
+        success: boolean;
+        waybill: {
+            waybill_number: string;
+            status: string;
+            checkpoints_visited: string[];
+        };
+    }>;
+    recordArrival(input: TransitArrivalClientInput): Promise<{
+        success: boolean;
+        waybill: {
+            waybill_number: string;
+            status: string;
+            arrived_at?: string | null;
+        };
+    }>;
+    listCorridors(): Promise<TransitCorridorsResponse>;
+}
 interface EvidencePayload {
     task_id?: string;
     digest?: string;
@@ -607,6 +697,7 @@ declare class PassportClient {
     readonly reserves: ReservesClient;
     readonly escrow: ReservesEscrowClient;
     readonly artisanal: ArtisanalClient;
+    readonly transit: TransitClient;
     constructor(options: PassportClientOptions);
     /**
      * Issue a pending signed receipt (Bearer auth required).
@@ -677,4 +768,4 @@ declare function createMastraPassportMiddleware(client: PassportClient, options:
     wrapWorkflow<T extends MastraWorkflowLike>(workflow: T): T;
 };
 
-export { type ArtisanalClient as A, type BridgeDoreClientInput as B, type CommodityEscrowRecord as C, type DividendsResponse as D, type ErrorTranche as E, type FinalizeReceiptInput as F, type GateVerifyResult as G, type SwarmBountyItem as H, type IssueReceiptInput as I, type SwarmClient as J, type SwarmMemoryItem as K, type SwarmPublishInput as L, type MastraAgentLike as M, type SwarmQueryInput as N, OPERATIONAL_DOMAINS as O, PassportClient as P, type QuorumProposalInput as Q, type RegimeStateResponse as R, type SaveCapsuleInput as S, classifyMastraError as T, createMastraPassportMiddleware as U, type VaultsResponse as V, isErrorTranche as W, isOperationalDomain as X, type ArtisanalStationsResponse as a, type AssaysResponse as b, type BridgeDoreResponse as c, type CommodityEscrowStatus as d, type CreateBountyParams as e, type CreateEscrowInput as f, ERROR_TRANCHES as g, type EvidencePayload as h, type FinalizeStatus as i, type MastraPassportMiddlewareOptions as j, type MastraWorkflowLike as k, type OperationalDomain as l, type OreIntakeInput as m, type OreIntakeResponse as n, type PassportClientOptions as o, type PoRResponse as p, type QuorumProposalResponse as q, type QuorumProposalsListResponse as r, type QuorumSignInput as s, type QuorumSignResponse as t, type ReleaseEscrowInput as u, type ReportThreatInput as v, type ReservesClient as w, type ReservesEscrowClient as x, type SignEvidenceResult as y, type SignedReceipt as z };
+export { createMastraPassportMiddleware as $, type ArtisanalClient as A, type BridgeDoreClientInput as B, type CommodityEscrowRecord as C, type DispatchTransitClientInput as D, type ErrorTranche as E, type FinalizeReceiptInput as F, type GateVerifyResult as G, type SignEvidenceResult as H, type IssueReceiptInput as I, type SignedReceipt as J, type SwarmBountyItem as K, type SwarmClient as L, type MastraAgentLike as M, type SwarmMemoryItem as N, OPERATIONAL_DOMAINS as O, PassportClient as P, type QuorumProposalInput as Q, type RegimeStateResponse as R, type SaveCapsuleInput as S, type SwarmPublishInput as T, type SwarmQueryInput as U, type TransitArrivalClientInput as V, type TransitCheckpointClientInput as W, type TransitClient as X, type TransitCorridorsResponse as Y, type VaultsResponse as Z, classifyMastraError as _, type ArtisanalStationsResponse as a, isErrorTranche as a0, isOperationalDomain as a1, type AssaysResponse as b, type BridgeDoreResponse as c, type CommodityEscrowStatus as d, type CreateBountyParams as e, type CreateEscrowInput as f, type DispatchTransitResponse as g, type DividendsResponse as h, ERROR_TRANCHES as i, type EvidencePayload as j, type FinalizeStatus as k, type MastraPassportMiddlewareOptions as l, type MastraWorkflowLike as m, type OperationalDomain as n, type OreIntakeInput as o, type OreIntakeResponse as p, type PassportClientOptions as q, type PoRResponse as r, type QuorumProposalResponse as s, type QuorumProposalsListResponse as t, type QuorumSignInput as u, type QuorumSignResponse as v, type ReleaseEscrowInput as w, type ReportThreatInput as x, type ReservesClient as y, type ReservesEscrowClient as z };

@@ -931,4 +931,57 @@ model SovereignStateHeartbeat {
   updatedAt      DateTime @updatedAt
 }
 
+/// Coastal Port Enclave (Diplomatic Bonded customs berths at Lomé, Togo & Conakry, Guinea).
+/// Secures transit corridors connecting landlocked Mali, Burkina Faso, and Niger to coastal ports (Black Paper Strategy #3).
+model CoastalPortEnclave {
+  id                   String   @id @default(cuid())
+  portCode             String   @unique // "PORT-LOME-TG", "PORT-CONAKRY-GN"
+  portName             String
+  countryCode          String   // "TG", "GN", "CI"
+  customsAuthorityName String
+  enclavePublicKey     String   // Ed25519 public key of port customs authority
+  clearingFeeShareBps  Int      @default(50) // 0.50% port authority fee dividend
+  totalTransitGrams    Float    @default(0)
+  totalFeesEarnedAngel Int      @default(0)
+  activeStatus         String   @default("ACTIVE") // "ACTIVE", "MAINTENANCE", "CLOSED"
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  waybills             BondedTransitWaybill[]
+
+  @@index([countryCode])
+  @@index([activeStatus])
+}
+
+/// Bonded Transit Waybill.
+/// Cryptographically sealed intermodal transit manifest linking physical bullion lots to bonded carriers and port customs.
+model BondedTransitWaybill {
+  id                   String   @id @default(cuid())
+  waybillNumber        String   @unique // "WAYBILL-AES-LOME-2026-0001"
+  batchNumber          String
+  enclaveId            String
+  destinationPortCode  String
+  originVaultId        String
+  carrierCommitment    String
+  carrierBondAngel     Int      @default(5000)
+  grossWeightGrams     Float
+  fineGoldGrams        Float
+  diplomaticSealDigest String   // SHA-256 hash of physical container tamper-mesh e-seal
+  status               String   @default("DISPATCHED") // "DISPATCHED", "IN_TRANSIT", "PORT_ARRIVED", "SEAL_BREACHED", "CLEARED"
+  checkpointsVisited   String[] // Array of checked transit points: ["SIKASSO", "OUAGA", "CINKASSE"]
+  dispatchedAt         DateTime @default(now())
+  arrivedAt            DateTime?
+  clearedAt            DateTime?
+  slashedAt            DateTime?
+
+  enclave              CoastalPortEnclave @relation(fields: [enclaveId], references: [id])
+
+  @@index([batchNumber])
+  @@index([carrierCommitment])
+  @@index([destinationPortCode])
+  @@index([status])
+  @@index([dispatchedAt])
+}
+
+
 
