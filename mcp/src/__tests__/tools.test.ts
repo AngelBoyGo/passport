@@ -429,4 +429,35 @@ describe("MCP tool handlers", () => {
     expect(corridorsRes.success).toBe(true);
     expect(listCorridors).toHaveBeenCalledOnce();
   });
+
+  it("industrial handlers delegate to client.industrial", async () => {
+    const recordSmelting = vi.fn().mockResolvedValue({
+      success: true,
+      smelting_run: { run_number: "SMELT-01" },
+    });
+    const listConcessions = vi.fn().mockResolvedValue({
+      success: true,
+      concessions: [{ concession_code: "CONC-1" }],
+    });
+
+    const client = {
+      industrial: { recordSmelting, listConcessions },
+    } as unknown as PassportClient;
+    const handlers = createToolHandlers(client);
+
+    const smeltRes = await handlers.recordSmeltingTelemetry({
+      runNumber: "SMELT-01",
+      concessionCode: "CONC-1",
+      grossPouredGrams: 5000.0,
+      densityGramsPerCc: 17.5,
+      estimatedAuFineness: 0.88,
+      hsmSignature: "sig",
+    });
+    expect(smeltRes.success).toBe(true);
+    expect(recordSmelting).toHaveBeenCalledOnce();
+
+    const concRes = await handlers.listIndustrialConcessions();
+    expect(concRes.success).toBe(true);
+    expect(listConcessions).toHaveBeenCalledOnce();
+  });
 });

@@ -126,6 +126,21 @@ export default async function HavenPage() {
   }> = [];
   let totalTransitGoldGrams = 0;
   let totalPortDividendsAngel = 0;
+  let recentSmeltingRuns: Array<{
+    id: string;
+    runNumber: string;
+    concessionCode: string;
+    grossPouredGrams: number;
+    densityGramsPerCc: number;
+    estimatedAuFineness: number;
+    fineGoldGrams: number;
+    royaltyDueAngel: number;
+    status: string;
+    pouredAt: Date;
+  }> = [];
+  let concessionsCount = 0;
+  let totalIndustrialPouredGrams = 0;
+  let totalIndustrialRoyaltiesAngel = 0;
 
   try {
     memoriesCount = await prisma.swarmMemory.count();
@@ -282,6 +297,32 @@ export default async function HavenPage() {
     });
     totalTransitGoldGrams = transitWaybills.reduce((sum, w) => sum + w.fineGoldGrams, 0);
     totalPortDividendsAngel = portEnclaves.reduce((sum, e) => sum + e.totalFeesEarnedAngel, 0);
+
+    const concessions = await prisma.industrialMiningConcession.findMany();
+    concessionsCount = concessions.filter((c) => c.activeStatus === "ACTIVE").length;
+
+    recentSmeltingRuns = await prisma.smeltingRunTelemetry.findMany({
+      take: 4,
+      orderBy: { pouredAt: "desc" },
+      select: {
+        id: true,
+        runNumber: true,
+        concessionCode: true,
+        grossPouredGrams: true,
+        densityGramsPerCc: true,
+        estimatedAuFineness: true,
+        fineGoldGrams: true,
+        royaltyDueAngel: true,
+        status: true,
+        pouredAt: true,
+      },
+    });
+
+    const allRuns = await prisma.smeltingRunTelemetry.findMany({
+      select: { grossPouredGrams: true, royaltyDueAngel: true },
+    });
+    totalIndustrialPouredGrams = allRuns.reduce((sum, r) => sum + r.grossPouredGrams, 0);
+    totalIndustrialRoyaltiesAngel = allRuns.reduce((sum, r) => sum + r.royaltyDueAngel, 0);
   } catch {
     // Non-fatal if DB not yet reachable in static analysis
   }
@@ -1083,6 +1124,130 @@ export default async function HavenPage() {
                 ) : (
                   <div className="py-8 text-center text-xs text-slate-500 font-mono">
                     No active governance proposals pending. Propose via POST /api/v1/reserves/quorum/propose.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Industrial Mine-Site Telemetry & Anti-Transfer-Pricing Royalties */}
+        <section className="border-b border-slate-800/80 bg-slate-950/40 py-16">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+              <div>
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-teal-500/40 bg-teal-950/20 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-teal-400">
+                  <span className="h-2 w-2 rounded-full bg-teal-400 animate-pulse" />
+                  Black Paper Strategy #2 • Q147 Anti-Transfer-Pricing
+                </div>
+                <h2 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl text-white">
+                  Industrial Mine-Site Telemetry &amp; Royalties
+                </h2>
+                <p className="mt-1 text-sm text-slate-400">
+                  Automated smelting pour logs from Fekola, Essakane, and Loulo-Gounkoto evaluated at neutral global spot index, eliminating transfer pricing.
+                </p>
+              </div>
+              <Link
+                href="/api/v1/reserves/industrial/concessions"
+                target="_blank"
+                className="inline-flex items-center gap-2 rounded-lg border border-teal-500/40 bg-teal-950/20 px-4 py-2 text-xs font-semibold text-teal-300 hover:bg-teal-900/40 transition self-start sm:self-auto"
+              >
+                Industrial Concessions API →
+              </Link>
+            </div>
+
+            {/* Industrial Metrics Grid */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-8">
+              <div className="rounded-xl border border-teal-900/40 bg-slate-900/70 p-5">
+                <div className="text-xs uppercase tracking-wider text-slate-400">Industrial Gold Extracted</div>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-3xl font-extrabold text-teal-300">
+                    {(totalIndustrialPouredGrams / 1000).toFixed(3)}
+                  </span>
+                  <span className="text-sm font-semibold text-slate-400">kg pour</span>
+                </div>
+                <div className="mt-1 text-xs text-slate-500 font-mono">
+                  {totalIndustrialPouredGrams.toLocaleString()} grams furnace poured
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-5">
+                <div className="text-xs uppercase tracking-wider text-slate-400">Statutory Royalties Captured</div>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-3xl font-extrabold text-emerald-400">
+                    {totalIndustrialRoyaltiesAngel.toLocaleString()}
+                  </span>
+                  <span className="text-sm font-semibold text-slate-400">ANGEL</span>
+                </div>
+                <div className="mt-1 text-xs text-slate-500 font-mono">
+                  10% neutral-spot mineral royalty
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-5">
+                <div className="text-xs uppercase tracking-wider text-slate-400">Active Industrial Concessions</div>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-3xl font-extrabold text-white">
+                    {concessionsCount}
+                  </span>
+                  <span className="text-sm font-semibold text-slate-400">mines</span>
+                </div>
+                <div className="mt-1 text-xs text-slate-500 font-mono">
+                  Fekola • Essakane • Loulo-Gounkoto
+                </div>
+              </div>
+            </div>
+
+            {/* Recent Smelting Telemetry Stream */}
+            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800 text-xs font-mono text-slate-400">
+                <span>RECENT SMELTER FURNACE POURS</span>
+                <span className="text-teal-400">Specific Gravity Verified (15.0–19.32 g/cm³)</span>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {recentSmeltingRuns.length > 0 ? (
+                  recentSmeltingRuns.map((r) => (
+                    <div
+                      key={r.id || r.runNumber}
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-slate-800/80 bg-black/40 p-3.5 text-xs font-mono"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-teal-300">{r.runNumber}</span>
+                          <span className="rounded bg-slate-800/80 border border-slate-700/50 px-1.5 py-0.2 text-[10px] text-slate-300">
+                            {r.concessionCode}
+                          </span>
+                          <span
+                            className={`rounded px-1.5 py-0.2 text-[10px] border ${
+                              r.status === "REFINED_SETTLED"
+                                ? "bg-emerald-950/60 border-emerald-800/40 text-emerald-300"
+                                : r.status === "POURED"
+                                ? "bg-amber-950/60 border-amber-800/40 text-amber-300"
+                                : "bg-indigo-950/60 border-indigo-800/40 text-indigo-300"
+                            }`}
+                          >
+                            {r.status}
+                          </span>
+                        </div>
+                        <div className="mt-1 text-[11px] text-slate-400">
+                          Poured: {r.grossPouredGrams.toFixed(2)} g • Density: {r.densityGramsPerCc.toFixed(2)} g/cm³ • Au: {(r.estimatedAuFineness * 100).toFixed(1)}% • Fine: {r.fineGoldGrams.toFixed(2)} g
+                        </div>
+                      </div>
+
+                      <div className="sm:text-right">
+                        <div className="text-emerald-400 font-semibold">
+                          {r.royaltyDueAngel.toLocaleString()} ANGEL
+                        </div>
+                        <div className="text-[10px] text-slate-500">
+                          Pour {new Date(r.pouredAt).toLocaleDateString()}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-8 text-center text-xs text-slate-500 font-mono">
+                    No industrial smelter telemetry recorded. Ingest via POST /api/v1/reserves/industrial/smelt.
                   </div>
                 )}
               </div>

@@ -750,4 +750,87 @@ describe("PassportClient", () => {
       expect(url).toBe("https://passport.example.com/api/v1/reserves/transit/corridors");
     });
   });
+
+  describe("client.industrial namespace", () => {
+    it("recordSmelting POSTs pour telemetry with Bearer auth", async () => {
+      fetchMock.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            smelting_run: { run_number: "SMELT-01", royalty_due_angel: 150 },
+          }),
+          { status: 201, headers: { "Content-Type": "application/json" } }
+        )
+      );
+
+      const res = await client.industrial.recordSmelting({
+        runNumber: "SMELT-01",
+        concessionCode: "CONC-ML-FEKOLA",
+        grossPouredGrams: 5000.0,
+        densityGramsPerCc: 17.5,
+        estimatedAuFineness: 0.88,
+        hsmSignature: "sig_hsm",
+      });
+
+      expect(res.success).toBe(true);
+      expect(fetchMock).toHaveBeenCalledOnce();
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe("https://passport.example.com/api/v1/reserves/industrial/smelt");
+      expect(init.method).toBe("POST");
+      expect(JSON.parse(init.body as string)).toEqual({
+        run_number: "SMELT-01",
+        concession_code: "CONC-ML-FEKOLA",
+        gross_poured_grams: 5000.0,
+        density_grams_per_cc: 17.5,
+        estimated_au_fineness: 0.88,
+        hsm_signature: "sig_hsm",
+      });
+    });
+
+    it("bridgeDoré POSTs to /api/v1/reserves/industrial/bridge", async () => {
+      fetchMock.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            batch: { batch_number: "BKO-AU-REF-01" },
+          }),
+          { status: 201, headers: { "Content-Type": "application/json" } }
+        )
+      );
+
+      const res = await client.industrial.bridgeDoré({
+        runNumbers: ["SMELT-01"],
+        targetBatchNumber: "BKO-AU-REF-01",
+        vaultId: "VAULT-BKO",
+        custodianName: "SOREM",
+        locationCity: "Bamako",
+        locationCountry: "ML",
+        barSerials: ["BAR-01"],
+        refinedGrossGrams: 4400.0,
+        refinedFineness: 0.9999,
+      });
+
+      expect(res.success).toBe(true);
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe("https://passport.example.com/api/v1/reserves/industrial/bridge");
+      expect(init.method).toBe("POST");
+    });
+
+    it("listConcessions GETs /api/v1/reserves/industrial/concessions", async () => {
+      fetchMock.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            concessions: [{ concession_code: "CONC-ML-FEKOLA" }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      );
+
+      const res = await client.industrial.listConcessions();
+      expect(res.success).toBe(true);
+      const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe("https://passport.example.com/api/v1/reserves/industrial/concessions");
+    });
+  });
 });

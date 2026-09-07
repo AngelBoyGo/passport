@@ -189,4 +189,15 @@ export declare function createToolHandlers(client: PassportClient): {
         };
     }>;
     listTransitCorridors(): Promise<import("@passport7/sdk").TransitCorridorsResponse>;
+    recordSmeltingTelemetry(input: {
+        runNumber: string;
+        concessionCode: string;
+        grossPouredGrams: number;
+        densityGramsPerCc: number;
+        estimatedAuFineness: number;
+        estimatedAgFineness?: number;
+        hsmSignature: string;
+        hsmPublicKey?: string;
+    }): Promise<import("@passport7/sdk").SmeltingRunResponse>;
+    listIndustrialConcessions(): Promise<import("@passport7/sdk").IndustrialConcessionsResponse>;
 };

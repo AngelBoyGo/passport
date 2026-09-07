@@ -127,6 +127,7 @@ var PassportClient = class {
   escrow;
   artisanal;
   transit;
+  industrial;
   constructor(options) {
     this.apiKey = options.apiKey;
     this.baseUrl = options.baseUrl.replace(/\/$/, "");
@@ -614,6 +615,59 @@ var PassportClient = class {
       },
       listCorridors: async () => {
         const url = `${this.baseUrl}/api/v1/reserves/transit/corridors`;
+        const response = await fetchWithRetry(url, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`
+          }
+        });
+        return this.parseJsonResponse(response);
+      }
+    };
+    this.industrial = {
+      recordSmelting: async (input) => {
+        const response = await fetchWithRetry(`${this.baseUrl}/api/v1/reserves/industrial/smelt`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${this.apiKey}`
+          },
+          body: JSON.stringify({
+            run_number: input.runNumber,
+            concession_code: input.concessionCode,
+            gross_poured_grams: input.grossPouredGrams,
+            density_grams_per_cc: input.densityGramsPerCc,
+            estimated_au_fineness: input.estimatedAuFineness,
+            estimated_ag_fineness: input.estimatedAgFineness,
+            hsm_signature: input.hsmSignature,
+            hsm_public_key: input.hsmPublicKey
+          })
+        });
+        return this.parseJsonResponse(response);
+      },
+      bridgeDor\u00E9: async (input) => {
+        const response = await fetchWithRetry(`${this.baseUrl}/api/v1/reserves/industrial/bridge`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${this.apiKey}`
+          },
+          body: JSON.stringify({
+            run_numbers: input.runNumbers,
+            target_batch_number: input.targetBatchNumber,
+            vault_id: input.vaultId,
+            custodian_name: input.custodianName,
+            location_city: input.locationCity,
+            location_country: input.locationCountry,
+            bar_serials: input.barSerials,
+            refined_gross_grams: input.refinedGrossGrams,
+            refined_fineness: input.refinedFineness
+          })
+        });
+        return this.parseJsonResponse(response);
+      },
+      listConcessions: async () => {
+        const url = `${this.baseUrl}/api/v1/reserves/industrial/concessions`;
         const response = await fetchWithRetry(url, {
           method: "GET",
           headers: {

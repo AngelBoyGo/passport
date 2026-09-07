@@ -983,5 +983,62 @@ model BondedTransitWaybill {
   @@index([dispatchedAt])
 }
 
+/// Industrial Mining Concession (Large-Scale Industrial Concessions: Loulo, Fekola, Essakane, Syama).
+/// Manages mine-gate furnace controllers, statutory royalties, and state participation equity (Black Paper Strategy #2).
+model IndustrialMiningConcession {
+  id                        String   @id @default(cuid())
+  concessionCode            String   @unique // "CONC-ML-FEKOLA", "CONC-BF-ESSAKANE"
+  concessionName            String
+  countryCode               String   // "ML", "BF", "NE"
+  districtName              String
+  operatorCompany           String   // e.g. "B2Gold / SOREM Joint Venture"
+  statutoryRoyaltyPercent   Float    @default(10.0) // 10% statutory mineral royalty
+  stateParticipationPercent Float    @default(20.0) // 20% state free-carried equity
+  smelterHsmPublicKey       String   // Ed25519 public key of furnace controller
+  activeStatus              String   @default("ACTIVE") // "ACTIVE", "AUDIT_HOLD", "SUSPENDED"
+  totalPouredGrams          Float    @default(0)
+  totalRoyaltiesAngel       Int      @default(0)
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  smeltingRuns              SmeltingRunTelemetry[]
+
+  @@index([countryCode])
+  @@index([districtName])
+  @@index([activeStatus])
+}
+
+/// Smelting Run Telemetry (Automated Mine-Gate Pour Log).
+/// Ingests automated weight, specific gravity density, and inline XRF purities directly from furnace edge HSM.
+model SmeltingRunTelemetry {
+  id                   String   @id @default(cuid())
+  runNumber            String   @unique // "SMELT-FEK-2026-0001"
+  concessionId         String
+  concessionCode       String
+  grossPouredGrams     Float
+  densityGramsPerCc    Float    // Specific gravity: 15.0 - 19.32 g/cm³
+  estimatedAuFineness  Float    // Inline XRF gold purity: 0.70 - 0.98
+  estimatedAgFineness  Float    @default(0.08) // Silver by-product purity: 0.02 - 0.20
+  fineGoldGrams        Float    // grossPouredGrams * estimatedAuFineness
+  fineSilverGrams      Float    // grossPouredGrams * estimatedAgFineness
+  goldSpotUsdPerGram   Float
+  silverSpotUsdPerGram Float    @default(0.95)
+  grossMarketValueUsd  Float
+  royaltyDueUsd        Float
+  royaltyDueAngel      Int      // Math.floor(royaltyDueUsd / 5.0)
+  stateShareDueAngel   Int      // State equity dividend in AngelCoin
+  hsmSignature         String   // Ed25519 signature over canonical pour payload
+  status               String   @default("POURED") // "POURED", "DISPATCHED_TO_REFINERY", "REFINED_SETTLED"
+  refinedBatchNumber   String?
+  pouredAt             DateTime @default(now())
+
+  concession           IndustrialMiningConcession @relation(fields: [concessionId], references: [id])
+
+  @@index([concessionCode])
+  @@index([status])
+  @@index([pouredAt])
+}
+
+
 
 

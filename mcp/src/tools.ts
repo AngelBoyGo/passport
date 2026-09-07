@@ -265,5 +265,22 @@ export function createToolHandlers(client: PassportClient) {
     async listTransitCorridors() {
       return client.transit.listCorridors();
     },
+
+    async recordSmeltingTelemetry(input: {
+      runNumber: string;
+      concessionCode: string;
+      grossPouredGrams: number;
+      densityGramsPerCc: number;
+      estimatedAuFineness: number;
+      estimatedAgFineness?: number;
+      hsmSignature: string;
+      hsmPublicKey?: string;
+    }) {
+      return client.industrial.recordSmelting(input);
+    },
+
+    async listIndustrialConcessions() {
+      return client.industrial.listConcessions();
+    },
   };
 }

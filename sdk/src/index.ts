@@ -44,6 +44,11 @@ export type {
   TransitCheckpointClientInput,
   TransitArrivalClientInput,
   TransitCorridorsResponse,
+  IndustrialClient,
+  RecordSmeltInput,
+  SmeltingRunResponse,
+  BridgeIndustrialClientInput,
+  IndustrialConcessionsResponse,
 } from "./client.js";
 export {
   OPERATIONAL_DOMAINS,

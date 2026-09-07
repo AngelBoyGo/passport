@@ -134,5 +134,11 @@ export function createToolHandlers(client) {
         async listTransitCorridors() {
             return client.transit.listCorridors();
         },
+        async recordSmeltingTelemetry(input) {
+            return client.industrial.recordSmelting(input);
+        },
+        async listIndustrialConcessions() {
+            return client.industrial.listConcessions();
+        },
     };
 }

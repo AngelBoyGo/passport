@@ -667,6 +667,81 @@ export interface TransitClient {
   listCorridors(): Promise<TransitCorridorsResponse>;
 }
 
+export interface RecordSmeltInput {
+  runNumber: string;
+  concessionCode: string;
+  grossPouredGrams: number;
+  densityGramsPerCc: number;
+  estimatedAuFineness: number;
+  estimatedAgFineness?: number;
+  hsmSignature: string;
+  hsmPublicKey?: string;
+}
+
+export interface SmeltingRunResponse {
+  success: boolean;
+  smelting_run: {
+    run_number: string;
+    concession_code: string;
+    gross_poured_grams: number;
+    fine_gold_grams: number;
+    fine_silver_grams: number;
+    gross_market_value_usd: number;
+    royalty_due_angel: number;
+    state_share_due_angel: number;
+    status: string;
+    poured_at: string;
+  };
+  royalty_calculation: Record<string, unknown>;
+}
+
+export interface BridgeIndustrialClientInput {
+  runNumbers: string[];
+  targetBatchNumber: string;
+  vaultId: string;
+  custodianName: string;
+  locationCity: string;
+  locationCountry: string;
+  barSerials: string[];
+  refinedGrossGrams: number;
+  refinedFineness: number;
+}
+
+export interface IndustrialConcessionsResponse {
+  success: boolean;
+  metrics: {
+    activeConcessionsCount: number;
+    totalSmeltingRunsCount: number;
+    totalGrossPouredGrams: number;
+    totalFineGoldGrams: number;
+    totalMarketValueUsd: number;
+    totalRoyaltiesCapturedAngel: number;
+    totalStateEquityAngel: number;
+    runsRefinedToBullion: number;
+    runsInTransit: number;
+  };
+  concessions: Array<{
+    concession_code: string;
+    concession_name: string;
+    country_code: string;
+    district_name: string;
+    operator_company: string;
+    statutory_royalty_percent: number;
+    state_participation_percent: number;
+    smelter_hsm_public_key: string;
+    active_status: string;
+    total_poured_grams: number;
+    total_royalties_angel: number;
+  }>;
+  timestamp: string;
+}
+
+export interface IndustrialClient {
+  recordSmelting(input: RecordSmeltInput): Promise<SmeltingRunResponse>;
+  bridgeDoré(input: BridgeIndustrialClientInput): Promise<BridgeDoreResponse>;
+  listConcessions(): Promise<IndustrialConcessionsResponse>;
+}
+
 export interface EvidencePayload {
   task_id?: string;
   digest?: string;
@@ -717,6 +792,7 @@ export class PassportClient {
   public readonly escrow: ReservesEscrowClient;
   public readonly artisanal: ArtisanalClient;
   public readonly transit: TransitClient;
+  public readonly industrial: IndustrialClient;
 
   constructor(options: PassportClientOptions) {
     this.apiKey = options.apiKey;
@@ -1261,6 +1337,62 @@ export class PassportClient {
 
       listCorridors: async () => {
         const url = `${this.baseUrl}/api/v1/reserves/transit/corridors`;
+        const response = await fetchWithRetry(url, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`,
+          },
+        });
+        return this.parseJsonResponse(response);
+      },
+    };
+
+    this.industrial = {
+      recordSmelting: async (input: RecordSmeltInput) => {
+        const response = await fetchWithRetry(`${this.baseUrl}/api/v1/reserves/industrial/smelt`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${this.apiKey}`,
+          },
+          body: JSON.stringify({
+            run_number: input.runNumber,
+            concession_code: input.concessionCode,
+            gross_poured_grams: input.grossPouredGrams,
+            density_grams_per_cc: input.densityGramsPerCc,
+            estimated_au_fineness: input.estimatedAuFineness,
+            estimated_ag_fineness: input.estimatedAgFineness,
+            hsm_signature: input.hsmSignature,
+            hsm_public_key: input.hsmPublicKey,
+          }),
+        });
+        return this.parseJsonResponse(response);
+      },
+
+      bridgeDoré: async (input: BridgeIndustrialClientInput) => {
+        const response = await fetchWithRetry(`${this.baseUrl}/api/v1/reserves/industrial/bridge`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${this.apiKey}`,
+          },
+          body: JSON.stringify({
+            run_numbers: input.runNumbers,
+            target_batch_number: input.targetBatchNumber,
+            vault_id: input.vaultId,
+            custodian_name: input.custodianName,
+            location_city: input.locationCity,
+            location_country: input.locationCountry,
+            bar_serials: input.barSerials,
+            refined_gross_grams: input.refinedGrossGrams,
+            refined_fineness: input.refinedFineness,
+          }),
+        });
+        return this.parseJsonResponse(response);
+      },
+
+      listConcessions: async () => {
+        const url = `${this.baseUrl}/api/v1/reserves/industrial/concessions`;
         const response = await fetchWithRetry(url, {
           method: "GET",
           headers: {

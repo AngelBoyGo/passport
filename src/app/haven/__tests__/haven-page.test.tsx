@@ -15,6 +15,8 @@ import type {
   SovereignStateHeartbeat,
   CoastalPortEnclave,
   BondedTransitWaybill,
+  IndustrialMiningConcession,
+  SmeltingRunTelemetry,
 } from "@prisma/client";
 
 describe("HavenPage Server Component", () => {
@@ -263,6 +265,50 @@ describe("HavenPage Server Component", () => {
         clearedAt: null,
         slashedAt: null,
       } as unknown as BondedTransitWaybill,
+    ]);
+
+    vi.spyOn(prisma.industrialMiningConcession, "findMany").mockResolvedValue([
+      {
+        id: "conc_1",
+        concessionCode: "CONC-ML-FEKOLA",
+        concessionName: "Fekola Gold Mine",
+        countryCode: "ML",
+        districtName: "Kenéba",
+        operatorCompany: "B2Gold / SOREM JV",
+        statutoryRoyaltyPercent: 10.0,
+        stateParticipationPercent: 20.0,
+        smelterHsmPublicKey: "pk_hsm",
+        activeStatus: "ACTIVE",
+        totalPouredGrams: 50000.0,
+        totalRoyaltiesAngel: 5000,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as unknown as IndustrialMiningConcession,
+    ]);
+
+    vi.spyOn(prisma.smeltingRunTelemetry, "findMany").mockResolvedValue([
+      {
+        id: "run_1",
+        runNumber: "SMELT-FEK-2026-0001",
+        concessionId: "conc_1",
+        concessionCode: "CONC-ML-FEKOLA",
+        grossPouredGrams: 5000.0,
+        densityGramsPerCc: 17.5,
+        estimatedAuFineness: 0.88,
+        estimatedAgFineness: 0.08,
+        fineGoldGrams: 4400.0,
+        fineSilverGrams: 400.0,
+        goldSpotUsdPerGram: 75.0,
+        silverSpotUsdPerGram: 0.95,
+        grossMarketValueUsd: 330380.0,
+        royaltyDueUsd: 33038.0,
+        royaltyDueAngel: 6608,
+        stateShareDueAngel: 13215,
+        hsmSignature: "sig",
+        status: "POURED",
+        refinedBatchNumber: null,
+        pouredAt: new Date(),
+      } as unknown as SmeltingRunTelemetry,
     ]);
   });
 

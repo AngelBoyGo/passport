@@ -675,6 +675,76 @@ interface TransitClient {
     }>;
     listCorridors(): Promise<TransitCorridorsResponse>;
 }
+interface RecordSmeltInput {
+    runNumber: string;
+    concessionCode: string;
+    grossPouredGrams: number;
+    densityGramsPerCc: number;
+    estimatedAuFineness: number;
+    estimatedAgFineness?: number;
+    hsmSignature: string;
+    hsmPublicKey?: string;
+}
+interface SmeltingRunResponse {
+    success: boolean;
+    smelting_run: {
+        run_number: string;
+        concession_code: string;
+        gross_poured_grams: number;
+        fine_gold_grams: number;
+        fine_silver_grams: number;
+        gross_market_value_usd: number;
+        royalty_due_angel: number;
+        state_share_due_angel: number;
+        status: string;
+        poured_at: string;
+    };
+    royalty_calculation: Record<string, unknown>;
+}
+interface BridgeIndustrialClientInput {
+    runNumbers: string[];
+    targetBatchNumber: string;
+    vaultId: string;
+    custodianName: string;
+    locationCity: string;
+    locationCountry: string;
+    barSerials: string[];
+    refinedGrossGrams: number;
+    refinedFineness: number;
+}
+interface IndustrialConcessionsResponse {
+    success: boolean;
+    metrics: {
+        activeConcessionsCount: number;
+        totalSmeltingRunsCount: number;
+        totalGrossPouredGrams: number;
+        totalFineGoldGrams: number;
+        totalMarketValueUsd: number;
+        totalRoyaltiesCapturedAngel: number;
+        totalStateEquityAngel: number;
+        runsRefinedToBullion: number;
+        runsInTransit: number;
+    };
+    concessions: Array<{
+        concession_code: string;
+        concession_name: string;
+        country_code: string;
+        district_name: string;
+        operator_company: string;
+        statutory_royalty_percent: number;
+        state_participation_percent: number;
+        smelter_hsm_public_key: string;
+        active_status: string;
+        total_poured_grams: number;
+        total_royalties_angel: number;
+    }>;
+    timestamp: string;
+}
+interface IndustrialClient {
+    recordSmelting(input: RecordSmeltInput): Promise<SmeltingRunResponse>;
+    bridgeDoré(input: BridgeIndustrialClientInput): Promise<BridgeDoreResponse>;
+    listConcessions(): Promise<IndustrialConcessionsResponse>;
+}
 interface EvidencePayload {
     task_id?: string;
     digest?: string;
@@ -698,6 +768,7 @@ declare class PassportClient {
     readonly escrow: ReservesEscrowClient;
     readonly artisanal: ArtisanalClient;
     readonly transit: TransitClient;
+    readonly industrial: IndustrialClient;
     constructor(options: PassportClientOptions);
     /**
      * Issue a pending signed receipt (Bearer auth required).
@@ -768,4 +839,4 @@ declare function createMastraPassportMiddleware(client: PassportClient, options:
     wrapWorkflow<T extends MastraWorkflowLike>(workflow: T): T;
 };
 
-export { createMastraPassportMiddleware as $, type ArtisanalClient as A, type BridgeDoreClientInput as B, type CommodityEscrowRecord as C, type DispatchTransitClientInput as D, type ErrorTranche as E, type FinalizeReceiptInput as F, type GateVerifyResult as G, type SignEvidenceResult as H, type IssueReceiptInput as I, type SignedReceipt as J, type SwarmBountyItem as K, type SwarmClient as L, type MastraAgentLike as M, type SwarmMemoryItem as N, OPERATIONAL_DOMAINS as O, PassportClient as P, type QuorumProposalInput as Q, type RegimeStateResponse as R, type SaveCapsuleInput as S, type SwarmPublishInput as T, type SwarmQueryInput as U, type TransitArrivalClientInput as V, type TransitCheckpointClientInput as W, type TransitClient as X, type TransitCorridorsResponse as Y, type VaultsResponse as Z, classifyMastraError as _, type ArtisanalStationsResponse as a, isErrorTranche as a0, isOperationalDomain as a1, type AssaysResponse as b, type BridgeDoreResponse as c, type CommodityEscrowStatus as d, type CreateBountyParams as e, type CreateEscrowInput as f, type DispatchTransitResponse as g, type DividendsResponse as h, ERROR_TRANCHES as i, type EvidencePayload as j, type FinalizeStatus as k, type MastraPassportMiddlewareOptions as l, type MastraWorkflowLike as m, type OperationalDomain as n, type OreIntakeInput as o, type OreIntakeResponse as p, type PassportClientOptions as q, type PoRResponse as r, type QuorumProposalResponse as s, type QuorumProposalsListResponse as t, type QuorumSignInput as u, type QuorumSignResponse as v, type ReleaseEscrowInput as w, type ReportThreatInput as x, type ReservesClient as y, type ReservesEscrowClient as z };
+export { type TransitCheckpointClientInput as $, type ArtisanalClient as A, type BridgeDoreClientInput as B, type CommodityEscrowRecord as C, type DispatchTransitClientInput as D, type ErrorTranche as E, type FinalizeReceiptInput as F, type GateVerifyResult as G, type ReleaseEscrowInput as H, type IndustrialClient as I, type ReportThreatInput as J, type ReservesClient as K, type ReservesEscrowClient as L, type MastraAgentLike as M, type SignEvidenceResult as N, OPERATIONAL_DOMAINS as O, PassportClient as P, type QuorumProposalInput as Q, type RecordSmeltInput as R, type SaveCapsuleInput as S, type SignedReceipt as T, type SmeltingRunResponse as U, type SwarmBountyItem as V, type SwarmClient as W, type SwarmMemoryItem as X, type SwarmPublishInput as Y, type SwarmQueryInput as Z, type TransitArrivalClientInput as _, type ArtisanalStationsResponse as a, type TransitClient as a0, type TransitCorridorsResponse as a1, type VaultsResponse as a2, classifyMastraError as a3, createMastraPassportMiddleware as a4, isErrorTranche as a5, isOperationalDomain as a6, type AssaysResponse as b, type BridgeDoreResponse as c, type BridgeIndustrialClientInput as d, type CommodityEscrowStatus as e, type CreateBountyParams as f, type CreateEscrowInput as g, type DispatchTransitResponse as h, type DividendsResponse as i, ERROR_TRANCHES as j, type EvidencePayload as k, type FinalizeStatus as l, type IndustrialConcessionsResponse as m, type IssueReceiptInput as n, type MastraPassportMiddlewareOptions as o, type MastraWorkflowLike as p, type OperationalDomain as q, type OreIntakeInput as r, type OreIntakeResponse as s, type PassportClientOptions as t, type PoRResponse as u, type QuorumProposalResponse as v, type QuorumProposalsListResponse as w, type QuorumSignInput as x, type QuorumSignResponse as y, type RegimeStateResponse as z };

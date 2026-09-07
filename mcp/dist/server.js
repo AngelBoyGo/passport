@@ -318,6 +318,36 @@ export function createPassportMcpServer(client) {
             content: [{ type: "text", text: JSON.stringify(result) }],
         };
     });
+    server.tool("passport_record_smelting_telemetry", "Ingest automated smelting pour telemetry (gross weight, density specific gravity, inline XRF Au/Ag fineness) signed by industrial mine-gate furnace edge HSM", {
+        run_number: z.string().min(1),
+        concession_code: z.string().min(1),
+        gross_poured_grams: z.number().positive(),
+        density_grams_per_cc: z.number().min(15.0).max(19.32),
+        estimated_au_fineness: z.number().min(0.70).max(0.99),
+        estimated_ag_fineness: z.number().optional(),
+        hsm_signature: z.string().min(1),
+        hsm_public_key: z.string().optional(),
+    }, async (args) => {
+        const result = await handlers.recordSmeltingTelemetry({
+            runNumber: args.run_number,
+            concessionCode: args.concession_code,
+            grossPouredGrams: args.gross_poured_grams,
+            densityGramsPerCc: args.density_grams_per_cc,
+            estimatedAuFineness: args.estimated_au_fineness,
+            estimatedAgFineness: args.estimated_ag_fineness,
+            hsmSignature: args.hsm_signature,
+            hsmPublicKey: args.hsm_public_key,
+        });
+        return {
+            content: [{ type: "text", text: JSON.stringify(result) }],
+        };
+    });
+    server.tool("passport_list_industrial_concessions", "List registered industrial gold mining concessions (Loulo-Gounkoto, Fekola, Essakane), statutory royalty rates, and extraction metrics", {}, async () => {
+        const result = await handlers.listIndustrialConcessions();
+        return {
+            content: [{ type: "text", text: JSON.stringify(result) }],
+        };
+    });
     return server;
 }
 /**
