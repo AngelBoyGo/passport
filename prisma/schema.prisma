@@ -1282,6 +1282,7 @@ model RailSpec {
   blueprintId        String?
   authorCommitment   String
   authorizedBy       String?
+  signerCommitment   String? // Phase 21: authorized Ed25519 signer for live settlements
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
   version            Int      @default(1)
@@ -1289,6 +1290,29 @@ model RailSpec {
   @@index([state])
   @@index([category])
   @@index([blueprintId])
+}
+
+/// Rail Factory — an authenticated, idempotent settlement on an ENABLED rail (Phase 21).
+/// (railKey, reference) is the DB-unique idempotency guard: a redelivered settlement
+/// returns the ORIGINAL row and never double-settles.
+model RailSettlement {
+  id              String   @id @default(cuid())
+  settlementId    String   @unique
+  railKey         String
+  reference       String
+  signerCommitment String
+  payload         Json
+  fxRateUsd       Float?
+  creditedAngel   Int      @default(0)
+  status          String   @default("PENDING") // PENDING | SETTLED | PENDING_REVIEW | REJECTED
+  errorTranche    String   @default("NONE")
+  createdAt       DateTime @default(now())
+  settledAt       DateTime?
+
+  @@unique([railKey, reference])
+  @@index([status])
+  @@index([railKey])
+  @@index([settlementId])
 }
 
 /// Rail Factory — a discovered candidate rail awaiting scoring/spec-proposal (Phase 19).
