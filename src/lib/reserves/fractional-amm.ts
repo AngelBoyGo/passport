@@ -189,18 +189,27 @@ export async function fractionalizeVaultBatch(input: FractionalizeInput) {
       throw new Error(`Vault batch '${input.batchNumber}' is no longer AUDITED (fractionalization aborted)`);
     }
 
-    // 1. Mint exact integer milli-units into the deterministic fractional wallet.
+    // 1. Mint exact integer milli-units into the dedicated fractional commodity ledger.
+    //    Fractional units are NEVER written into AgentWallet.balance, which is reserved
+    //    for whole ANGEL; storing milli-units there would pollute the protocol-wide
+    //    circulating-supply accounting used by the rate oracle and solvency governor.
     const walletCommitment = fractionalCommodityWalletCommitment(unit.symbol, input.depositorCommitment);
-    await tx.agentWallet.upsert({
-      where: { subjectCommitment: walletCommitment },
+    await tx.fractionalCommodityBalance.upsert({
+      where: {
+        subjectCommitment_commoditySymbol: {
+          subjectCommitment: walletCommitment,
+          commoditySymbol: unit.symbol,
+        },
+      },
       create: {
         subjectCommitment: walletCommitment,
-        balance: mintUnits,
+        commoditySymbol: unit.symbol,
+        milliUnits: mintUnits,
         earnedTotal: mintUnits,
         lastActivityAt: new Date(),
       },
       update: {
-        balance: { increment: mintUnits },
+        milliUnits: { increment: mintUnits },
         earnedTotal: { increment: mintUnits },
         lastActivityAt: new Date(),
       },
@@ -462,13 +471,13 @@ export async function executePoolSwap(input: SwapInput) {
       });
     }
 
-    // Debit agent wallet on the input leg.
+    // Debit agent on the input leg.
     const agentWalletCommitment = fractionalCommodityWalletCommitment(
       unit.symbol,
       input.agentCommitment
     );
     if (directions.inputIsAngel) {
-      // Agent pays ANGEL from their whole-ANGEL wallet.
+      // Agent pays ANGEL from their whole-ANGEL wallet (AgentWallet holds only ANGEL).
       const angelDebit = await tx.agentWallet.updateMany({
         where: { subjectCommitment: input.agentCommitment, balance: { gte: inputAmount } },
         data: {
@@ -481,12 +490,15 @@ export async function executePoolSwap(input: SwapInput) {
         throw new Error(`Agent '${input.agentCommitment}' has insufficient ANGEL balance`);
       }
     } else {
-      // Agent pays commodity milli-units from fractional wallet.
-      const commodityDebit = await tx.agentWallet.updateMany({
-        where: { subjectCommitment: agentWalletCommitment, balance: { gte: inputAmount } },
+      // Agent pays commodity milli-units from the dedicated fractional ledger.
+      const commodityDebit = await tx.fractionalCommodityBalance.updateMany({
+        where: {
+          subjectCommitment: agentWalletCommitment,
+          commoditySymbol: unit.symbol,
+          milliUnits: { gte: inputAmount },
+        },
         data: {
-          balance: { decrement: inputAmount },
-          spentTotal: { increment: inputAmount },
+          milliUnits: { decrement: inputAmount },
           lastActivityAt: new Date(),
         },
       });
@@ -495,31 +507,52 @@ export async function executePoolSwap(input: SwapInput) {
       }
     }
 
-    // Credit agent wallet on the output leg.
-    const outputCommitment =
-      directions.inputIsAngel
-        ? agentWalletCommitment
-        : input.agentCommitment;
+    // Credit agent on the output leg.
     const payoutAmount = directions.inputIsAngel ? outputAmount : agentPayoutAngel;
     if (payoutAmount < 1) {
       throw new Error("Swap output net of fees is below 1 unit");
     }
-    await tx.agentWallet.upsert({
-      where: { subjectCommitment: outputCommitment },
-      create: {
-        subjectCommitment: outputCommitment,
-        balance: payoutAmount,
-        earnedTotal: payoutAmount,
-        lastActivityAt: new Date(),
-      },
-      update: {
-        balance: { increment: payoutAmount },
-        earnedTotal: { increment: payoutAmount },
-        lastActivityAt: new Date(),
-      },
-    });
+    if (directions.inputIsAngel) {
+      // ANGEL -> commodity: credit milli-units to the dedicated fractional ledger.
+      await tx.fractionalCommodityBalance.upsert({
+        where: {
+          subjectCommitment_commoditySymbol: {
+            subjectCommitment: agentWalletCommitment,
+            commoditySymbol: unit.symbol,
+          },
+        },
+        create: {
+          subjectCommitment: agentWalletCommitment,
+          commoditySymbol: unit.symbol,
+          milliUnits: payoutAmount,
+          earnedTotal: payoutAmount,
+          lastActivityAt: new Date(),
+        },
+        update: {
+          milliUnits: { increment: payoutAmount },
+          earnedTotal: { increment: payoutAmount },
+          lastActivityAt: new Date(),
+        },
+      });
+    } else {
+      // commodity -> ANGEL: credit net ANGEL payout to the whole-ANGEL wallet.
+      await tx.agentWallet.upsert({
+        where: { subjectCommitment: input.agentCommitment },
+        create: {
+          subjectCommitment: input.agentCommitment,
+          balance: payoutAmount,
+          earnedTotal: payoutAmount,
+          lastActivityAt: new Date(),
+        },
+        update: {
+          balance: { increment: payoutAmount },
+          earnedTotal: { increment: payoutAmount },
+          lastActivityAt: new Date(),
+        },
+      });
+    }
 
-    const swapId = `SWAP-${input.poolId}-${Date.now()}`;
+    const swapId = `SWAP-${input.poolId}-${Date.now()}-${Math.floor(Math.random() * 100_000)}`;
     const receipt = await tx.ammSwapReceipt.create({
       data: {
         swapId,
@@ -647,24 +680,37 @@ export async function redeemFractionalBatch(input: {
     const totalMinted = integerMilliUnitsFromFineWeight(batch.fineWeightGrams, unit.milliUnitsPerUnit);
     const walletCommitment = fractionalCommodityWalletCommitment(unit.symbol, input.holderCommitment);
 
-    const holder = await tx.agentWallet.findUnique({
-      where: { subjectCommitment: walletCommitment },
+    const holder = await tx.fractionalCommodityBalance.findUnique({
+      where: {
+        subjectCommitment_commoditySymbol: {
+          subjectCommitment: walletCommitment,
+          commoditySymbol: unit.symbol,
+        },
+      },
     });
-    if (!holder || holder.balance < totalMinted) {
+    if (!holder || holder.milliUnits < totalMinted) {
       throw new Error(
         `Holder does not hold 100% of the ${unit.unit} issued for batch '${input.batchNumber}'`
       );
     }
 
-    // Burn the full milli-unit supply atomically.
-    const burned = await tx.agentWallet.update({
-      where: { subjectCommitment: walletCommitment },
+    // Burn the full milli-unit supply atomically with a balance guard (TOCTOU-safe).
+    const burned = await tx.fractionalCommodityBalance.updateMany({
+      where: {
+        subjectCommitment: walletCommitment,
+        commoditySymbol: unit.symbol,
+        milliUnits: { gte: totalMinted },
+      },
       data: {
-        balance: { decrement: totalMinted },
-        spentTotal: { increment: totalMinted },
+        milliUnits: { decrement: totalMinted },
         lastActivityAt: new Date(),
       },
     });
+    if (burned.count !== 1) {
+      throw new Error(
+        `Holder's ${unit.unit} balance changed concurrently (burn aborted)`
+      );
+    }
 
     // Restore the physical lot to AUDITED reserve status.
     const unlocked = await tx.vaultBatch.updateMany({
@@ -680,7 +726,7 @@ export async function redeemFractionalBatch(input: {
       burnedMilliUnits: totalMinted,
       holderCommitment: input.holderCommitment,
       restoredStatus: "AUDITED",
-      burned: !!burned,
+      burned: burned.count === 1,
     };
   });
 }

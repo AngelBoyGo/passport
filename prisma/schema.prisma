@@ -1204,6 +1204,25 @@ model AmmSwapReceipt {
   @@index([createdAt])
 }
 
+/// Dedicated fractional commodity milli-unit ledger (Phase 17 RWA-AMM).
+/// Fractional units (mAu / gLi) are NEVER stored in AgentWallet.balance — they must
+/// not pollute the ANGEL circulating-supply accounting used by the rate oracle,
+/// basket valuation, and Dual-State Governor solvency math.
+model FractionalCommodityBalance {
+  id                String   @id @default(cuid())
+  subjectCommitment String // deterministic 64-hex: sha256("fractional:SYMBOL:holder")
+  commoditySymbol   String   // "Au", "Li"
+  milliUnits        Int      @default(0)
+  earnedTotal       Int      @default(0)
+  lastActivityAt    DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([subjectCommitment, commoditySymbol])
+  @@index([subjectCommitment])
+  @@index([commoditySymbol])
+}
+
 
 
 

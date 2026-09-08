@@ -12,6 +12,11 @@ const { prismaMock } = vi.hoisted(() => ({
       updateMany: vi.fn(),
     },
     ammSwapReceipt: { create: vi.fn() },
+    fractionalCommodityBalance: {
+      findUnique: vi.fn(),
+      upsert: vi.fn(),
+      updateMany: vi.fn(),
+    },
     agentWallet: {
       findUnique: vi.fn(),
       upsert: vi.fn(),
@@ -112,13 +117,24 @@ describe("Fractionalized Commodity Clearing & RWA-AMM (Phase 17)", () => {
           data: expect.objectContaining({ status: "FRACTIONALIZED_LOCKED" }),
         })
       );
-      // Minted into deterministic 64-hex fractional wallet
-      expect(prismaMock.agentWallet.upsert).toHaveBeenCalledWith(
+      // Minted into deterministic 64-hex fractional ledger (NOT AgentWallet.balance)
+      expect(prismaMock.fractionalCommodityBalance.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            subjectCommitment_commoditySymbol: expect.objectContaining({
+              subjectCommitment: fractionalCommodityWalletCommitment("Au", AGENT),
+              commoditySymbol: "Au",
+            }),
+          }),
+          create: expect.objectContaining({ milliUnits: 1_000_000 }),
+        })
+      );
+      // The ANGEL wallet space must NOT be polluted with milli-units:
+      expect(prismaMock.agentWallet.upsert).not.toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
             subjectCommitment: fractionalCommodityWalletCommitment("Au", AGENT),
           }),
-          create: expect.objectContaining({ balance: 1_000_000 }),
         })
       );
     });
