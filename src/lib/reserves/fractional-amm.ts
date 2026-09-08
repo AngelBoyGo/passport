@@ -30,11 +30,6 @@ export function fractionalCommodityWalletCommitment(
   return sha256Hex(`fractional:${commoditySymbol.toUpperCase()}:${holderCommitment}`);
 }
 
-/** Deterministic 64-hex commitment for a fractional commodity liquidity pool LP vault. */
-export function poolLpVaultCommitment(poolId: string): string {
-  return sha256Hex(`amm:lp:vault:${poolId}`);
-}
-
 export interface CommodityUnit {
   unit: string;
   commodityType: string;
@@ -180,7 +175,6 @@ export async function bootstrapAmmLiquidity(input: BootstrapLiquidityInput) {
   }
 
   const lpTokens = Math.floor(Math.sqrt(angelSeed * commoditySeed));
-  const lpVault = poolLpVaultCommitment(pool.poolId);
 
   return prisma.$transaction(async (tx) => {
     // Atomic guard: only seeds a still-empty pool (version bump protects concurrent seed).
@@ -197,27 +191,17 @@ export async function bootstrapAmmLiquidity(input: BootstrapLiquidityInput) {
       throw new Error(`Pool '${input.poolId}' was seeded concurrently (aborted)`);
     }
 
-    await tx.agentWallet.upsert({
-      where: { subjectCommitment: lpVault },
-      create: {
-        subjectCommitment: lpVault,
-        balance: lpTokens,
-        earnedTotal: lpTokens,
-        lastActivityAt: new Date(),
-      },
-      update: {
-        balance: { increment: lpTokens },
-        earnedTotal: { increment: lpTokens },
-        lastActivityAt: new Date(),
-      },
-    });
+    // NOTE: LP share tokens are NOT written into AgentWallet.balance. That ledger is
+    // reserved exclusively for whole ANGEL and is summed as circulating supply by the
+    // rate oracle, basket valuation, and Dual-State Governor. LP tokens are pool-relative
+    // share accounting only (already tracked in totalLpTokens) and must never inflate
+    // the ANGEL money supply.
 
     return {
       poolId: pool.poolId,
       angelSeed,
       commoditySeed,
       lpTokensMinted: lpTokens,
-      lpVaultCommitment: lpVault,
       regime,
     };
   });

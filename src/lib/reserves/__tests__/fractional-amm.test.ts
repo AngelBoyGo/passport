@@ -397,13 +397,9 @@ describe("Fractionalized Commodity Clearing & RWA-AMM (Phase 17)", () => {
           }),
         })
       );
-      expect(prismaMock.agentWallet.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            subjectCommitment: expect.stringMatching(/^[0-9a-f]{64}$/),
-          }),
-        })
-      );
+      // REGRESSION GUARD: LP share tokens are pool-relative accounting and must NEVER be
+      // written into AgentWallet.balance (which is summed as ANGEL circulating supply).
+      expect(prismaMock.agentWallet.upsert).not.toHaveBeenCalled();
     });
   });
 });
