@@ -1261,6 +1261,86 @@ model FiatFix {
   @@index([currency, expiresAt])
 }
 
+/// Rail Factory — a discovered/provisioned settlement rail (Phase 19).
+/// A rail is a typed, versioned, lifecycle-managed settlement channel. Every state
+/// transition is atomic (updateMany status+version guard) and money-touching actions
+/// are audit-logged.
+model RailSpec {
+  id                 String   @id @default(cuid())
+  railKey            String   @unique
+  name               String
+  category           String   // "PAYMENT" | "AGRI" | "ENERGY" | "CORRIDOR" | "AGENT_PAYROLL"
+  providerKey        String
+  ledgerKind         String   // "ANGEL" | "FRACTIONAL" | "LP" | "STATE"
+  kycTier            String   @default("NONE") // "NONE" | "IDENTITY" | "KYC1" | "KYC2"
+  feeBps             Int      @default(0)
+  endpoints          Json?
+  idempotencyKeyPath String?
+  fxActor            Json?
+  schemaVersion      Int      @default(1)
+  state              String   @default("PROPOSED") // PROPOSED|PROVISIONED|SMOKE_TESTED|ENABLED|QUARANTINED|RETIRED
+  blueprintId        String?
+  authorCommitment   String
+  authorizedBy       String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  version            Int      @default(1)
+
+  @@index([state])
+  @@index([category])
+  @@index([blueprintId])
+}
+
+/// Rail Factory — a discovered candidate rail awaiting scoring/spec-proposal (Phase 19).
+/// fingerprint is the content-hash of the normalized payload and doubles as the dedupe key.
+model RailCandidate {
+  id                   String   @id @default(cuid())
+  fingerprint          String   @unique
+  source               String
+  payload              Json
+  score                Float    @default(0)
+  rationale            String?
+  needsReview          Boolean  @default(false)
+  proposedBlueprintId  String?
+  createdAt            DateTime @default(now())
+
+  @@index([source])
+  @@index([score])
+}
+
+/// Rail Factory — per-settlement telemetry for an ENABLED rail (Phase 19).
+/// Feeds the auto-quarantine feedback loop (3 consecutive SLA breaches -> QUARANTINED).
+model RailTelemetry {
+  id              String   @id @default(cuid())
+  railKey         String
+  seq             Int      @default(0)
+  latencyMs       Int      @default(0)
+  volumeUnits     Int      @default(0)
+  dedupeHits      Int      @default(0)
+  errorTranche    String   @default("NONE") // "NONE" | "SLA_BREACH" | "DATA_LEAKAGE" | "COMPUTE_TIMEOUT" | "LOGIC_DETECTION"
+  settlementCount Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  @@index([railKey, seq])
+  @@index([errorTranche])
+}
+
+/// Rail Factory — a generalized provisioning runbook/blueprint (Phase 19).
+/// Captured from manual provisioning sessions; promoted to `automated` once 3+ sample
+/// specs share >85% structural similarity, after which matching candidates auto-provision.
+model RailRunbook {
+  id                      String   @id @default(cuid())
+  blueprintId             String   @unique
+  sampleSpecs             Json
+  generalization          Json?
+  successMetrics          Json?
+  promotedFromCandidateId String?
+  automated               Boolean  @default(false)
+  createdAt               DateTime @default(now())
+
+  @@index([automated])
+}
+
 
 
 
