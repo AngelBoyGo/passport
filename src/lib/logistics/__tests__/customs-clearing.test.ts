@@ -162,6 +162,35 @@ describe("Automated Diplomatic Transit Customs Clearing & Corridor Settlement (P
       ).rejects.toThrow(/escort officer public key/i);
     });
 
+    it("rejects origin or destination jurisdiction outside the statutory corridor", async () => {
+      await expect(
+        registerTransitShipment({
+          shipmentId: "SHIP-X",
+          manifestNumber: "M-X",
+          commodityType: "GOLD",
+          fineUnits: 100,
+          originJurisdiction: "ZZ",
+          destinationJurisdiction: "TG",
+          routeCode: "R",
+          escortPublicKey,
+          containerSealDigest: SEAL,
+        })
+      ).rejects.toThrow(/Invalid origin jurisdiction/);
+      await expect(
+        registerTransitShipment({
+          shipmentId: "SHIP-X",
+          manifestNumber: "M-X",
+          commodityType: "GOLD",
+          fineUnits: 100,
+          originJurisdiction: "ML",
+          destinationJurisdiction: "XX",
+          routeCode: "R",
+          escortPublicKey,
+          containerSealDigest: SEAL,
+        })
+      ).rejects.toThrow(/Invalid destination jurisdiction/);
+    });
+
     it("creates an IN_TRANSIT shipment on valid input", async () => {
       prismaMock.transitShipment.create.mockResolvedValue({
         shipmentId: "SHIP-AES-LOME-2026-0001",
@@ -229,6 +258,8 @@ describe("Automated Diplomatic Transit Customs Clearing & Corridor Settlement (P
       });
 
       expect(result.shipment.status).toBe("CHECKPOINT_CLEARED");
+      // Returned shipment reflects the freshly-cleared checkpoint (no state drift)
+      expect(result.shipment.checkpointsCleared).toEqual(["CP-SIKASSO-ML"]);
       expect(result.waterfall.grossValueUsd).toBe(150_000);
       expect(result.waterfall.tariffAngel).toBe(225);
       expect(result.waterfall).toEqual({

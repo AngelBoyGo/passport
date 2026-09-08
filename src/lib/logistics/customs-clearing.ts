@@ -142,14 +142,32 @@ export async function registerTransitShipment(input: RegisterTransitShipmentInpu
     );
   }
 
+  const originJurisdiction = input.originJurisdiction.toUpperCase();
+  const destinationJurisdiction = input.destinationJurisdiction.toUpperCase();
+
+  if (
+    !CORRIDOR_JURISDICTIONS.includes(originJurisdiction as CorridorJurisdiction)
+  ) {
+    throw new Error(
+      `Invalid origin jurisdiction '${originJurisdiction}' (must be one of ${CORRIDOR_JURISDICTIONS.join(", ")})`
+    );
+  }
+  if (
+    !CORRIDOR_JURISDICTIONS.includes(destinationJurisdiction as CorridorJurisdiction)
+  ) {
+    throw new Error(
+      `Invalid destination jurisdiction '${destinationJurisdiction}' (must be one of ${CORRIDOR_JURISDICTIONS.join(", ")})`
+    );
+  }
+
   return prisma.transitShipment.create({
     data: {
       shipmentId: input.shipmentId,
       manifestNumber: input.manifestNumber,
       commodityType: input.commodityType,
       fineUnits: input.fineUnits,
-      originJurisdiction: input.originJurisdiction.toUpperCase(),
-      destinationJurisdiction: input.destinationJurisdiction.toUpperCase(),
+      originJurisdiction,
+      destinationJurisdiction,
       routeCode: input.routeCode,
       escortPublicKey: input.escortPublicKey,
       containerSealDigest: input.containerSealDigest,
@@ -326,7 +344,11 @@ export async function verifyCheckpointPassage(input: VerifyCheckpointInput) {
 
     return {
       settlement,
-      shipment: { ...shipment, status: "CHECKPOINT_CLEARED" },
+      shipment: {
+        ...shipment,
+        status: "CHECKPOINT_CLEARED",
+        checkpointsCleared: [...shipment.checkpointsCleared, input.checkpointCode],
+      },
       waterfall: {
         grossValueUsd,
         tariffAngel,
