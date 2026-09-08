@@ -67,10 +67,9 @@ describe("Rail Execution Runtime (Phase 20)", () => {
   });
 
   describe("live-vs-dry-run gate", () => {
-    it("requires a live canary endpoint or explicit authorization", () => {
-      expect(canExecuteLive({ endpoints: null, authorizedBy: null })).toBe(false);
-      expect(canExecuteLive({ endpoints: { sandboxUrl: "https://x" }, authorizedBy: null })).toBe(true);
-      expect(canExecuteLive({ endpoints: null, authorizedBy: "op_1" })).toBe(true);
+    it("requires a real canary endpoint (authorizedBy alone is not enough)", () => {
+      expect(canExecuteLive({ endpoints: null })).toBe(false);
+      expect(canExecuteLive({ endpoints: { sandboxUrl: "https://x" } })).toBe(true);
     });
 
     it("resolves the idempotency key from the configured path", () => {
@@ -124,22 +123,17 @@ describe("Rail Execution Runtime (Phase 20)", () => {
       expect(result.live).toBe(false);
     });
 
-    it("STATE credits the deterministic stabilization treasury (live, authorized)", async () => {
+    it("STATE never mints treasury credits from the executor", async () => {
       prismaMock.railSpec.findUnique.mockResolvedValue(
         enabledSpec({ ledgerKind: "STATE", authorizedBy: "op_1" })
       );
-      prismaMock.agentWallet.upsert.mockResolvedValue({});
       const result = await executeRailSettlement("rail-1", {
         payload: { country_code: "ML", amount: 500 },
       });
       expect(result.stage).toBe("STATE");
-      expect(result.live).toBe(true);
-      expect(prismaMock.agentWallet.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({ subjectCommitment: expect.stringMatching(/^[0-9a-f]{64}$/) }),
-          update: expect.objectContaining({ balance: { increment: 500 } }),
-        })
-      );
+      expect(result.live).toBe(false);
+      // Treasury credits are issued by reserve services, never this executor.
+      expect(prismaMock.agentWallet.upsert).not.toHaveBeenCalled();
     });
 
     it("returns a logic error for an unknown ledgerKind", async () => {

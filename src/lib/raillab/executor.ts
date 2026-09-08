@@ -16,7 +16,6 @@
 import { prisma } from "@/lib/db";
 import { settleMobileMoneyOnramp } from "@/lib/digital-gateway/mobile-money";
 import { executePoolSwap, removeLiquidity } from "@/lib/reserves/fractional-amm";
-import { stateStabilizationWalletCommitment } from "@/lib/reserves/industrialization-fund";
 import { recordSettlement, isSlaBreach, getRailTelemetry } from "./telemetry";
 import { autoQuarantineFailingRails } from "./factory-agent";
 
@@ -35,13 +34,15 @@ export interface ExecuteSettlementResult {
   errorTranche: "NONE" | "SLA_BREACH" | "COMPUTE_TIMEOUT" | "LOGIC_DETECTION";
 }
 
-/** A rail may execute LIVE only after a real canary endpoint exists or explicit authorization. */
-export function canExecuteLive(spec: {
-  endpoints?: any;
-  authorizedBy?: string | null;
-}): boolean {
+/**
+ * A rail may execute LIVE only after it has a REAL live endpoint (passed LIVE_CANARY).
+ * `authorizedBy` alone (which every ENABLED rail has) does NOT permit live money movement —
+ * otherwise a scheduled tick would mint ANGEL from a fabricated payload. State/treasury
+ * credits are intentionally excluded from this executor's live path.
+ */
+export function canExecuteLive(spec: { endpoints?: any }): boolean {
   const sandboxUrl = spec.endpoints?.sandboxUrl;
-  return Boolean(sandboxUrl) || Boolean(spec.authorizedBy);
+  return Boolean(sandboxUrl);
 }
 
 /** Resolves the idempotency key from the payload at the spec's configured path. */
@@ -67,7 +68,8 @@ function asNumber(v: unknown): number {
  */
 export async function executeRailSettlement(
   railKey: string,
-  input: ExecuteSettlementInput
+  input: ExecuteSettlementInput,
+  opts?: { forceDryRun?: boolean }
 ): Promise<ExecuteSettlementResult> {
   const spec = await prisma.railSpec.findUnique({ where: { railKey } });
   if (!spec) {
@@ -77,7 +79,7 @@ export async function executeRailSettlement(
     throw new Error(`Rail '${railKey}' is not ENABLED (current: ${spec.state})`);
   }
 
-  const live = canExecuteLive(spec);
+  const live = opts?.forceDryRun ? false : canExecuteLive(spec);
   const payload = input.payload ?? {};
   const idempotencyKey = resolveIdempotencyKey(spec.idempotencyKeyPath, payload);
 
@@ -87,6 +89,15 @@ export async function executeRailSettlement(
     case "ANGEL": {
       // Idempotency is enforced by MoneySettlement's (provider, externalRef) unique key;
       // dry-run passes `dryRun` so a non-canary rail never mints money.
+      if (spec.idempotencyKeyPath && !idempotencyKey) {
+        return {
+          live,
+          ok: false,
+          stage,
+          detail: `ANGEL settlement missing idempotency key at '${spec.idempotencyKeyPath}'`,
+          errorTranche: "LOGIC_DETECTION",
+        };
+      }
       const res = await settleMobileMoneyOnramp({
         provider: spec.providerKey,
         payload,
@@ -143,27 +154,16 @@ export async function executeRailSettlement(
     }
 
     case "STATE": {
-      if (!live) {
-        return {
-          live,
-          ok: true,
-          stage,
-          detail: "STATE dry-run: treasury credit shape validated (no money moved)",
-          errorTranche: "NONE",
-        };
-      }
-      const countryCode = String(payload.country_code ?? payload.countryCode ?? "");
-      const amount = asNumber(payload.amount);
-      if (!countryCode || amount <= 0) {
-        throw new Error("STATE settlement requires country_code and amount");
-      }
-      const commitment = stateStabilizationWalletCommitment(countryCode);
-      await prisma.agentWallet.upsert({
-        where: { subjectCommitment: commitment },
-        create: { subjectCommitment: commitment, balance: amount, earnedTotal: amount, lastActivityAt: new Date() },
-        update: { balance: { increment: amount }, earnedTotal: { increment: amount }, lastActivityAt: new Date() },
-      });
-      return { live, ok: true, stage, detail: `STATE treasury credited ${amount} ANGEL`, creditedAngel: amount, errorTranche: "NONE" };
+      // STATE rails mint treasury credits from a fabricated input. The executor never
+      // fabricates a real mint — treasury credits are issued by the reserve services, not
+      // the rail tick. Always dry-run-safe.
+      return {
+        live: false,
+        ok: true,
+        stage,
+        detail: "STATE treasury credit deferred to reserve services (no fabricated mint)",
+        errorTranche: "NONE",
+      };
     }
 
     default:
@@ -190,8 +190,9 @@ export interface ExecutionTickResult {
 }
 
 /**
- * Full execution + health tick: for each ENABLED rail, execute (live or dry-run), record
- * settlement telemetry, then run the health check. Fail-closed.
+ * Full execution + health tick: for each ENABLED rail, execute in DRY-RUN ONLY (a scheduled
+ * health tick must never mint money from a fabricated payload), record settlement telemetry,
+ * then run the health check. Fail-closed.
  */
 export async function runExecutionTick(): Promise<ExecutionTickResult> {
   const enabled = await prisma.railSpec.findMany({ where: { state: "ENABLED" } });
@@ -203,9 +204,11 @@ export async function runExecutionTick(): Promise<ExecutionTickResult> {
     const startedAt = Date.now();
     let result: ExecuteSettlementResult;
     try {
-      result = await executeRailSettlement(spec.railKey, {
-        payload: { external_reference: `tick-${spec.railKey}-${startedAt}`, amount: 3000 },
-      });
+      result = await executeRailSettlement(
+        spec.railKey,
+        { payload: { external_reference: `health-${spec.railKey}-${startedAt}`, amount: 1 } },
+        { forceDryRun: true }
+      );
     } catch (err) {
       result = {
         live: false,
