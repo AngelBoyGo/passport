@@ -213,17 +213,26 @@ export async function submitQuorumSignature(input: SubmitSignatureInput) {
     let executionResult = null;
 
     if (isThresholdReached) {
-      // Execute the action transition
-      executionResult = await executeProposalAction(tx, proposal.actionType, proposal.payload);
-
-      await tx.sovereignQuorumProposal.update({
-        where: { id: proposal.id },
+      // Atomic guard: transition PENDING -> EXECUTED; only one concurrent vote executes the action
+      const transitioned = await tx.sovereignQuorumProposal.updateMany({
+        where: { id: proposal.id, status: "PENDING" },
         data: {
           status: "EXECUTED",
           executedAt: new Date(),
-          executionResult: executionResult as unknown as Prisma.InputJsonValue,
         },
       });
+
+      if (transitioned.count === 1) {
+        // Execute the action transition
+        executionResult = await executeProposalAction(tx, proposal.actionType, proposal.payload);
+
+        await tx.sovereignQuorumProposal.update({
+          where: { id: proposal.id },
+          data: {
+            executionResult: executionResult as unknown as Prisma.InputJsonValue,
+          },
+        });
+      }
     }
 
     return {

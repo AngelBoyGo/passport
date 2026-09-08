@@ -159,6 +159,20 @@ export async function releaseEscrowOnAssay(input: ReleaseEscrowInput) {
       throw new Error(`Escrow is not in HELD state (current: ${held.status})`);
     }
 
+    // 0. Atomic guard against concurrent double-release race
+    const transitioned = await tx.commodityEscrow.updateMany({
+      where: { escrowId: input.escrowId, status: "HELD" },
+      data: {
+        status: "RELEASED",
+        assayCertificationNumber: input.assayCertificationNumber,
+        releaseSignature: input.releaseSignature,
+        releasedAt: new Date(),
+      },
+    });
+    if (transitioned.count !== 1) {
+      throw new Error(`Escrow '${input.escrowId}' is no longer in HELD state`);
+    }
+
     // Assay verification gate
     const assay = await tx.assayerCertification.findUnique({
       where: { certificationNumber: input.assayCertificationNumber },
@@ -228,6 +242,15 @@ export async function refundEscrowOnTimeout(escrowId: string) {
     }
     if (new Date() < held.timeoutAt) {
       throw new Error("Escrow has not reached its timeout");
+    }
+
+    // 0. Atomic guard against concurrent double-refund race
+    const transitioned = await tx.commodityEscrow.updateMany({
+      where: { escrowId, status: "HELD" },
+      data: { status: "REFUNDED" },
+    });
+    if (transitioned.count !== 1) {
+      throw new Error(`Escrow '${escrowId}' is no longer in HELD state`);
     }
 
     await tx.agentWallet.update({

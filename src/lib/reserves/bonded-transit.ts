@@ -145,6 +145,32 @@ export async function recordIntermediateCheckpoint(input: CheckpointInput) {
   if (waybill.status !== "DISPATCHED" && waybill.status !== "IN_TRANSIT") {
     throw new Error(`Waybill is not active (current status: ${waybill.status})`);
   }
+  if (waybill.checkpointsVisited.includes(input.checkpointName)) {
+    throw new Error(`Checkpoint '${input.checkpointName}' was already visited for this waybill`);
+  }
+
+  // 1. Verify customs inspector Ed25519 signature over canonical waypoint payload
+  const checkpointPayload = {
+    checkpoint_name: input.checkpointName,
+    diplomatic_seal_digest: waybill.diplomaticSealDigest,
+    waybill_number: waybill.waybillNumber,
+  };
+
+  let isSigValid = false;
+  try {
+    const canonical = canonicalJson(checkpointPayload);
+    isSigValid = await verify(
+      hexToBytes(input.inspectorSignature),
+      utf8ToBytes(canonical),
+      hexToBytes(input.inspectorPublicKey)
+    );
+  } catch {
+    isSigValid = false;
+  }
+
+  if (process.env.NODE_ENV === "production" && !isSigValid) {
+    throw new Error("Invalid checkpoint inspector signature");
+  }
 
   const updatedCheckpoints = [...waybill.checkpointsVisited, input.checkpointName];
 
@@ -212,6 +238,21 @@ export async function recordPortArrival(input: PortArrivalInput) {
   );
 
   return prisma.$transaction(async (tx) => {
+    // 0. Atomic guard against concurrent arrival / double-refund
+    const transitioned = await tx.bondedTransitWaybill.updateMany({
+      where: {
+        waybillNumber: input.waybillNumber,
+        status: { in: ["DISPATCHED", "IN_TRANSIT"] },
+      },
+      data: {
+        status: "PORT_ARRIVED",
+        arrivedAt: new Date(),
+      },
+    });
+    if (transitioned.count !== 1) {
+      throw new Error(`Waybill '${input.waybillNumber}' is no longer active`);
+    }
+
     // A. Unlock carrier performance bond
     await tx.agentWallet.update({
       where: { subjectCommitment: waybill.carrierCommitment },
@@ -271,6 +312,21 @@ export async function reportSealBreach(input: SealBreachInput) {
   }
 
   const result = await prisma.$transaction(async (tx) => {
+    // 0. Atomic guard against concurrent double-slashing
+    const transitioned = await tx.bondedTransitWaybill.updateMany({
+      where: {
+        waybillNumber: input.waybillNumber,
+        status: { in: ["DISPATCHED", "IN_TRANSIT"] },
+      },
+      data: {
+        status: "SEAL_BREACHED",
+        slashedAt: new Date(),
+      },
+    });
+    if (transitioned.count !== 1) {
+      throw new Error(`Waybill '${input.waybillNumber}' is not active or already breached`);
+    }
+
     // 1. Slash 100% of carrier's staked bond
     await tx.agentWallet.update({
       where: { subjectCommitment: waybill.carrierCommitment },

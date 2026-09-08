@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
-    sovereignQuorumProposal: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn(), findMany: vi.fn() },
+    sovereignQuorumProposal: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn(), findMany: vi.fn() },
     quorumSignature: { create: vi.fn(), count: vi.fn() },
     vaultBatch: { create: vi.fn(), update: vi.fn() },
     commodityReserve: { upsert: vi.fn() },
@@ -30,6 +30,7 @@ describe("Trilateral Multi-State Threshold Quorum & Governance", () => {
   const bfPrivateKey = "1112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f30";
 
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.restoreAllMocks();
   });
 
@@ -130,6 +131,7 @@ describe("Trilateral Multi-State Threshold Quorum & Governance", () => {
 
       prismaMock.quorumSignature.create.mockResolvedValue({});
       prismaMock.quorumSignature.count.mockResolvedValue(2); // 2 votes == 2 threshold!
+      prismaMock.sovereignQuorumProposal.updateMany.mockResolvedValue({ count: 1 });
       prismaMock.vaultBatch.update.mockResolvedValue({});
       prismaMock.sovereignQuorumProposal.update.mockResolvedValue({});
       vi.spyOn(porService, "generateLivePoR").mockResolvedValue(
@@ -152,6 +154,40 @@ describe("Trilateral Multi-State Threshold Quorum & Governance", () => {
           data: { status: "QUARANTINED" },
         })
       );
+    });
+
+    it("does not re-execute action if concurrent transaction already transitioned proposal", async () => {
+      const sigBytes = await sign(utf8ToBytes(payloadDigest), hexToBytes(bfPrivateKey));
+      const bfSignature = bytesToHex(sigBytes);
+      const bfPublicKey = bytesToHex(getPublicKey(hexToBytes(bfPrivateKey)));
+
+      prismaMock.sovereignQuorumProposal.findUnique.mockResolvedValue({
+        id: "prop_db_1",
+        proposalId: "PROP-AES-001",
+        actionType: "QUARANTINE_VAULT",
+        payload: { batchNumber: "BKO-01" },
+        payloadDigest,
+        requiredThreshold: 2,
+        status: "PENDING",
+        expiresAt: new Date(Date.now() + 3600 * 1000),
+      });
+
+      prismaMock.quorumSignature.create.mockResolvedValue({});
+      prismaMock.quorumSignature.count.mockResolvedValue(2);
+      // Concurrent transaction already won the transition race:
+      prismaMock.sovereignQuorumProposal.updateMany.mockResolvedValue({ count: 0 });
+
+      const result = await submitQuorumSignature({
+        proposalId: "PROP-AES-001",
+        signerState: "BF",
+        signature: bfSignature,
+        signerPublicKey: bfPublicKey,
+      });
+
+      expect(result.status).toBe("EXECUTED");
+      expect(result.executionResult).toBeNull();
+      // Vault batch update was NOT re-executed
+      expect(prismaMock.vaultBatch.update).not.toHaveBeenCalled();
     });
 
     it("rejects signature if proposal has expired", async () => {

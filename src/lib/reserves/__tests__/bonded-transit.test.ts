@@ -5,7 +5,7 @@ const { prismaMock } = vi.hoisted(() => ({
     coastalPortEnclave: { findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn() },
     vaultBatch: { findUnique: vi.fn(), update: vi.fn() },
     agentWallet: { findUnique: vi.fn(), update: vi.fn(), upsert: vi.fn() },
-    bondedTransitWaybill: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn(), findMany: vi.fn() },
+    bondedTransitWaybill: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn(), findMany: vi.fn() },
     $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(prismaMock)),
   },
 }));
@@ -30,6 +30,7 @@ describe("Cross-Border Diplomatic Bonded Customs & Coastal Logistics", () => {
   const portCode = "PORT-LOME-TG";
 
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.restoreAllMocks();
   });
 
@@ -146,6 +147,23 @@ describe("Cross-Border Diplomatic Bonded Customs & Coastal Logistics", () => {
         })
       );
     });
+
+    it("rejects duplicate checkpoint visit on the same waybill", async () => {
+      prismaMock.bondedTransitWaybill.findUnique.mockResolvedValue({
+        waybillNumber: "WAYBILL-001",
+        status: "IN_TRANSIT",
+        checkpointsVisited: ["SIKASSO", "OUAGA"],
+      });
+
+      await expect(
+        recordIntermediateCheckpoint({
+          waybillNumber: "WAYBILL-001",
+          checkpointName: "OUAGA", // Already visited
+          inspectorSignature: "sig",
+          inspectorPublicKey: "pk",
+        })
+      ).rejects.toThrow(/already visited/i);
+    });
   });
 
   describe("recordPortArrival", () => {
@@ -176,6 +194,7 @@ describe("Cross-Border Diplomatic Bonded Customs & Coastal Logistics", () => {
       prismaMock.agentWallet.update.mockResolvedValue({});
       prismaMock.coastalPortEnclave.update.mockResolvedValue({});
       prismaMock.vaultBatch.update.mockResolvedValue({});
+      prismaMock.bondedTransitWaybill.updateMany.mockResolvedValue({ count: 1 });
       prismaMock.bondedTransitWaybill.update.mockResolvedValue({
         waybillNumber: "WAYBILL-001",
         status: "PORT_ARRIVED",
@@ -237,6 +256,7 @@ describe("Cross-Border Diplomatic Bonded Customs & Coastal Logistics", () => {
       prismaMock.agentWallet.update.mockResolvedValue({});
       prismaMock.agentWallet.upsert.mockResolvedValue({});
       prismaMock.vaultBatch.update.mockResolvedValue({});
+      prismaMock.bondedTransitWaybill.updateMany.mockResolvedValue({ count: 1 });
       prismaMock.bondedTransitWaybill.update.mockResolvedValue({
         waybillNumber: "WAYBILL-001",
         status: "SEAL_BREACHED",

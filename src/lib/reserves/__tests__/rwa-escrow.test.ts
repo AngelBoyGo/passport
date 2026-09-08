@@ -4,7 +4,7 @@ const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
     vaultBatch: { findUnique: vi.fn(), update: vi.fn() },
     agentWallet: { findUnique: vi.fn(), update: vi.fn() },
-    commodityEscrow: { create: vi.fn(), findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn() },
+    commodityEscrow: { create: vi.fn(), findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
     assayerCertification: { findUnique: vi.fn() },
     sovereignDisbursement: { create: vi.fn(), findMany: vi.fn() },
     $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(prismaMock)),
@@ -36,6 +36,8 @@ describe("RWA Commodity Escrow Service", () => {
     prismaMock.commodityEscrow.findMany.mockReset();
     prismaMock.commodityEscrow.findMany.mockResolvedValue([]);
     prismaMock.commodityEscrow.update.mockReset();
+    prismaMock.commodityEscrow.updateMany.mockReset();
+    prismaMock.commodityEscrow.updateMany.mockResolvedValue({ count: 1 });
     prismaMock.assayerCertification.findUnique.mockReset();
     prismaMock.sovereignDisbursement.create.mockReset();
   });
@@ -246,6 +248,27 @@ describe("RWA Commodity Escrow Service", () => {
           releaseSignature: "sig",
         })
       ).rejects.toThrow(/does not match/i);
+    });
+
+    it("rejects release if concurrent transaction already transitioned escrow status", async () => {
+      prismaMock.commodityEscrow.findUnique.mockResolvedValue({
+        escrowId: "esc_1",
+        status: "HELD",
+        sellerCommitment: seller,
+        batchNumber: batch,
+        lockedAngel: 100,
+        protocolFeeAngel: 3,
+      });
+      // Race: concurrent release already executed
+      prismaMock.commodityEscrow.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(
+        releaseEscrowOnAssay({
+          escrowId: "esc_1",
+          assayCertificationNumber: "CERT-1",
+          releaseSignature: "sig",
+        })
+      ).rejects.toThrow(/no longer in HELD state/i);
     });
   });
 

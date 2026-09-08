@@ -266,14 +266,22 @@ export async function bridgeDoréToRefinedVault(input: BridgeDoreInput) {
       );
     }
 
-    // 1. Mark raw ore receipts as settled into the refined batch
-    await tx.oreIntakeReceipt.updateMany({
-      where: { receiptNumber: { in: uniqueReceiptNumbers } },
+    // 1. Mark raw ore receipts as settled into the refined batch (atomic guard: must be PURCHASED)
+    const updated = await tx.oreIntakeReceipt.updateMany({
+      where: {
+        receiptNumber: { in: uniqueReceiptNumbers },
+        status: "PURCHASED",
+      },
       data: {
         status: "REFINED_SETTLED",
         transferredBatchNumber: input.targetBatchNumber,
       },
     });
+    if (updated.count !== uniqueReceiptNumbers.length) {
+      throw new Error(
+        "One or more ore intake receipts could not be found or are already refined/settled"
+      );
+    }
 
     // 2. Ensure gold commodity reserve exists
     const reserve = await tx.commodityReserve.upsert({

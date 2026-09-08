@@ -283,14 +283,22 @@ export async function bridgeIndustrialDoréToRefinery(input: BridgeIndustrialInp
       );
     }
 
-    // 1. Mark runs as refined
-    await tx.smeltingRunTelemetry.updateMany({
-      where: { runNumber: { in: uniqueRunNumbers } },
+    // 1. Mark runs as refined (atomic guard: must be POURED)
+    const updated = await tx.smeltingRunTelemetry.updateMany({
+      where: {
+        runNumber: { in: uniqueRunNumbers },
+        status: "POURED",
+      },
       data: {
         status: "REFINED_SETTLED",
         refinedBatchNumber: input.targetBatchNumber,
       },
     });
+    if (updated.count !== uniqueRunNumbers.length) {
+      throw new Error(
+        "One or more smelting runs could not be found or are already refined/settled"
+      );
+    }
 
     // 2. Ensure gold reserve exists
     const reserve = await tx.commodityReserve.upsert({
