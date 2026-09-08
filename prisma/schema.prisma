@@ -1157,6 +1157,53 @@ model BorderTaxSettlement {
   @@index([clearedAt])
 }
 
+/// Fractionalized Commodity Liquidity Pool (Phase 17 RWA-AMM).
+/// XYK constant-product pool pairing ANGEL against milli-unit fractional
+/// commodity tokens (mAu for gold, gLi for lithium).
+model CommodityLiquidityPool {
+  id              String   @id @default(cuid())
+  poolId          String   @unique // "POOL-ANGEL-MAU-GOLD"
+  pairSymbol      String   // "ANGEL_MAU", "ANGEL_GLI"
+  commoditySymbol String   // "Au", "Li"
+  angelReserve    Int      @default(0) // whole ANGEL units
+  commodityReserve Int     @default(0) // milli-units (mAu or gLi)
+  totalLpTokens   Int      @default(0)
+  version         Int      @default(1) // optimistic concurrency guard
+  status          String   @default("ACTIVE") // "ACTIVE", "HALTED"
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  receipts AmmSwapReceipt[]
+
+  @@index([pairSymbol])
+  @@index([status])
+}
+
+/// Atomic swap receipt within the fractionalized commodity AMM.
+/// Immutable record of every swap input/output, fee, and governing regime.
+model AmmSwapReceipt {
+  id              String   @id @default(cuid())
+  swapId          String   @unique
+  poolId          String
+  agentCommitment String
+  inputToken      String   // "ANGEL" | "MAU" | "GLI"
+  inputAmount     Int
+  outputToken     String
+  outputAmount    Int
+  feeAngel        Int      @default(0)
+  oracleSpotUsd   Float
+  effectivePriceUsd Float
+  deviationPct    Float    @default(0)
+  regimeAtSwap    String   // "SOLID" | "GHOST"
+  createdAt       DateTime @default(now())
+
+  pool CommodityLiquidityPool @relation(fields: [poolId], references: [id])
+
+  @@index([poolId])
+  @@index([agentCommitment])
+  @@index([createdAt])
+}
+
 
 
 

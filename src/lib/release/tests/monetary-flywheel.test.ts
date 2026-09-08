@@ -7,7 +7,7 @@ const { prismaMock } = vi.hoisted(() => ({
     operatorLedgerEntry: { create: vi.fn(), findMany: vi.fn() },
     commodityReserve: { upsert: vi.fn(), findMany: vi.fn() },
     vaultBatch: { findUnique: vi.fn(), update: vi.fn() },
-    commodityEscrow: { create: vi.fn(), findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn() },
+    commodityEscrow: { create: vi.fn(), findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
     assayerCertification: { findUnique: vi.fn() },
     sovereignDisbursement: { create: vi.fn() },
     $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(prismaMock)),
@@ -166,6 +166,7 @@ describe("Unified AngelCoin Monetary Flywheel (Closed-Loop Integration)", () => 
       escrowId: "esc_flywheel_001",
       status: "RELEASED",
     });
+    prismaMock.commodityEscrow.updateMany.mockResolvedValue({ count: 1 });
 
     const released = await releaseEscrowOnAssay({
       escrowId: "esc_flywheel_001",
