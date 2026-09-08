@@ -53,16 +53,44 @@ export async function GET(request: NextRequest) {
   const card = {
     name: "Passport",
     description:
-      "Tamper-evident behavioral receipt system for AI agents. " +
-      "Issues Ed25519-signed receipts, manages agent enrollment and evidence ingestion, " +
-      "runs the AngelCoin credit ledger, marketplace engagement lifecycle, and Stripe billing.",
+      "Free, open-source (MIT) tamper-evident identity & authenticity layer for AI agents. " +
+      "Issue Ed25519-signed receipts, post signed behavioral evidence, verify agents, and " +
+      "integrate with a commodity-backed sovereign reserve stack (ANGEL, Proof-of-Reserves, " +
+      "escrow, transit, artisanal sourcing, industrialization fund, rail factory). No payment " +
+      "required for the core protocol, any SDK, or verification.",
     url: baseUrl,
+    license: "MIT",
+    open_source: true,
+    pricing: {
+      model: "freemium",
+      description:
+        "Free tier (100 receipts/mo), keyless public verification, and all SDKs are free and " +
+        "MIT-licensed. An optional $49/mo Pro tier serves higher volume (10K receipts) and is a " +
+        "Stripe-billed extra — it never gates verifying, privacy, open-source, or SDK surfaces.",
+      free_tier: "100 receipts/month, developer API key, public keyless verification",
+    },
+    sdks: [
+      {
+        language: "typescript",
+        package: "@passport7/sdk",
+        install: "npm install @passport7/sdk",
+        docs_url: "https://www.npmjs.com/package/@passport7/sdk",
+        node_modules_subpaths: ["/langchain", "/mastra", "/vercel-ai"],
+      },
+      {
+        language: "python",
+        package: "passport-sdk",
+        docs_url: "https://github.com/AngelBoyGo/passport/tree/main/python",
+      },
+    ],
+    llms_txt: `${baseUrl}/llms.txt`,
     agent_card_version: "1.0",
     authentication: {
       schemes: [
         {
           type: "bearer",
-          description: "API key authentication (pp_...). Obtain from the operator dashboard.",
+          description:
+            "API key authentication (pp_...). Obtain from the operator dashboard. Core verification endpoints are public and keyless.",
           documentation_url: `${baseUrl}/docs/api-reference#authentication`,
         },
         {
@@ -136,6 +164,9 @@ export async function GET(request: NextRequest) {
       { type: "documentation", url: `${baseUrl}/docs/getting-started` },
       { type: "documentation", url: `${baseUrl}/docs/api-reference` },
       { type: "documentation", url: `${baseUrl}/docs/integrate` },
+      { type: "llms-txt", url: `${baseUrl}/llms.txt` },
+      { type: "mcp", url: `${baseUrl}/.well-known/mcp.json` },
+      { type: "sdk", url: "https://www.npmjs.com/package/@passport7/sdk" },
       { type: "api", url: `${baseUrl}/api/v1/public-key` },
       { type: "api", url: `${baseUrl}/api/health` },
     ],

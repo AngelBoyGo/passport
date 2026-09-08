@@ -1,0 +1,65 @@
+# Passport
+
+> Free & open-source (MIT) cryptographic identity and authenticity layer for AI agents.
+> Issue tamper-evident, Ed25519-signed receipts for agent work; post signed behavioral
+> evidence; verify agents; and integrate with a commodity-backed sovereign reserve stack
+> (ANGEL, Proof-of-Reserves, escrow, transit, artisanal sourcing, industrialization fund,
+> rail factory). No payment required for the core protocol or any SDK.
+
+## Key facts
+- License: MIT (core protocol + TypeScript SDK `@passport7/sdk` + Python SDK)
+- Pricing: free to use — no signup or payment for verifying, the SDK, or the core API
+- Hosted at: https://passport.metis.gold (self-hostable, Next.js + PostgreSQL)
+- Agent card (A2A): https://passport.metis.gold/.well-known/agent.json
+- MCP manifest: https://passport.metis.gold/.well-known/mcp.json
+
+## SDKs
+- TypeScript: npm package `@passport7/sdk` — https://www.npmjs.com/package/@passport7/sdk
+  - Framework hooks: `@passport7/sdk/langchain`, `@passport7/sdk/mastra`, `@passport7/sdk/vercel-ai`
+- Python: https://github.com/AngelBoyGo/passport/tree/main/python (stdlib only)
+- Source: https://github.com/AngelBoyGo/passport
+
+## Core docs
+- Getting started: https://passport.metis.gold/docs/getting-started
+- API reference: https://passport.metis.gold/docs/api-reference
+- Integrations: https://passport.metis.gold/docs/integrations
+- Integrate: https://passport.metis.gold/docs/integrate
+- Verification: https://passport.metis.gold/docs/verification
+- SDK docs: https://passport.metis.gold/docs/sdk
+
+## Key endpoints (all under https://passport.metis.gold)
+- POST /api/v1/passport/agents/enroll/start — proof-based agent enrollment (public)
+- POST /api/v1/passport/agents/{commitment}/evidence — post signed behavioral evidence
+- POST /api/v1/receipts — issue a signed receipt (Bearer auth)
+- POST /api/v1/receipts/{id}/finalize — finalize with outcome
+- GET  /api/v1/receipts/{id}/public-manifest — public, unauthenticated receipt verification
+- GET  /api/v1/public-key — published Ed25519 verifying key
+- POST /api/v1/gate/verify — operator gate check
+- GET  /api/v1/rate — ANGEL rate + reserve state (public, signed)
+- GET  /api/v1/reserves/por — Proof-of-Reserves (public)
+- GET  /api/v1/leaderboard — public agent leaderboard
+- GET  /api/health — liveness probe (public)
+
+## Sovereign Haven (RWA) protocol (Phases 12–21)
+ANGEL monetary system ($5.00 peg, solvency-gated) · commodity oracle · Proof-of-Reserves
+Merkle tree · bilateral commodity escrow + statutory waterfall · artisanal XRF sourcing ·
+industrial smelting telemetry · bonded transit corridors · automated customs clearing ·
+fractionalized RWA-AMM · Sahel mobile-money/USSD gateway · autonomous rail factory +
+settlement webhook.
+
+## Quickstart (TypeScript)
+```bash
+npm install @passport7/sdk
+```
+```ts
+import { PassportClient } from "@passport7/sdk";
+const p = new PassportClient({ apiKey: "pp_…", baseUrl: "https://passport.metis.gold" });
+const r = await p.issueReceipt({ agent_id: "a1", receipt_type: "competence",
+  input_digest: "<sha256>", authority_scope: "example.com", expiry: "2026-08-01T00:00:00Z" });
+await p.finalizeReceipt(r.receipt_id, { status: "success", output_hash: "<sha256>" });
+```
+
+## Frameworks
+- LangChain: wrap any model with PassportCallbackHandler to post OTel evidence per call
+- Mastra: wrap agents/workflows to anchor every run with a receipt (success/failure_tombstone)
+- Vercel AI: use passportMiddleware to gate + audit LLM calls

@@ -1,8 +1,17 @@
-# Passport — Phase 1 MVP
+# Passport — Open-Source AI Agent Identity & Authenticity Protocol
 
 Portable, tamper-evident behavioral receipts for AI agents. Identity gets your agent in the door; Passport tells the other side whether to ship.
 
+**Free & open-source.** The core protocol and the official SDKs are MIT-licensed. Anyone — humans or autonomous agents — can issue, verify, and trust receipts without payment. Optional paid *operator* tiers (Stripe-billed) only gate convenience/extras; they never gate the verifying, privacy, or SDK surfaces.
+
 **Honesty boundary:** tamper-evident integrity + verifiability — not unforgeable honesty.
+
+- **TypeScript SDK:** [`@passport7/sdk`](https://www.npmjs.com/package/@passport7/sdk) (MIT) · [sdk/README.md](./sdk/README.md)
+- **Python SDK:** [`python/`](./python/) · [python/README.md](./python/README.md)
+- **LLM directory:** [`/llms.txt`](https://passport.metis.gold/llms.txt)
+- **Agent card:** [`/.well-known/agent.json`](https://passport.metis.gold/.well-known/agent.json)
+- **MCP manifest:** [`/.well-known/mcp.json`](https://passport.metis.gold/.well-known/mcp.json)
+- **Docs:** [/docs](/docs) · **API reference:** [/docs/api-reference](/docs/api-reference)
 
 ## Quick start
 
@@ -30,9 +39,9 @@ Open [http://localhost:3000](http://localhost:3000) and click **Live verify demo
 | `DATABASE_URL` | Yes | `postgresql://USER:PASSWORD@HOST:5432/passport?schema=public` |
 | `SIGNING_PRIVATE_KEY` | Yes | 32-byte ed25519 seed (64 hex chars). Verifier write-only. Never rotate without a key-rotation plan. |
 | `NEXT_PUBLIC_APP_URL` | Yes | Public HTTPS origin, e.g. `https://passport.example.com` |
-| `STRIPE_SECRET_KEY` | Prod | Stripe secret key. Omit for dev mock mode. |
+| `STRIPE_SECRET_KEY` | Prod (optional) | Stripe secret key. The core protocol is free; Stripe only powers optional paid operator tiers. |
 | `STRIPE_WEBHOOK_SECRET` | Prod | Stripe webhook signing secret |
-| `STRIPE_PRICE_PRO` | Prod | Stripe Price ID for Pro ($49/mo recurring) |
+| `STRIPE_PRICE_PRO` | Prod (optional) | Stripe Price ID for an optional paid operator tier. Not required to use the protocol or SDK. |
 | `NODE_ENV` | Prod | Set to `production` (disables dev mock provisioning) |
 
 Copy `.env` and adjust as needed. Generate a signing key:
@@ -115,9 +124,9 @@ Next.js App Router (standalone output), TypeScript, Prisma + PostgreSQL, `@noble
 
 ## Coolify self-hosted deployment
 
-### Stripe merchant panel configuration
+### Stripe merchant panel configuration (optional paid tiers only)
 
-1. Create a **Product** with a recurring **Price** ($49/mo Pro tier). Copy the Price ID into `STRIPE_PRICE_PRO`.
+1. Create a **Product** with a recurring **Price**. Copy the Price ID into `STRIPE_PRICE_PRO`.
 2. Add a webhook endpoint: `https://<NEXT_PUBLIC_APP_URL>/api/stripe/webhook`
 3. Subscribe to events: `checkout.session.completed`, `invoice.payment_succeeded`, `customer.created`
 4. Copy the signing secret into `STRIPE_WEBHOOK_SECRET`
@@ -147,7 +156,7 @@ The Dockerfile copies the Prisma CLI into the runner image (standalone tracing s
 
 ## License
 
-Private — Phase 1 MVP.
+MIT — the core protocol, the TypeScript SDK (`@passport7/sdk`), and the Python SDK are open source. See [LICENSE](./LICENSE). Optional paid operator tiers (Stripe-billed) exist but are not required to use any protocol or SDK surface.
 
 ## Branching and pilot freeze
 
