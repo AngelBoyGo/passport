@@ -21,6 +21,7 @@ import {
 } from "./factory-brain";
 import { runSmokeLadder } from "./smoke-test";
 import { runDiscovery } from "./discovery";
+import { isSlaBreach } from "./telemetry";
 import type { RailSpecShape } from "./types";
 
 export const FACTORY_COMMITMENT = "raillab_factory_agent";
@@ -311,12 +312,9 @@ export async function quarantineRailSpec(specId: string, reason: string): Promis
     .catch(() => null);
 }
 
-function isBreach(errorTranche: string): boolean {
-  return errorTranche !== "NONE";
-}
-
 /**
- * Auto-quarantines ENABLED rails whose last 3 telemetry rows are consecutive breaches.
+ * Auto-quarantines ENABLED rails whose last 3 telemetry rows are consecutive SLA breaches
+ * (error tranche, latency, or dedupe-ratio — see `isSlaBreach`).
  */
 export async function autoQuarantineFailingRails(): Promise<{
   quarantined: string[];
@@ -332,7 +330,14 @@ export async function autoQuarantineFailingRails(): Promise<{
     });
     if (
       recent.length >= AUTO_QUARANTINE_CONSECUTIVE_BREACHES &&
-      recent.every((t) => isBreach(t.errorTranche))
+      recent.every((t) =>
+        isSlaBreach({
+          latencyMs: t.latencyMs,
+          dedupeHits: t.dedupeHits,
+          errorTranche: t.errorTranche,
+          settlementCount: t.settlementCount,
+        })
+      )
     ) {
       await quarantineRailSpec(spec.id, `auto-quarantine: ${AUTO_QUARANTINE_CONSECUTIVE_BREACHES} consecutive SLA breaches`);
       quarantined.push(spec.railKey);
