@@ -51,6 +51,7 @@ import {
 import { generalizeRunbook as brainGeneralize, writeProposalRationale } from "../factory-brain";
 import { mockSmokeTest, MockLedger, sandboxSmokeTest } from "../smoke-test";
 import { runDiscovery, fingerprintCandidate } from "../discovery";
+import { settleMobileMoneyOnramp } from "../../digital-gateway/mobile-money";
 
 const validFix = {
   id: "fix_1",
@@ -201,8 +202,7 @@ describe("Autonomous Rail Factory (Phase 19)", () => {
   });
 
   describe("SANDBOX double-callback dedupe (d)", () => {
-    it("dedupes the second identical callback (single credit)", async () => {
-      prismaMock.fiatFix.create.mockResolvedValue(validFix);
+    it("dedupes the second identical callback via the real settlement path", async () => {
       prismaMock.fiatFix.findFirst.mockResolvedValue(validFix);
       prismaMock.moneySettlement.create
         .mockResolvedValueOnce({ id: "set_1", status: "PENDING" })
@@ -210,7 +210,7 @@ describe("Autonomous Rail Factory (Phase 19)", () => {
       prismaMock.moneySettlement.findUnique.mockResolvedValue({
         id: "set_1",
         provider: "agent_api",
-        externalRef: "any",
+        externalRef: "TX-1",
         xofAmount: 3000,
         xofRateUsd: 1 / 600.0,
         creditedAngel: 1,
@@ -221,9 +221,26 @@ describe("Autonomous Rail Factory (Phase 19)", () => {
       prismaMock.operatorLedgerEntry.create.mockResolvedValue({});
       prismaMock.moneySettlement.update.mockResolvedValue({});
 
+      const payload = { external_reference: "TX-1", amount: 3000 };
+      const first = await settleMobileMoneyOnramp({ provider: "agent_api", payload, internal: true });
+      const second = await settleMobileMoneyOnramp({ provider: "agent_api", payload, internal: true });
+
+      expect(first.deduped).toBe(false);
+      expect(second.deduped).toBe(true);
+      // Exactly one credit across both calls.
+      expect(prismaMock.agentWallet.upsert).toHaveBeenCalledTimes(1);
+    });
+
+    it("smoke rung dry-run never mints money or touches the treasury", async () => {
+      prismaMock.fiatFix.findFirst.mockResolvedValue(validFix);
+      prismaMock.moneySettlement.findUnique.mockResolvedValue(null);
+
       const result = await sandboxSmokeTest();
       expect(result.outcome).toBe("PASS");
-      expect(result.detail).toContain("deduped");
+      // Dry-run must NOT create a settlement row, credit a wallet, or book the treasury.
+      expect(prismaMock.moneySettlement.create).not.toHaveBeenCalled();
+      expect(prismaMock.agentWallet.upsert).not.toHaveBeenCalled();
+      expect(prismaMock.operatorLedgerEntry.create).not.toHaveBeenCalled();
     });
   });
 

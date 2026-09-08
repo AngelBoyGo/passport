@@ -47,6 +47,12 @@ export interface SettleOnrampInput {
    * so provider HMAC is skipped. Provider callbacks MUST NOT set this.
    */
   internal?: boolean;
+  /**
+   * Dry-run: performs the full validation path (parse, FX fix, dedupe detection) but
+   * NEVER creates a settlement row, credits a wallet, or books the treasury. Used by the
+   * Rail Factory smoke-test ladder so a "test" never mints money in production.
+   */
+  dryRun?: boolean;
 }
 
 export interface SettleOnrampResult {
@@ -94,6 +100,38 @@ export async function settleMobileMoneyOnramp(
   const creditedAngel = xofToAngel(xofAmount, fix.rateUsdPerUnit);
   const targetCommitment =
     input.targetCommitment ?? collectorWalletCommitment(externalRef);
+
+  // 0. Dry-run: validate without any money mutation. Detects a prior settlement for
+  //    idempotency reporting, but never persists a row or moves funds.
+  if (input.dryRun) {
+    const existing = await prisma.moneySettlement.findUnique({
+      where: { provider_externalRef: { provider: provider.name, externalRef } },
+    });
+    if (existing) {
+      return {
+        deduped: true,
+        settlementId: existing.id,
+        provider: existing.provider,
+        externalRef: existing.externalRef,
+        xofAmount: existing.xofAmount,
+        xofRateUsd: existing.xofRateUsd,
+        creditedAngel: existing.creditedAngel,
+        targetCommitment: existing.targetCommitment,
+        status: existing.status,
+      };
+    }
+    return {
+      deduped: false,
+      settlementId: "dry-run",
+      provider: provider.name,
+      externalRef,
+      xofAmount,
+      xofRateUsd: fix.rateUsdPerUnit,
+      creditedAngel,
+      targetCommitment,
+      status: "PENDING",
+    };
+  }
 
   // 1. Idempotency lock: create the settlement row FIRST (committed). The unique
   //    (provider, externalRef) index makes a concurrent redelivery collide.

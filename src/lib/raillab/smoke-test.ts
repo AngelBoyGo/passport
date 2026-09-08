@@ -4,15 +4,15 @@
  *   MOCK       — deterministic in-memory double-entry ledger; asserts exact deltas and the
  *                sacred invariant that AgentWallet.balance is NEVER touched by non-ANGEL
  *                units (the two bugs this project has already shipped and fixed).
- *   SANDBOX    — drives the REAL Phase-18 `settleMobileMoneyOnramp` with a seeded FiatFix and
- *                asserts idempotency (double callback → deduped, single delta).
+ *   SANDBOX    — DRY-RUN validation against the REAL Phase-18 `settleMobileMoneyOnramp`
+ *                (parse + FX-fix band + idempotency detection) WITHOUT moving money. A smoke
+ *                test must never mint ANGEL or book the treasury.
  *   LIVE_CANARY— relays 3 real currency units against a REAL configured sandbox endpoint with
  *                a bounded cap. No configured endpoint → the rail is NOT canary-tested (must be
  *                human-enabled); any SLA breach → QUARANTINE.
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { prisma } from "@/lib/db";
 import { settleMobileMoneyOnramp } from "@/lib/digital-gateway/mobile-money";
 
 export type SmokeStage = "MOCK" | "SANDBOX" | "LIVE_CANARY";
@@ -103,58 +103,45 @@ export function mockSmokeTest(spec: {
   }
 }
 
-// ── SANDBOX: idempotency against real Phase-18 settlement code ──
+// ── SANDBOX: dry-run validation against real Phase-18 settlement code ──
 
 const SANDBOX_EXTERNAL_REF_PREFIX = "raillab-sandbox";
 
 /**
- * Exercises the real mobile-money idempotency path: seeds a fresh FiatFix, then calls
- * `settleMobileMoneyOnramp` twice with the same reference. PASS only if the second call is
- * deduped (no double credit).
+ * Validates the real mobile-money settlement path in DRY-RUN mode — parse, FX-fix band, and
+ * idempotency detection — WITHOUT creating a settlement row, crediting a wallet, or booking
+ * the treasury. A smoke test must never mint money. The idempotency *guarantee* (double
+ * callback → single credit) is asserted at the unit-test level against the real
+ * `settleMobileMoneyOnramp`, not re-exercised against the live ledger here.
  */
 export async function sandboxSmokeTest(): Promise<SmokeResult> {
   try {
     const ref = `${SANDBOX_EXTERNAL_REF_PREFIX}-${Date.now()}`;
-    // Ensure a valid FiatFix exists (1 USD = 600 XOF, within band, 24h window).
-    await prisma.fiatFix.create({
-      data: {
-        currency: "XOF",
-        rateUsdPerUnit: 1 / 600.0,
-        source: "raillab-sandbox",
-        validFrom: new Date(),
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      },
-    });
-
     const payload = { external_reference: ref, amount: 3000 };
-    const first = await settleMobileMoneyOnramp({
+    const result = await settleMobileMoneyOnramp({
       provider: "agent_api",
       payload,
       internal: true,
-    });
-    const second = await settleMobileMoneyOnramp({
-      provider: "agent_api",
-      payload,
-      internal: true,
+      dryRun: true,
     });
 
-    if (first.deduped || !second.deduped) {
+    if (result.deduped || result.creditedAngel < 1) {
       return {
         stage: "SANDBOX",
         outcome: "FAIL",
-        detail: `idempotency broken: first.deduped=${first.deduped}, second.deduped=${second.deduped}`,
+        detail: `dry-run validation failed: deduped=${result.deduped}, credited=${result.creditedAngel}`,
       };
     }
     return {
       stage: "SANDBOX",
       outcome: "PASS",
-      detail: `double callback deduped (credited=${first.creditedAngel} ANGEL, exactly once)`,
+      detail: `dry-run settlement validated (would credit ${result.creditedAngel} ANGEL; no money moved)`,
     };
   } catch (err) {
     return {
       stage: "SANDBOX",
       outcome: "FAIL",
-      detail: err instanceof Error ? err.message : "sandbox settlement failed",
+      detail: err instanceof Error ? err.message : "sandbox validation failed",
     };
   }
 }
