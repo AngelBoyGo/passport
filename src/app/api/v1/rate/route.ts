@@ -51,6 +51,7 @@ export async function GET() {
           "angelcoin_on_behalf",
           "rwa_redemption_queued",
           "angl_redemption",
+          "sahel_onramp",
         ],
       },
     },

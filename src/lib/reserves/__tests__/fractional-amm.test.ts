@@ -38,6 +38,7 @@ import {
   executePoolSwap,
   removeLiquidity,
   ensurePool,
+  bootstrapAmmLiquidity,
   fractionalCommodityWalletCommitment,
   integerMilliUnitsFromFineWeight,
   FEE_BPS_SOLID,
@@ -52,7 +53,7 @@ const GOLD_BATCH = {
   batchNumber: "BKO-AU-2026-AMM-001",
   reserveId: "res_au",
   status: "AUDITED",
-  fineWeightGrams: 1000.0, // 1000g * 1000 = 1,000,000 mAu
+  fineWeightGrams: 1000.0,
   reserve: { commodityType: "GOLD", symbol: "Au" },
 };
 
@@ -61,7 +62,7 @@ const LITHIUM_BATCH = {
   batchNumber: "GOUL-LI-2026-AMM-001",
   reserveId: "res_li",
   status: "AUDITED",
-  fineWeightGrams: 250.0, // 250 kg * 1000 = 250,000 gLi
+  fineWeightGrams: 250.0,
   reserve: { commodityType: "LITHIUM", symbol: "Li" },
 };
 
@@ -107,7 +108,6 @@ describe("Fractionalized Commodity Clearing & RWA-AMM (Phase 17)", () => {
       expect(result.symbol).toBe("Au");
       expect(result.unit).toBe("mAu");
       expect(result.mintedMilliUnits).toBe(1_000_000);
-      // Atomic guard used to lock batch
       expect(prismaMock.vaultBatch.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
@@ -117,7 +117,6 @@ describe("Fractionalized Commodity Clearing & RWA-AMM (Phase 17)", () => {
           data: expect.objectContaining({ status: "FRACTIONALIZED_LOCKED" }),
         })
       );
-      // Minted into deterministic 64-hex fractional ledger (NOT AgentWallet.balance)
       expect(prismaMock.fractionalCommodityBalance.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
@@ -129,7 +128,6 @@ describe("Fractionalized Commodity Clearing & RWA-AMM (Phase 17)", () => {
           create: expect.objectContaining({ milliUnits: 1_000_000 }),
         })
       );
-      // The ANGEL wallet space must NOT be polluted with milli-units:
       expect(prismaMock.agentWallet.upsert).not.toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
@@ -174,7 +172,7 @@ describe("Fractionalized Commodity Clearing & RWA-AMM (Phase 17)", () => {
     it("aborts if a concurrent transaction already locked the batch", async () => {
       prismaMock.vaultBatch.findUnique.mockResolvedValue({ ...GOLD_BATCH });
       prismaMock.commodityEscrow.findFirst.mockResolvedValue(null);
-      prismaMock.vaultBatch.updateMany.mockResolvedValue({ count: 0 }); // race lost
+      prismaMock.vaultBatch.updateMany.mockResolvedValue({ count: 0 });
 
       await expect(
         fractionalizeVaultBatch({
@@ -191,8 +189,8 @@ describe("Fractionalized Commodity Clearing & RWA-AMM (Phase 17)", () => {
       poolId: "POOL-ANGEL_MAU",
       pairSymbol: "ANGEL_MAU",
       commoditySymbol: "Au",
-      angelReserve: 30_000_000, // 30,000,000 ANGEL
-      commodityReserve: 2_000_000_000, // 2,000,000,000 mAu = 2,000,000 g = 2,000 kg
+      angelReserve: 30_000_000,
+      commodityReserve: 2_000_000_000,
       totalLpTokens: 0,
       version: 1,
       status: "ACTIVE",
@@ -200,8 +198,6 @@ describe("Fractionalized Commodity Clearing & RWA-AMM (Phase 17)", () => {
 
     const mockSwapSetup = (overrides: Partial<typeof GOLD_POOL> = {}) => {
       const pool = { ...GOLD_POOL, ...overrides };
-      prismaMock.commodityLiquidityPool.findUnique.mockResolvedValue({ ...pool });
-      // Fresh read inside the transaction
       prismaMock.commodityLiquidityPool.findUnique.mockResolvedValue({ ...pool });
       prismaMock.commodityLiquidityPool.updateMany.mockResolvedValue({ count: 1 });
       prismaMock.agentWallet.updateMany.mockResolvedValue({ count: 1 });
@@ -221,7 +217,7 @@ describe("Fractionalized Commodity Clearing & RWA-AMM (Phase 17)", () => {
         poolId: pool.poolId,
         agentCommitment: AGENT,
         inputToken: "ANGEL",
-        inputAmount: 15_000, // $75,000 → ~1000g worth of mAu (1000 g × 1000 = 1,000,000 mAu)
+        inputAmount: 15_000,
       });
 
       expect(result.inputToken).toBe("ANGEL");
@@ -229,15 +225,12 @@ describe("Fractionalized Commodity Clearing & RWA-AMM (Phase 17)", () => {
       expect(result.outputAmount).toBeGreaterThan(0);
       expect(result.feeAngel).toBeGreaterThan(0);
       expect(result.regime).toBe("SOLID");
-      // Oracle band respected
       expect(Math.abs(result.deviationPct)).toBeLessThanOrEqual(MAX_ORACLE_DEVIATION_PCT);
-      // Atomic optimistic-lock used (version guard)
       expect(prismaMock.commodityLiquidityPool.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({ id: "pool_au", version: 1, status: "ACTIVE" }),
         })
       );
-      // Treasury gets its share
       expect(prismaMock.agentWallet.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({ subjectCommitment: STABILIZATION_TREASURY }),
@@ -257,15 +250,10 @@ describe("Fractionalized Commodity Clearing & RWA-AMM (Phase 17)", () => {
       });
 
       expect(result.regime).toBe("GHOST");
-      expect(result.feeAngel).toBeGreaterThan(0);
-      // 1500 bps = 15% on 15,000 = 2,250 ANGEL
       expect(result.feeAngel).toBe(2250);
     });
 
     it("rejects a swap whose execution price deviates more than 5% from the oracle spot", async () => {
-      // Pool with reserves far off the oracle spot price: effective price will be crushed.
-      // angelReserve: 300,000,000 ANGEL, commodityReserve: 10,000,000 mAu → effective = 300/0.01 = 30,000 per g
-      // vs oracle 75 USD/g → deviation ~ +39,900% → aborted.
       const pool = mockSwapSetup({
         angelReserve: 300_000_000,
         commodityReserve: 10_000_000,
@@ -279,13 +267,11 @@ describe("Fractionalized Commodity Clearing & RWA-AMM (Phase 17)", () => {
           inputAmount: 15_000,
         })
       ).rejects.toThrow(/exceeds the .* oracle band/i);
-      // Pool was NOT mutated
       expect(prismaMock.commodityLiquidityPool.updateMany).not.toHaveBeenCalled();
     });
 
     it("aborts the swap under concurrent mutation of the pool (double-spend guard)", async () => {
       const pool = mockSwapSetup();
-      // Concurrent transaction already bumped the version:
       prismaMock.commodityLiquidityPool.updateMany.mockResolvedValue({ count: 0 });
 
       await expect(
@@ -296,7 +282,6 @@ describe("Fractionalized Commodity Clearing & RWA-AMM (Phase 17)", () => {
           inputAmount: 15_000,
         })
       ).rejects.toThrow(/mutated concurrently/i);
-      // No receipt created on failure
       expect(prismaMock.ammSwapReceipt.create).not.toHaveBeenCalled();
     });
   });
@@ -343,6 +328,80 @@ describe("Fractionalized Commodity Clearing & RWA-AMM (Phase 17)", () => {
       expect(prismaMock.commodityLiquidityPool.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({ id: "pool_au", version: 3, status: "ACTIVE" }),
+        })
+      );
+    });
+  });
+
+  describe("bootstrapAmmLiquidity", () => {
+    const GOLD_POOL_EMPTY = {
+      id: "pool_au",
+      poolId: "POOL-ANGEL_MAU",
+      pairSymbol: "ANGEL_MAU",
+      commoditySymbol: "Au",
+      status: "ACTIVE",
+      totalLpTokens: 0,
+      version: 1,
+    };
+
+    it("blocks re-seeding an already-seeded pool", async () => {
+      prismaMock.commodityLiquidityPool.findUnique.mockResolvedValue({
+        ...GOLD_POOL_EMPTY,
+        totalLpTokens: 500,
+      });
+
+      await expect(
+        bootstrapAmmLiquidity({
+          poolId: "POOL-ANGEL_MAU",
+          angelSeed: 10_000,
+          commoditySeed: 100_000,
+        })
+      ).rejects.toThrow(/re-seed refused/i);
+      expect(prismaMock.commodityLiquidityPool.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("blocks seeding in GHOST regime", async () => {
+      setRegime("GHOST");
+      prismaMock.commodityLiquidityPool.findUnique.mockResolvedValue({ ...GOLD_POOL_EMPTY });
+
+      await expect(
+        bootstrapAmmLiquidity({
+          poolId: "POOL-ANGEL_MAU",
+          angelSeed: 10_000,
+          commoditySeed: 100_000,
+        })
+      ).rejects.toThrow(/GHOST regime/i);
+    });
+
+    it("mints LP tokens exactly once on a valid seed", async () => {
+      setRegime("SOLID");
+      prismaMock.commodityLiquidityPool.findUnique.mockResolvedValue({ ...GOLD_POOL_EMPTY });
+      prismaMock.commodityLiquidityPool.updateMany.mockResolvedValue({ count: 1 });
+      prismaMock.agentWallet.upsert.mockResolvedValue({});
+
+      const result = await bootstrapAmmLiquidity({
+        poolId: "POOL-ANGEL_MAU",
+        angelSeed: 10_000,
+        commoditySeed: 90_000,
+      });
+
+      // floor(sqrt(10,000 * 90,000)) = floor(30,000) = 30,000
+      expect(result.lpTokensMinted).toBe(30000);
+      expect(result.regime).toBe("SOLID");
+      expect(prismaMock.commodityLiquidityPool.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            id: "pool_au",
+            totalLpTokens: 0,
+            status: "ACTIVE",
+          }),
+        })
+      );
+      expect(prismaMock.agentWallet.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            subjectCommitment: expect.stringMatching(/^[0-9a-f]{64}$/),
+          }),
         })
       );
     });

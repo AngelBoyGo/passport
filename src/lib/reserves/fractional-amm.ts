@@ -141,6 +141,88 @@ export async function ensurePool(pairSymbol: "ANGEL_MAU" | "ANGEL_GLI") {
   });
 }
 
+export interface BootstrapLiquidityInput {
+  poolId: string;
+  angelSeed: number;
+  commoditySeed: number;
+  reason?: string;
+}
+
+/**
+ * Seeds an empty constant-product pool with initial ANGEL + commodity milli-unit reserves.
+ * Guards:
+ *   - Re-seed is refused (pool.totalLpTokens > 0) → no LP-token dilution.
+ *   - Seeding is refused while the Dual-State Governor is in GHOST regime.
+ * Mints `floor(sqrt(angelSeed * commoditySeed))` LP tokens to the pool LP vault.
+ */
+export async function bootstrapAmmLiquidity(input: BootstrapLiquidityInput) {
+  const angelSeed = Math.max(1, Math.floor(input.angelSeed));
+  const commoditySeed = Math.max(1, Math.floor(input.commoditySeed));
+
+  const pool = await prisma.commodityLiquidityPool.findUnique({
+    where: { poolId: input.poolId },
+  });
+  if (!pool) {
+    throw new Error(`Liquidity pool '${input.poolId}' not found`);
+  }
+  if (pool.status !== "ACTIVE") {
+    throw new Error(`Liquidity pool '${input.poolId}' is currently ${pool.status}`);
+  }
+  if (pool.totalLpTokens > 0) {
+    throw new Error(`Liquidity pool '${input.poolId}' is already seeded (re-seed refused)`);
+  }
+
+  const regime = (await getLiveGovernorAssessment()).regime;
+  if (regime === "GHOST") {
+    throw new Error(
+      `Liquidity bootstrap blocked while the Dual-State Governor is in GHOST regime`
+    );
+  }
+
+  const lpTokens = Math.floor(Math.sqrt(angelSeed * commoditySeed));
+  const lpVault = poolLpVaultCommitment(pool.poolId);
+
+  return prisma.$transaction(async (tx) => {
+    // Atomic guard: only seeds a still-empty pool (version bump protects concurrent seed).
+    const seeded = await tx.commodityLiquidityPool.updateMany({
+      where: { id: pool.id, totalLpTokens: 0, status: "ACTIVE" },
+      data: {
+        angelReserve: { increment: angelSeed },
+        commodityReserve: { increment: commoditySeed },
+        totalLpTokens: lpTokens,
+        version: { increment: 1 },
+      },
+    });
+    if (seeded.count !== 1) {
+      throw new Error(`Pool '${input.poolId}' was seeded concurrently (aborted)`);
+    }
+
+    await tx.agentWallet.upsert({
+      where: { subjectCommitment: lpVault },
+      create: {
+        subjectCommitment: lpVault,
+        balance: lpTokens,
+        earnedTotal: lpTokens,
+        lastActivityAt: new Date(),
+      },
+      update: {
+        balance: { increment: lpTokens },
+        earnedTotal: { increment: lpTokens },
+        lastActivityAt: new Date(),
+      },
+    });
+
+    return {
+      poolId: pool.poolId,
+      angelSeed,
+      commoditySeed,
+      lpTokensMinted: lpTokens,
+      lpVaultCommitment: lpVault,
+      regime,
+    };
+  });
+}
+
 /**
  * Fractionalizes an audited, unencumbered VaultBatch into milli-unit tokens credited to a
  * deterministic 64-hex fractional wallet. The physical lot is locked to FRACTIONALIZED_LOCKED.

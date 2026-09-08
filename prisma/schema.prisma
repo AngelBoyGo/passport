@@ -1223,6 +1223,44 @@ model FractionalCommodityBalance {
   @@index([commoditySymbol])
 }
 
+/// Idempotent mobile-money settlement (Phase 18 Sahel Digital Money Gateway).
+/// The (provider, externalRef) composite unique is the database-level guard against
+/// double-credit: a redelivered mobile-money callback finds the row and returns the
+/// ORIGINAL event instead of re-crediting.
+model MoneySettlement {
+  id             String   @id @default(cuid())
+  provider       String   // "orangemoney" | "moov" | "momo" | "agent_api"
+  externalRef    String
+  xofAmount      Int
+  xofRateUsd     Float     // FiatFix rate captured at settlement time
+  creditedAngel  Int
+  targetCommitment String // deterministic collector wallet or agent commitment
+  status         String   @default("SETTLED") // "SETTLED", "PENDING_REVIEW"
+  metadata       String?  // canonical callback payload (sans signature)
+  createdAt      DateTime @default(now())
+  settledAt      DateTime?
+
+  @@unique([provider, externalRef])
+  @@index([provider])
+  @@index([createdAt])
+}
+
+/// Fiat exchange-rate fix for the Sahel on-ramp (Phase 18).
+/// XOF (FCFA) → USD price fix refreshed by a scheduler. Staleness (>24h) and an
+/// out-of-band guard (±2.5% against a configured reference) refuse on-ramp so no
+/// arbitrage window opens against a dirty rate.
+model FiatFix {
+  id            String   @id @default(cuid())
+  currency      String   // "XOF"
+  rateUsdPerUnit Float
+  source        String
+  validFrom     DateTime @default(now())
+  expiresAt     DateTime
+
+  @@index([currency, validFrom])
+  @@index([currency, expiresAt])
+}
+
 
 
 
