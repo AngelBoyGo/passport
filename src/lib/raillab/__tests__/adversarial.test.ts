@@ -289,5 +289,47 @@ describe("Money-Ledger Integrity & Adversarial Audit (Phase 22)", () => {
       expect(status.supply_consistent).toBe(true);
       expect(status.ok).toBe(true);
     });
+
+    it("considers swaps by including pool commodityReserve (no false positive on buy-side held)", async () => {
+      // One 1,000g Au batch fractionalized -> 1,000,000 mAu minted.
+      // 200,000 mAu sits in holder wallets (some bought via swaps), 800,000 mAu sits in the
+      // pool as commodityReserve after swaps/LP-seed. minted === held + pooled -> consistent.
+      prismaMock.agentWallet.findMany.mockResolvedValue([{ balance: 0, staked: 0 }]);
+      prismaMock.railSpec.findMany.mockResolvedValue([]);
+      prismaMock.railSettlement.findMany.mockResolvedValue([]);
+      prismaMock.vaultBatch.findMany.mockResolvedValue([
+        { fineWeightGrams: 1000, reserve: { symbol: "Au", commodityType: "GOLD" } },
+      ]);
+      prismaMock.fractionalCommodityBalance.findMany.mockResolvedValue([
+        { commoditySymbol: "Au", milliUnits: 200_000 },
+      ]);
+      prismaMock.commodityLiquidityPool.findMany.mockResolvedValue([
+        { commoditySymbol: "Au", commodityReserve: 800_000, totalLpTokens: 0 },
+      ]);
+
+      const status = await runIntegrityCheck({ expectedAngelSupply: 0 });
+      expect(status.cross_ledger.fractional_consistent).toBe(true);
+      expect(status.ok).toBe(true);
+    });
+
+    it("flags a real fractional leak (minted != held + pooled)", async () => {
+      prismaMock.agentWallet.findMany.mockResolvedValue([{ balance: 0, staked: 0 }]);
+      prismaMock.railSpec.findMany.mockResolvedValue([]);
+      prismaMock.railSettlement.findMany.mockResolvedValue([]);
+      prismaMock.vaultBatch.findMany.mockResolvedValue([
+        { fineWeightGrams: 1000, reserve: { symbol: "Au", commodityType: "GOLD" } }, // 1,000,000 mAu minted
+      ]);
+      prismaMock.fractionalCommodityBalance.findMany.mockResolvedValue([
+        { commoditySymbol: "Au", milliUnits: 200_000 },
+      ]);
+      // Pool only holds 100,000 -> 300,000 total != 1,000,000 minted (700,000 leaked).
+      prismaMock.commodityLiquidityPool.findMany.mockResolvedValue([
+        { commoditySymbol: "Au", commodityReserve: 100_000, totalLpTokens: 0 },
+      ]);
+
+      const status = await runIntegrityCheck({ expectedAngelSupply: 0 });
+      expect(status.cross_ledger.fractional_consistent).toBe(false);
+      expect(status.ok).toBe(false);
+    });
   });
 });

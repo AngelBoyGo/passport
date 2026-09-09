@@ -30,6 +30,7 @@ export interface IntegrityStatus {
     fractionalized_batches: number;
     fractional_mint_by_symbol: Record<string, number>;
     fractional_held_by_symbol: Record<string, number>;
+    fractional_pool_reserve_by_symbol: Record<string, number>;
     fractional_consistent: boolean;
     pools_with_lp_tokens: number;
     lp_tokens_pool_side: number;
@@ -84,13 +85,17 @@ export async function runIntegrityCheck(input: IntegrityInput = {}): Promise<Int
   let fractionalizedBatches = 0;
   let fractionalMintBySymbol: Record<string, number> = {};
   let fractionalHeldBySymbol: Record<string, number> = {};
+  let fractionalPoolReserveBySymbol: Record<string, number> = {};
   let fractionalConsistent = true;
   let poolsWithLpTokens = 0;
   let lpTokensPoolSide = 0;
   let lpInvariantOk = true;
 
   try {
-    // Fractionalized batches: minted milli-units per commodity.
+    // Fractionalized batches: minted milli-units per commodity. Synthetic != held:
+    // swaps move milli-units between pools (commodityReserve) and holders. The only CREATION
+    // event is fractionalizeVaultBatch; redeemFractionalBatch burns and restores the batch to
+    // AUDITED (which removes it from this set, rebalancing the equation).
     const batches = await prisma.vaultBatch.findMany({
       where: { status: "FRACTIONALIZED_LOCKED" },
       select: { fineWeightGrams: true, reserve: { select: { symbol: true, commodityType: true } } },
@@ -102,7 +107,7 @@ export async function runIntegrityCheck(input: IntegrityInput = {}): Promise<Int
       fractionalMintBySymbol[symbol] = (fractionalMintBySymbol[symbol] ?? 0) + minted;
     }
 
-    // Held milli-units per commodity.
+    // Held milli-units per commodity (holder wallets).
     const balances = await prisma.fractionalCommodityBalance.findMany({
       select: { commoditySymbol: true, milliUnits: true },
     });
@@ -111,24 +116,43 @@ export async function runIntegrityCheck(input: IntegrityInput = {}): Promise<Int
       fractionalHeldBySymbol[symbol] = (fractionalHeldBySymbol[symbol] ?? 0) + (x.milliUnits ?? 0);
     }
 
-    // Conservation per symbol (within float tolerance).
-    for (const symbol of Object.keys(fractionalMintBySymbol)) {
-      const minted = fractionalMintBySymbol[symbol];
+    // Pool commodityReserve per commodity: swaps move milli-units between holders and pools;
+    // LP-seeded liquidity also sits here without a batch mint. So the total in existence
+    // (minted) must equal held(wallets) + commodityReserve(pools).
+    const pools = await prisma.commodityLiquidityPool.findMany({
+      select: { commoditySymbol: true, commodityReserve: true },
+    });
+    for (const p of pools) {
+      const symbol = p.commoditySymbol === "Li" ? "Li" : "Au";
+      fractionalPoolReserveBySymbol[symbol] =
+        (fractionalPoolReserveBySymbol[symbol] ?? 0) + (p.commodityReserve ?? 0);
+    }
+
+    // Conservation per symbol (within float tolerance):
+    //   minted(batches) === held(wallets) + commodityReserve(pools)
+    const allSymbols = new Set([
+      ...Object.keys(fractionalMintBySymbol),
+      ...Object.keys(fractionalHeldBySymbol),
+      ...Object.keys(fractionalPoolReserveBySymbol),
+    ]);
+    for (const symbol of allSymbols) {
+      const minted = fractionalMintBySymbol[symbol] ?? 0;
       const held = fractionalHeldBySymbol[symbol] ?? 0;
-      if (Math.abs(held - minted) > MILLI_UNITS_FLOAT_TOLERANCE) {
+      const pooled = fractionalPoolReserveBySymbol[symbol] ?? 0;
+      if (Math.abs(held + pooled - minted) > MILLI_UNITS_FLOAT_TOLERANCE) {
         fractionalConsistent = false;
         issues.push(
-          `Fractional ${symbol} conservation broken: minted=${minted}, held=${held}`
+          `Fractional ${symbol} conservation broken: minted=${minted}, held=${held}, pooled=${pooled}`
         );
       }
     }
 
     // LP invariant: LP tokens are pool-relative and must never be materialized in AgentWallet.
-    const pools = await prisma.commodityLiquidityPool.findMany({
+    const poolsLp = await prisma.commodityLiquidityPool.findMany({
       select: { totalLpTokens: true },
     });
-    poolsWithLpTokens = pools.filter((p) => (p.totalLpTokens ?? 0) > 0).length;
-    lpTokensPoolSide = pools.reduce((sum, p) => sum + (p.totalLpTokens ?? 0), 0);
+    poolsWithLpTokens = poolsLp.filter((p) => (p.totalLpTokens ?? 0) > 0).length;
+    lpTokensPoolSide = poolsLp.reduce((sum, p) => sum + (p.totalLpTokens ?? 0), 0);
 
     if (poolsWithLpTokens > 0 && lpTokensPoolSide === 0) {
       issues.push("LP pool has totalLpTokens>0 but no pool-side record");
@@ -177,6 +201,7 @@ export async function runIntegrityCheck(input: IntegrityInput = {}): Promise<Int
       fractionalized_batches: fractionalizedBatches,
       fractional_mint_by_symbol: fractionalMintBySymbol,
       fractional_held_by_symbol: fractionalHeldBySymbol,
+      fractional_pool_reserve_by_symbol: fractionalPoolReserveBySymbol,
       fractional_consistent: fractionalConsistent,
       pools_with_lp_tokens: poolsWithLpTokens,
       lp_tokens_pool_side: lpTokensPoolSide,
