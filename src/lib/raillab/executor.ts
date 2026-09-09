@@ -206,7 +206,7 @@ export async function runExecutionTick(): Promise<ExecutionTickResult> {
     try {
       result = await executeRailSettlement(
         spec.railKey,
-        { payload: { external_reference: `health-${spec.railKey}-${startedAt}`, amount: 1 } },
+        { payload: { external_reference: `health-${spec.railKey}-${startedAt}`, amount: 3000 } },
         { forceDryRun: true }
       );
     } catch (err) {
