@@ -102,15 +102,17 @@ async function pruneAttestations(): Promise<void> {
   try {
     const excess = await prisma.integrityAttestation.count();
     if (excess <= ATTESTATION_RETENTION_MAX) return;
-    const oldestToKeep = await prisma.integrityAttestation.findMany({
+    // Keep the newest ATTESTATION_RETENTION_MAX rows. The (MAX)-th newest is at index MAX-1;
+    // prune anything strictly older than that boundary row.
+    const boundary = await prisma.integrityAttestation.findMany({
       orderBy: { checkedAt: "desc" },
-      skip: ATTESTATION_RETENTION_MAX,
+      skip: ATTESTATION_RETENTION_MAX - 1,
       take: 1,
       select: { checkedAt: true },
     });
-    if (oldestToKeep.length === 1) {
+    if (boundary.length === 1) {
       await prisma.integrityAttestation.deleteMany({
-        where: { checkedAt: { lt: oldestToKeep[0].checkedAt } },
+        where: { checkedAt: { lt: boundary[0].checkedAt } },
       });
     }
   } catch {

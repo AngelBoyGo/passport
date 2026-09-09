@@ -253,6 +253,38 @@ describe("Fractionalized Commodity Clearing & RWA-AMM (Phase 17)", () => {
       expect(result.feeAngel).toBe(2250);
     });
 
+    it("SELL (mAu→ANGEL) is conservation-exact: seller bears the FULL fee (no mint)", async () => {
+      // Regression: the sell direction used to credit `retained` to the pool WITHOUT debiting it
+      // from the seller, minting `retained` ANGEL into existence. Now the seller bears the full
+      // fee, so ANGEL supply is conserved (pool -(output) + retained ; seller +(output-fee);
+      // treasury +t ; corridor +c ; and retained+t+c == fee).
+      const pool = mockSwapSetup();
+      prismaMock.fractionalCommodityBalance.updateMany.mockResolvedValue({ count: 1 });
+      prismaMock.agentWallet.upsert.mockResolvedValue({});
+
+      const result = await executePoolSwap({
+        poolId: pool.poolId,
+        agentCommitment: AGENT,
+        inputToken: "MAU",
+        inputAmount: 100_000,
+      });
+
+      expect(result.outputToken).toBe("ANGEL");
+      expect(result.outputAmount).toBeGreaterThan(0);
+      expect(result.feeAngel).toBeGreaterThan(0);
+
+      // The FULL fee must be borne by the seller: seller ANGEL credit == payout (output - fee).
+      // result.outputAmount already equals agentPayoutAngel (output - fee) in the SELL direction.
+      const upserts = prismaMock.agentWallet.upsert.mock.calls.map((c) => c[0]);
+      const sellerCredit = upserts.find((u) => u.where.subjectCommitment === AGENT);
+      expect(sellerCredit.update.balance.increment).toBe(result.outputAmount);
+      // And outputAmount is strictly less than the raw pool output by exactly the fee:
+      expect(result.outputAmount).toBeGreaterThan(0);
+      // feeAngel schedule: treasury 30% + corridor 10% + retained 60%.
+      const treasuryCredit = upserts.find((u) => u.where.subjectCommitment === STABILIZATION_TREASURY);
+      expect(treasuryCredit.update.balance.increment).toBe(Math.floor((result.feeAngel * 30) / 100));
+    });
+
     it("rejects a swap whose execution price deviates more than 5% from the oracle spot", async () => {
       const pool = mockSwapSetup({
         angelReserve: 300_000_000,
@@ -355,6 +387,7 @@ describe("Fractionalized Commodity Clearing & RWA-AMM (Phase 17)", () => {
           poolId: "POOL-ANGEL_MAU",
           angelSeed: 10_000,
           commoditySeed: 100_000,
+          angelSourceCommitment: OPERATOR,
         })
       ).rejects.toThrow(/re-seed refused/i);
       expect(prismaMock.commodityLiquidityPool.updateMany).not.toHaveBeenCalled();
@@ -369,20 +402,23 @@ describe("Fractionalized Commodity Clearing & RWA-AMM (Phase 17)", () => {
           poolId: "POOL-ANGEL_MAU",
           angelSeed: 10_000,
           commoditySeed: 100_000,
+          angelSourceCommitment: OPERATOR,
         })
       ).rejects.toThrow(/GHOST regime/i);
     });
 
-    it("mints LP tokens exactly once on a valid seed", async () => {
+    it("mints LP tokens exactly once on a valid seed, debiting the ANGEL source", async () => {
       setRegime("SOLID");
       prismaMock.commodityLiquidityPool.findUnique.mockResolvedValue({ ...GOLD_POOL_EMPTY });
       prismaMock.commodityLiquidityPool.updateMany.mockResolvedValue({ count: 1 });
+      prismaMock.agentWallet.updateMany.mockResolvedValue({ count: 1 }); // seed debit
       prismaMock.agentWallet.upsert.mockResolvedValue({});
 
       const result = await bootstrapAmmLiquidity({
         poolId: "POOL-ANGEL_MAU",
         angelSeed: 10_000,
         commoditySeed: 90_000,
+        angelSourceCommitment: OPERATOR,
       });
 
       // floor(sqrt(10,000 * 90,000)) = floor(30,000) = 30,000
@@ -394,6 +430,15 @@ describe("Fractionalized Commodity Clearing & RWA-AMM (Phase 17)", () => {
             id: "pool_au",
             totalLpTokens: 0,
             status: "ACTIVE",
+          }),
+        })
+      );
+      // Conservation: the ANGEL seed is DEBITED from the provider wallet (no mint).
+      expect(prismaMock.agentWallet.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            subjectCommitment: OPERATOR,
+            balance: { gte: 10_000 },
           }),
         })
       );

@@ -113,6 +113,10 @@ export async function settle(
     input.publicKey
   );
 
+  const rawFx = input.payload.fx_rate_usd;
+const parsedFx = typeof rawFx === "number" ? rawFx : Number(rawFx);
+const fxRateUsd = Number.isFinite(parsedFx) && parsedFx > 0 ? parsedFx : null;
+
   // c. Idempotency lock: create PENDING with unique (railKey, reference); on collision
   //    return the ORIGINAL row (no double-settle).
   let settlementRow;
@@ -124,7 +128,7 @@ export async function settle(
         reference,
         signerCommitment: signerCommitment ?? sigCheck.publicKey ?? "",
         payload: input.payload as any,
-        fxRateUsd: input.payload.fx_rate_usd ? Number(input.payload.fx_rate_usd) : null,
+        fxRateUsd,
         status: "PENDING",
       },
     });

@@ -98,6 +98,11 @@ export async function settleMobileMoneyOnramp(
 
   const fix = await getFiatFix("XOF", FX_FIX_REFERENCE_RATE_USD);
   const creditedAngel = xofToAngel(xofAmount, fix.rateUsdPerUnit);
+  if (creditedAngel < 1) {
+    throw new Error(
+      `XOF amount (${xofAmount}) converts to 0 ANGEL below the 1 ANGEL minimum settlement floor`
+    );
+  }
   const targetCommitment =
     input.targetCommitment ?? collectorWalletCommitment(externalRef);
 

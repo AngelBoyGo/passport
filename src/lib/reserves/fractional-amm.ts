@@ -141,6 +141,9 @@ export interface BootstrapLiquidityInput {
   angelSeed: number;
   commoditySeed: number;
   reason?: string;
+  /** ANGEL wallet that supplies the ANGEL-side seed. Conservation: pool.angelReserve is
+   *  backed by a real wallet debit, NOT a mint from nothing. */
+  angelSourceCommitment: string;
 }
 
 /**
@@ -149,10 +152,17 @@ export interface BootstrapLiquidityInput {
  *   - Re-seed is refused (pool.totalLpTokens > 0) → no LP-token dilution.
  *   - Seeding is refused while the Dual-State Governor is in GHOST regime.
  * Mints `floor(sqrt(angelSeed * commoditySeed))` LP tokens to the pool LP vault.
+ *
+ * Conservation: the ANGEL-side seed is DEBITED from `angelSourceCommitment` in the same
+ * transaction so pool.angelReserve never conjures ANGEL out of thin air. The commodity-side
+ * seed represents an external physical/pool deposit (not a fractionalized batch mint).
  */
 export async function bootstrapAmmLiquidity(input: BootstrapLiquidityInput) {
   const angelSeed = Math.max(1, Math.floor(input.angelSeed));
   const commoditySeed = Math.max(1, Math.floor(input.commoditySeed));
+  if (!/^[0-9a-f]{64}$/i.test(input.angelSourceCommitment)) {
+    throw new Error("Invalid angelSourceCommitment (expected 64-hex)");
+  }
 
   const pool = await prisma.commodityLiquidityPool.findUnique({
     where: { poolId: input.poolId },
@@ -189,6 +199,21 @@ export async function bootstrapAmmLiquidity(input: BootstrapLiquidityInput) {
     });
     if (seeded.count !== 1) {
       throw new Error(`Pool '${input.poolId}' was seeded concurrently (aborted)`);
+    }
+
+    // Debit the ANGEL seed from the provider wallet (conservation — no mint).
+    const debited = await tx.agentWallet.updateMany({
+      where: { subjectCommitment: input.angelSourceCommitment, balance: { gte: angelSeed } },
+      data: {
+        balance: { decrement: angelSeed },
+        spentTotal: { increment: angelSeed },
+        lastActivityAt: new Date(),
+      },
+    });
+    if (debited.count !== 1) {
+      throw new Error(
+        `angelSourceCommitment '${input.angelSourceCommitment}' lacks ${angelSeed} ANGEL to seed the pool`
+      );
     }
 
     // NOTE: LP share tokens are NOT written into AgentWallet.balance. That ledger is
@@ -480,13 +505,22 @@ export async function executePoolSwap(input: SwapInput) {
     let finalCommodityReserve: number;
     let agentPayoutAngel: number;
     if (directions.inputIsAngel) {
+      // ANGEL -> commodity: pool keeps all input ANGEL except the treasury + corridor
+      //   shares that leave the pool (the retained LP share stays in the pool, deducted from
+      //   the buyer's input — conservation holds).
       finalAngelReserve = newAngelReserve - treasuryShare - corridorShare;
       finalCommodityReserve = newCommodityReserve;
       agentPayoutAngel = 0;
     } else {
+      // commodity -> ANGEL: the seller bears the FULL fee. The pool pays out `outputAmount`,
+      // but the agent receives `outputAmount - feeAngel` (all three fee components are
+      // deducted from the payout). The retained share is then ADDED BACK to the pool, so
+      // conservation is exact:
+      //   pool -(output) + retained ; agent +(output - fee) ; treasury +t ; corridor +c
+      //   sum = -output + retained + output - fee + t + c = 0   (since retained+t+c == fee)
       finalAngelReserve = newAngelReserve + retained;
       finalCommodityReserve = newCommodityReserve;
-      agentPayoutAngel = outputAmount - treasuryShare - corridorShare;
+      agentPayoutAngel = outputAmount - feeAngel;
     }
 
     // Atomic optimistic-lock: only succeeds if pool version is unchanged.
