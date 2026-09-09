@@ -106,6 +106,30 @@ describe("Rail Execution Runtime (Phase 20)", () => {
       expect(prismaMock.operatorLedgerEntry.create).not.toHaveBeenCalled();
     });
 
+    it("forceDryRun blocks live minting even when a sandboxUrl endpoint is set (execute-route guard)", async () => {
+      // A rail with a live endpoint would otherwise be eligible; the /execute route MUST
+      // force dry-run so an API-key holder can never mint ANGEL without the settlement
+      // signature flow.
+      prismaMock.railSpec.findUnique.mockResolvedValue(
+        enabledSpec({ endpoints: { sandboxUrl: "https://sandbox.example" } })
+      );
+      prismaMock.fiatFix.findFirst.mockResolvedValue(validFix);
+      prismaMock.moneySettlement.findUnique.mockResolvedValue(null);
+
+      const result = await executeRailSettlement(
+        "rail-1",
+        { payload: { external_reference: "TX-1", amount: 3000 } },
+        { forceDryRun: true }
+      );
+
+      expect(result.ok).toBe(true);
+      expect(result.live).toBe(false);
+      // settleMobileMoneyOnramp was called with dryRun=true -> no settlement, no wallet, no ledger.
+      expect(prismaMock.moneySettlement.create).not.toHaveBeenCalled();
+      expect(prismaMock.agentWallet.upsert).not.toHaveBeenCalled();
+      expect(prismaMock.operatorLedgerEntry.create).not.toHaveBeenCalled();
+    });
+
     it("FRACTIONAL dry-run validates shape without swapping", async () => {
       prismaMock.railSpec.findUnique.mockResolvedValue(
         enabledSpec({ ledgerKind: "FRACTIONAL" })

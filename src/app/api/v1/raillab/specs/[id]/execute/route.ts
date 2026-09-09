@@ -8,7 +8,12 @@ export const dynamic = "force-dynamic";
 const NO_STORE = { "Cache-Control": "no-store, max-age=0" };
 
 /**
- * POST /api/v1/raillab/specs/[id]/execute — one-off settlement execution for an ENABLED rail.
+ * POST /api/v1/raillab/specs/[id]/execute — DRY-RUN settlement validation for an ENABLED rail.
+ *
+ * SECURITY: this endpoint MUST never move real money. Live settlements require the
+ * authenticated, signature-verified, idempotent `/api/v1/raillab/settle` flow. Here we force
+ * `forceDryRun` so an authenticated operator can validate a rail's shape and routing without
+ * a settlement signature — and can NEVER mint ANGEL, swap commodity, or remove liquidity.
  */
 export async function POST(
   request: NextRequest,
@@ -39,7 +44,7 @@ export async function POST(
   }
 
   try {
-    const result = await executeRailSettlement(spec.railKey, { payload: body });
+    const result = await executeRailSettlement(spec.railKey, { payload: body }, { forceDryRun: true });
     return NextResponse.json(
       {
         success: result.ok,
