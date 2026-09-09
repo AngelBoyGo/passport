@@ -97,8 +97,10 @@ describe("Sovereign Dividend Waterfall & Anti-Extraction Engine", () => {
       expect(mockTx.sovereignDisbursement.create).not.toHaveBeenCalled();
     });
 
-    it("persists SovereignDisbursement record inside provided transaction", async () => {
+    it("persists SovereignDisbursement record inside provided transaction AND credits tranche wallets", async () => {
+      const agentWalletUpsert = vi.fn().mockResolvedValue({});
       const mockTx = {
+        agentWallet: { upsert: agentWalletUpsert },
         sovereignDisbursement: {
           create: vi.fn().mockResolvedValue({
             id: "disb_1",
@@ -113,6 +115,7 @@ describe("Sovereign Dividend Waterfall & Anti-Extraction Engine", () => {
         batchNumber: "BKO-AU-2026-001",
         totalFeeAngel: 25,
         location: { country: "ML", district: "Sikasso" },
+        agentCommitment: "a".repeat(64),
       });
 
       expect(result).not.toBeNull();
@@ -127,6 +130,12 @@ describe("Sovereign Dividend Waterfall & Anti-Extraction Engine", () => {
           }),
         })
       );
+      // The fee is actually PAID OUT (not burned): at least treasury + agent rebate get credited.
+      const calls = agentWalletUpsert.mock.calls.map((c) => c[0]);
+      const treasuryCall = calls.find((c) => c.where.subjectCommitment === "protocol_treasury_system");
+      expect(treasuryCall.update.balance.increment).toBe(7); // 30% of 25 -> Math.floor(7.5) = 7
+      const agentCall = calls.find((c) => c.where.subjectCommitment === "a".repeat(64));
+      expect(agentCall.update.balance.increment).toBe(2); // 10% of 25 -> floor(2.5) = 2
     });
   });
 

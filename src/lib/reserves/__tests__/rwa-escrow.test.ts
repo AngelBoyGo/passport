@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
     vaultBatch: { findUnique: vi.fn(), update: vi.fn() },
-    agentWallet: { findUnique: vi.fn(), update: vi.fn() },
+    agentWallet: { findUnique: vi.fn(), update: vi.fn(), upsert: vi.fn() },
     commodityEscrow: { create: vi.fn(), findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
     assayerCertification: { findUnique: vi.fn() },
     sovereignDisbursement: { create: vi.fn(), findMany: vi.fn() },
@@ -31,6 +31,9 @@ describe("RWA Commodity Escrow Service", () => {
     prismaMock.vaultBatch.update.mockReset();
     prismaMock.agentWallet.findUnique.mockReset();
     prismaMock.agentWallet.update.mockReset();
+    prismaMock.agentWallet.update.mockResolvedValue({});
+    prismaMock.agentWallet.upsert.mockReset();
+    prismaMock.agentWallet.upsert.mockResolvedValue({});
     prismaMock.commodityEscrow.create.mockReset();
     prismaMock.commodityEscrow.findUnique.mockReset();
     prismaMock.commodityEscrow.findMany.mockReset();

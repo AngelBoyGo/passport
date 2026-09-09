@@ -13,11 +13,30 @@
  */
 
 import { prisma } from "@/lib/db";
+import { sha256Hex } from "@/lib/receipt/canonical";
+import { stateStabilizationWalletCommitment } from "./industrialization-fund";
 
 export interface LocationContext {
   country: string;
   district?: string;
 }
+
+/** Deterministic 64-hex wallet for national state treasury. */
+export function stateCommunityWalletCommitment(countryCode: string): string {
+  return sha256Hex(`state:community:${countryCode.toUpperCase()}`);
+}
+
+/** Deterministic 64-hex wallet for state workers bonus pool. */
+export function stateWorkersWalletCommitment(countryCode: string): string {
+  return sha256Hex(`state:workers:${countryCode.toUpperCase()}`);
+}
+
+/** Deterministic 64-hex wallet for the sovereign validator pool. */
+export function sovereignValidatorPoolCommitment(): string {
+  return sha256Hex("sovereign:validator:pool");
+}
+
+export const STABILIZATION_TREASURY = "protocol_treasury_system";
 
 export interface StatutoryWaterfallResult {
   totalFeeAngel: number;
@@ -97,8 +116,9 @@ export function calculateStatutoryWaterfall(
 }
 
 /**
- * Persists a sovereign disbursement record inside an existing Prisma transaction.
- * If totalFeeAngel is 0, execution is a no-op and returns null.
+ * Persists a sovereign disbursement record inside an existing Prisma transaction AND credits
+ * each statutory tranche to its deterministic wallet (conservation: the protocol fee is
+ * actually paid out, not just logged). If totalFeeAngel is 0, execution is a no-op.
  */
 export async function executeDisbursementInTransaction(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -108,6 +128,8 @@ export async function executeDisbursementInTransaction(
     batchNumber: string;
     totalFeeAngel: number;
     location: LocationContext;
+    /** Commitment credited the agent-rebate tranche (the escrow seller/agent). */
+    agentCommitment?: string;
   }
 ) {
   if (params.totalFeeAngel <= 0) {
@@ -116,6 +138,38 @@ export async function executeDisbursementInTransaction(
 
   const waterfall = calculateStatutoryWaterfall(params.totalFeeAngel, params.location);
   const disbursementId = `disb_${params.escrowId.replace(/^esc_/, "")}_${Date.now()}`;
+
+  const creditWallet = async (commitment: string, amount: number) => {
+    if (!amount || amount <= 0) return;
+    await tx.agentWallet.upsert({
+      where: { subjectCommitment: commitment },
+      create: {
+        subjectCommitment: commitment,
+        balance: amount,
+        earnedTotal: amount,
+        lastActivityAt: new Date(),
+      },
+      update: {
+        balance: { increment: amount },
+        earnedTotal: { increment: amount },
+        lastActivityAt: new Date(),
+      },
+    });
+  };
+
+  const nationalCommitment = stateStabilizationWalletCommitment(waterfall.countryCode);
+  const communityCommitment = stateCommunityWalletCommitment(waterfall.countryCode);
+  const workersCommitment = stateWorkersWalletCommitment(waterfall.countryCode);
+  const validatorCommitment = sovereignValidatorPoolCommitment();
+
+  await creditWallet(nationalCommitment, waterfall.stateNationalAngel);
+  await creditWallet(communityCommitment, waterfall.stateCommunityAngel);
+  await creditWallet(workersCommitment, waterfall.stateWorkersAngel);
+  await creditWallet(STABILIZATION_TREASURY, waterfall.treasuryStabilizationAngel);
+  await creditWallet(validatorCommitment, waterfall.validatorPoolAngel);
+  if (params.agentCommitment) {
+    await creditWallet(params.agentCommitment, waterfall.agentRebateAngel);
+  }
 
   return tx.sovereignDisbursement.create({
     data: {

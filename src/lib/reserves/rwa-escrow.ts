@@ -201,7 +201,9 @@ export async function releaseEscrowOnAssay(input: ReleaseEscrowInput) {
       select: { locationCountry: true, locationCity: true },
     });
 
-    // Execute statutory sovereign dividend waterfall (Black Paper Q141)
+    // Execute statutory sovereign dividend waterfall (Black Paper Q141).
+    // Credits each tranche to its deterministic wallet (conservation: the fee is paid out,
+    // not burned). The agent-rebate tranche goes to the seller (the agent who earned it).
     await executeDisbursementInTransaction(tx, {
       escrowId: held.escrowId,
       batchNumber: held.batchNumber,
@@ -210,6 +212,7 @@ export async function releaseEscrowOnAssay(input: ReleaseEscrowInput) {
         country: updatedBatch.locationCountry,
         district: updatedBatch.locationCity,
       },
+      agentCommitment: held.sellerCommitment,
     });
 
     return tx.commodityEscrow.update({
