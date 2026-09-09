@@ -125,10 +125,10 @@ describe("Continuous Integrity Attestation (Phase 23)", () => {
       prismaMock.commodityLiquidityPool.findMany.mockResolvedValue([
         { commoditySymbol: "Au", commodityReserve: 100_000, totalLpTokens: 0 }, // leak -> breach
       ]);
-      // A breach row exists checked < QUIET_PERIOD ago (alert suppressed).
+      // A PRIOR breach row exists checked < QUIET_PERIOD ago -> this new breach is suppressed.
       prismaMock.integrityAttestation.findFirst
         .mockResolvedValueOnce(null) // chain
-        .mockResolvedValueOnce({ checkedAt: new Date(Date.now() - 1000) }); // recent breach
+        .mockResolvedValueOnce({ checkedAt: new Date(Date.now() - 1000) }); // PRIOR breach (recent)
       prismaMock.integrityAttestation.create.mockResolvedValue({
         attestationId: "attest_3", attestationHash: "h3", signature: "sig",
       });
@@ -136,9 +136,41 @@ describe("Continuous Integrity Attestation (Phase 23)", () => {
       prismaMock.adminAuditLog.create.mockResolvedValue({});
 
       const att = await runIntegrityAttestation();
-      // Breach exists but alert suppressed because a breach row is within quiet period.
+      // Breach exists but alert suppressed because a PRIOR breach row is within quiet period.
       expect(prismaMock.adminAuditLog.create).not.toHaveBeenCalled();
       expect(att.attestationHash).toMatch(/^[0-9a-f]{64}$/);
+    });
+
+    it("fires an alert when the PRIOR breach is older than the quiet period (not self-suppressed)", async () => {
+      prismaMock.agentWallet.findMany.mockResolvedValue([{ balance: 10, staked: 0 }]);
+      prismaMock.railSpec.findMany.mockResolvedValue([]);
+      prismaMock.railSettlement.findMany.mockResolvedValue([]);
+      prismaMock.vaultBatch.findMany.mockResolvedValue([
+        { fineWeightGrams: 1000, reserve: { symbol: "Au", commodityType: "GOLD" } },
+      ]);
+      prismaMock.fractionalCommodityBalance.findMany.mockResolvedValue([
+        { commoditySymbol: "Au", milliUnits: 200_000 },
+      ]);
+      prismaMock.commodityLiquidityPool.findMany.mockResolvedValue([
+        { commoditySymbol: "Au", commodityReserve: 100_000, totalLpTokens: 0 }, // leak -> breach
+      ]);
+      // A PRIOR breach exists but is OLDER than the quiet period -> this breach MUST alert.
+      // (Regression: the old code read the freshly-inserted breach as "prior" and would
+      // make priorBreach == now, always suppressing the very first alert.)
+      prismaMock.integrityAttestation.findFirst
+        .mockResolvedValueOnce(null) // chain
+        .mockResolvedValueOnce({ checkedAt: new Date(Date.now() - 2 * ATTESTATION_QUIET_PERIOD_MS) });
+      prismaMock.integrityAttestation.create.mockResolvedValue({
+        attestationId: "attest_recovery", attestationHash: "hr", signature: "sig",
+      });
+      prismaMock.integrityAttestation.count.mockResolvedValue(0);
+      prismaMock.adminAuditLog.create.mockResolvedValue({});
+
+      const att = await runIntegrityAttestation();
+      expect(att.ok).toBe(false);
+      expect(prismaMock.adminAuditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ action: "integrity_breach" }) })
+      );
     });
 
     it("does not throw when the DB is unreachable; returns a signed BREACH attestation", async () => {

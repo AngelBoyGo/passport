@@ -166,15 +166,21 @@ export async function runIntegrityAttestation(): Promise<SignedIntegrityAttestat
 
   let attestationHash = hashIntegrityAttestation(body);
   try {
-    // Chain to the preceding attestation; guard against two attestations hashing identically
-    // (entropy guard: append millis/counter into attestationId already differs per run).
+    // Chain to the preceding attestation; entropy in attestationId keeps hashes distinct.
     const prev = await latestAttestationHash();
+
+    // Quiet-period guard: read the LAST BREACH **before** inserting this one. If we read
+    // after inserting, the freshly-inserted breach would suppress its own alert forever
+    // (TOCTOU: latestBreachCheckedAt() would return the row we just wrote).
+    const isBreach = !body.ok;
+    const priorBreach = isBreach ? await latestBreachCheckedAt() : null;
+
     const pk = getPrivateKeyBytes();
     const signature = pk
       ? bytesToHex(await sign(utf8ToBytes(attestationHash), pk))
       : "";
 
-    const created = await prisma.integrityAttestation.create({
+    await prisma.integrityAttestation.create({
       data: {
         attestationId: body.attestationId,
         checkedAt: new Date(body.checkedAt),
@@ -193,11 +199,12 @@ export async function runIntegrityAttestation(): Promise<SignedIntegrityAttestat
       },
     });
 
-    // d. Quiet-period breach alerting.
-    if (!body.ok) {
-      const lastBreach = await latestBreachCheckedAt();
+    // Alert only when a breach occurred AND no prior breach exists within the quiet period.
+    // `priorBreach` is the previous breach (not the one just written), so a sustained breach
+    // alerts once, then is suppressed while it stays within QUIET_PERIOD of the PRIOR breach.
+    if (isBreach) {
       const now = Date.now();
-      if (!lastBreach || now - lastBreach.getTime() > ATTESTATION_QUIET_PERIOD_MS) {
+      if (!priorBreach || now - priorBreach.getTime() > ATTESTATION_QUIET_PERIOD_MS) {
         await prisma.adminAuditLog
           .create({
             data: {
