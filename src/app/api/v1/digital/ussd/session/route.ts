@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit, clientIpFromRequest, rateLimitResponse } from "@/lib/rateLimit";
 import { handleUssdInteraction } from "@/lib/digital-gateway/ussd";
-import { settleMobileMoneyOnramp } from "@/lib/digital-gateway/mobile-money";
 
 export const dynamic = "force-dynamic";
 
@@ -41,20 +40,13 @@ export async function POST(request: NextRequest) {
       },
       {
         onBuyConfirm: async (xofAmount: number) => {
-          // Direct on-ramp: no provider callback; tracked as provider "ussd".
-          const txnId = `${sessionId}-${Date.now()}`;
-          const result = await settleMobileMoneyOnramp({
-            provider: "ussd",
-            payload: {
-              external_reference: txnId,
-              amount: xofAmount,
-            },
-            internal: true,
-          });
-          return {
-            creditedAngel: result.creditedAngel,
-            reference: result.settlementId,
-          };
+          // SECURITY: USSD BUY must NOT mint ANGEL from nothing. A real value is only
+          // created by a mobile-money provider callback (MoneySettlement SETTLED). Without
+          // a real settlement backing this amount, a fabricated `internal` on-ramp is money
+          // from nothing. Fail closed: block the transaction rather than mint.
+          throw new Error(
+            "ERR USSD BUY requires a SETTLED mobile-money payment_reference; call /digital/onramp with payment_reference instead"
+          );
         },
       }
     );
