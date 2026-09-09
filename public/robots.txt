@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Allow: /llms.txt
+Allow: /llms-full.txt
+Allow: /.well-known/
+Allow: /docs/
+Allow: /api/
+Allow: /verify/
+
+# SDK and docs are static and safe to index.
+Sitemap: https://passport.metis.gold/sitemap.xml

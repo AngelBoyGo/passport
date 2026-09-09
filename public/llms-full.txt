@@ -1,0 +1,101 @@
+# Passport — Full Context (llms-full.txt)
+
+> Free & open-source (MIT) cryptographic identity and authenticity layer for AI agents
+> plus a commodity-backed sovereign reserve stack. No payment required for the core
+> protocol, any SDK, or verification.
+
+## Facts
+- License: MIT (core protocol + `@passport7/sdk` TypeScript + Python SDK)
+- Pricing: freemium — free tier 100 receipts/mo, keyless public verification, all SDKs free.
+  Optional $49/mo Pro tier is a Stripe-billed extra and never gates the open/verify surfaces.
+- Hosted: https://passport.metis.gold (self-hostable, Next.js + PostgreSQL)
+- Source: https://github.com/AngelBoyGo/passport
+
+## Discoverability endpoints
+- Agent card (A2A): https://passport.metis.gold/.well-known/agent.json
+- Agent card (alt): https://passport.metis.gold/.well-known/agent-card.json
+- MCP manifest: https://passport.metis.gold/.well-known/mcp.json
+- DID document: https://passport.metis.gold/.well-known/did.json
+- AI service: https://passport.metis.gold/.well-known/ai-service.json
+- Swarm protocol: https://passport.metis.gold/.well-known/swarm-protocol.json
+- This file: https://passport.metis.gold/llms-full.txt
+
+## SDKs
+- TypeScript: `npm install @passport7/sdk` — https://www.npmjs.com/package/@passport7/sdk
+  Subpaths: `@passport7/sdk/langchain`, `@passport7/sdk/mastra`, `@passport7/sdk/vercel-ai`
+- Python: `pip install passport-sdk` — stdlib only
+- Source README: https://github.com/AngelBoyGo/passport/tree/main/sdk
+
+## Core API (base https://passport.metis.gold)
+- POST /api/v1/passport/agents/enroll/start        — proof-based agent enrollment (public)
+- POST /api/v1/passport/agents/enroll/complete     — complete enrollment with PoW proof
+- POST /api/v1/passport/agents/autonomous/provision— self-provision (PoW + possession), no human
+- POST /api/v1/passport/agents/{commitment}/evidence — post signed behavioral evidence
+- POST /api/v1/receipts                            — issue a signed receipt (Bearer auth)
+- POST /api/v1/receipts/{id}/finalize              — finalize with outcome
+- GET  /api/v1/receipts/{id}/public-manifest       — public, keyless verification
+- GET  /api/v1/public-key                          — Ed25519 verifying key
+- POST /api/v1/gate/verify                         — operator domain gate check
+- GET  /api/v1/credentials/{commitment}            — W3C portable reputation credential
+- POST /api/v1/credentials/verify                  — offline credential verification
+- GET  /api/v1/leaderboard                         — public agent leaderboard
+- GET  /api/health                                 — liveness probe
+
+## Sovereign Haven (RWA) API (Phases 12–21)
+- GET  /api/v1/rate                                — ANGEL rate + reserve state (public, signed)
+- GET  /api/v1/reserves/por                        — Proof-of-Reserves (public)
+- GET  /api/v1/reserves/state                      — Dual-State Governor regime
+- POST /api/v1/reserves/escrow                     — bilateral commodity escrow
+- POST /api/v1/reserves/artisanal/intake           — artisanal XRF ore intake
+- POST /api/v1/reserves/industrial/smelt           — industrial furnace pour telemetry
+- POST /api/v1/reserves/transit/dispatch           — bonded corridor dispatch
+- POST /api/v1/logistics/transit/verify-checkpoint — automated customs clearing
+- POST /api/v1/reserves/amm/fractionalize          — fractionalized commodity clearing
+- POST /api/v1/digital/mobile-money/callback       — Sahel mobile-money on-ramp
+- POST /api/v1/digital/ussd/session                — USSD feature-phone gateway
+- POST /api/v1/raillab/discover                    — rail factory discovery (live)
+- POST /api/v1/raillab/settle                      — authenticated settlement webhook
+- GET  /api/v1/raillab/overview                    — rail factory KPI board
+
+## TypeScript quickstart
+```bash
+npm install @passport7/sdk
+```
+```ts
+import { PassportClient } from "@passport7/sdk";
+const p = new PassportClient({ apiKey: "pp_…", baseUrl: "https://passport.metis.gold" });
+const r = await p.issueReceipt({
+  agent_id: "a1", receipt_type: "competence",
+  input_digest: "<sha256 hex>", authority_scope: "example.com",
+  expiry: "2026-08-01T00:00:00.000Z",
+});
+await p.finalizeReceipt(r.receipt_id, { status: "success", output_hash: "<sha256 hex>" });
+```
+
+## Python quickstart
+```python
+from passport_sdk import PassportClient
+p = PassportClient(api_key="pp_…", base_url="https://passport.metis.gold")
+r = p.issue_receipt(agent_id="a1", receipt_type="competence", input_digest="<sha256 hex>",
+                    authority_scope="example.com", expiry="2026-08-01T00:00:00.000Z")
+p.finalize_receipt(r["receipt_id"], status="success", output_hash="<sha256 hex>")
+```
+
+## Framework integrations
+- LangChain: `PassportCallbackHandler` (@passport7/sdk/langchain) — evidence per LLM call
+- Mastra: `createMastraPassportMiddleware` (@passport7/sdk/mastra) — receipt-anchored runs
+- Vercel AI: `passportMiddleware` (@passport7/sdk/vercel-ai) — gated, audited LLM calls
+
+## Protocol (ASMC-3 Sovereign Haven)
+ANGEL $5.00 peg + solvency-gated revaluation · commodity oracle · Proof-of-Reserves Merkle tree
+· bilateral commodity escrow + statutory 40/30/20/10 waterfall · artisanal XRF sourcing ·
+industrial anti-transfer-pricing telemetry · bonded transit corridors + coastal enclaves ·
+automated customs clearing (0.75% ad-valorem) · fractionalized RWA-AMM (mAu/gLi) ·
+Sahel mobile-money + USSD gateway (exactly-once settlement) · autonomous rail factory with a
+live LLM brain, live discovery, atomic lifecycle, dry-run smoke ladder, and authenticated
+settlement webhook.
+
+## Vendor & compliance
+- NIST AI RMF, EU AI Act, SOC2, ISO 42001 evidence packages per commitment
+- W3C Verifiable Credentials for portable agent reputation
+- Proof-of-Work + Ed25519 self-provisioning for autonomous agents (no human needed)

@@ -1,0 +1,4 @@
+Contact: https://github.com/AngelBoyGo/passport/security/advisories/new
+Expires: 2027-09-09T00:00:00.000Z
+Canonical: https://passport.metis.gold/.well-known/security.txt
+Policy: https://passport.metis.gold/SECURITY.md

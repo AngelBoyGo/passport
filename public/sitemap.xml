@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://passport.metis.gold/</loc><changefreq>weekly</changefreq></url>
+  <url><loc>https://passport.metis.gold/docs</loc><changefreq>weekly</changefreq></url>
+  <url><loc>https://passport.metis.gold/docs/getting-started</loc><changefreq>weekly</changefreq></url>
+  <url><loc>https://passport.metis.gold/docs/api-reference</loc><changefreq>weekly</changefreq></url>
+  <url><loc>https://passport.metis.gold/docs/integrations</loc><changefreq>weekly</changefreq></url>
+  <url><loc>https://passport.metis.gold/docs/integrate</loc><changefreq>weekly</changefreq></url>
+  <url><loc>https://passport.metis.gold/docs/verification</loc><changefreq>weekly</changefreq></url>
+  <url><loc>https://passport.metis.gold/docs/sdk</loc><changefreq>weekly</changefreq></url>
+  <url><loc>https://passport.metis.gold/llms.txt</loc><changefreq>weekly</changefreq></url>
+  <url><loc>https://passport.metis.gold/llms-full.txt</loc><changefreq>weekly</changefreq></url>
+  <url><loc>https://passport.metis.gold/.well-known/agent.json</loc><changefreq>monthly</changefreq></url>
+  <url><loc>https://passport.metis.gold/.well-known/agent-card.json</loc><changefreq>monthly</changefreq></url>
+  <url><loc>https://passport.metis.gold/.well-known/mcp.json</loc><changefreq>monthly</changefreq></url>
+  <url><loc>https://passport.metis.gold/haven</loc><changefreq>monthly</changefreq></url>
+</urlset>
