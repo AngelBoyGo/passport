@@ -1365,6 +1365,32 @@ model RailRunbook {
   @@index([automated])
 }
 
+/// Continuous cryptographic integrity attestation (Phase 23).
+/// An append-only, Ed25519-chained certificate that the money ledgers stayed conserved.
+/// attestationHash = sha256(canonicalJson(body without signature)); prev chains the prior
+/// attestationHash so the entire health history is tamper-evident and remotely verifiable.
+model IntegrityAttestation {
+  id                    String   @id @default(cuid())
+  attestationId         String   @unique
+  checkedAt             DateTime
+  ok                    Boolean
+  supplyConsistent      Boolean
+  fractionalConsistent  Boolean
+  lpInvariantOk         Boolean
+  pendingReviewStale    Int      @default(0)
+  settledTotalCredited  Int      @default(0)
+  settledTotalRows      Int      @default(0)
+  issues                Json?
+  prevAttestationHash   String?
+  attestationHash       String   @unique
+  signature             String
+  algorithm             String   @default("ed25519")
+  createdAt             DateTime @default(now())
+
+  @@index([checkedAt])
+  @@index([ok])
+}
+
 
 
 

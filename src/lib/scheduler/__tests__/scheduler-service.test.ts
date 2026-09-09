@@ -91,4 +91,31 @@ describe("Scheduler — runTick", () => {
     const result = await runTick(deps);
     expect(result.think_tank.insights.length).toBeGreaterThanOrEqual(0);
   });
+
+  it("invokes the integrity attestation dep and carries the result (Phase 23)", async () => {
+    const runIntegrityAttestation = vi.fn().mockResolvedValue({
+      attestationHash: "attest_hash_1",
+      ok: true,
+      checkedAt: NOW,
+    });
+    const deps = makeDeps({ runIntegrityAttestation });
+    const result = await runTick(deps);
+    expect(runIntegrityAttestation).toHaveBeenCalledTimes(1);
+    expect(result.integrity_attestation).toEqual({
+      attestation_hash: "attest_hash_1",
+      ok: true,
+      checked_at: NOW,
+    });
+  });
+
+  it("handles attestation failure gracefully (non-fatal, ok=false)", async () => {
+    const runIntegrityAttestation = vi.fn().mockRejectedValue(new Error("attest blew up"));
+    const deps = makeDeps({ runIntegrityAttestation });
+    const result = await runTick(deps);
+    expect(result.integrity_attestation).toEqual({
+      attestation_hash: "",
+      ok: false,
+      checked_at: NOW,
+    });
+  });
 });

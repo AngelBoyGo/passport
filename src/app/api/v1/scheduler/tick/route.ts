@@ -101,6 +101,11 @@ export async function POST(request: NextRequest) {
 
     now: () => new Date().toISOString(),
     generateId: () => Math.random().toString(36).slice(2, 14),
+    runIntegrityAttestation: async () => {
+      const { runIntegrityAttestation } = await import("@/lib/raillab/attest");
+      const att = await runIntegrityAttestation();
+      return { attestationHash: att.attestationHash, ok: att.ok, checkedAt: att.checkedAt };
+    },
   };
 
   try {

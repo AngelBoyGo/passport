@@ -45,6 +45,11 @@ export interface TickResult {
     summary: string;
   };
   evidence_hash?: string;
+  integrity_attestation?: {
+    attestation_hash: string;
+    ok: boolean;
+    checked_at: string;
+  } | null;
 }
 
 export interface SchedulerDeps {
@@ -74,6 +79,12 @@ export interface SchedulerDeps {
   }>>;
   /** Post evidence of this tick */
   postEvidence: (payload: Record<string, unknown>) => Promise<{ event_commitment_hash: string }>;
+  /** Optional: produce a continuous integrity attestation as part of the tick (Phase 23). */
+  runIntegrityAttestation?: () => Promise<{
+    attestationHash: string;
+    ok: boolean;
+    checkedAt: string;
+  }>;
   /** Get current time */
   now: () => string;
   /** Generate a unique ID */
@@ -201,9 +212,29 @@ export async function runTick(deps: SchedulerDeps): Promise<TickResult> {
     // Non-fatal — tick still succeeded
   }
 
+  // Phase 23: continuous integrity attestation (optional dep; best-effort).
+  let integrityAttestation: TickResult["integrity_attestation"] = null;
+  if (deps.runIntegrityAttestation) {
+    try {
+      const att = await deps.runIntegrityAttestation();
+      integrityAttestation = {
+        attestation_hash: att.attestationHash,
+        ok: att.ok,
+        checked_at: att.checkedAt,
+      };
+    } catch {
+      integrityAttestation = {
+        attestation_hash: "",
+        ok: false,
+        checked_at: deps.now(),
+      };
+    }
+  }
+
   return {
     tick_id: tickId,
     ticked_at: tickedAt,
+    integrity_attestation: integrityAttestation,
     system_state: systemState,
     think_tank: {
       run_id: `tt_${tickId.slice(5)}`,
