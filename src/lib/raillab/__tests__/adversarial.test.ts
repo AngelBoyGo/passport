@@ -331,5 +331,23 @@ describe("Money-Ledger Integrity & Adversarial Audit (Phase 22)", () => {
       expect(status.cross_ledger.fractional_consistent).toBe(false);
       expect(status.ok).toBe(false);
     });
+
+    it("flags settlement-velocity bursts (compromised-signer detection)", async () => {
+      prismaMock.agentWallet.findMany.mockResolvedValue([{ balance: 0, staked: 0 }]);
+      prismaMock.railSpec.findMany.mockResolvedValue([]);
+      prismaMock.commodityLiquidityPool.findMany.mockResolvedValue([]);
+      prismaMock.vaultBatch.findMany.mockResolvedValue([]);
+      prismaMock.fractionalCommodityBalance.findMany.mockResolvedValue([]);
+      // Call order in runIntegrityCheck: (1) stale PENDING/PENDING_REVIEW, (2) settled,
+      // (3) velocity window. Stale -> [] ; settled -> 40 ; velocity -> 40 on "rail-1".
+      prismaMock.railSettlement.findMany
+        .mockResolvedValueOnce([]) // stale
+        .mockResolvedValueOnce(Array.from({ length: 40 }, () => ({ creditedAngel: 1 }))) // settled
+        .mockResolvedValueOnce(Array.from({ length: 40 }, () => ({ railKey: "rail-1" }))); // velocity
+      const status = await runIntegrityCheck({ expectedAngelSupply: 0 });
+      expect(status.ok).toBe(false);
+      expect(status.settlements.burst_settlement_rails.length).toBe(1);
+      expect(status.settlements.burst_settlement_count).toBe(40);
+    });
   });
 });

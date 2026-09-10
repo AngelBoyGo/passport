@@ -19,6 +19,10 @@ import { prisma } from "@/lib/db";
 
 export const PENDING_REVIEW_TTL_MS = 24 * 60 * 60 * 1000; // flag > 24h
 export const MILLI_UNITS_FLOAT_TOLERANCE = 1;
+/** Rolling window (ms) over which per-rail settled-settlement velocity is measured. */
+export const SETTLEMENT_VELOCITY_WINDOW_MS = 10 * 60 * 1000; // 10 min
+/** More than this many SETTLED rows per rail in the window flags a possible compromised signer. */
+export const SETTLEMENT_VELOCITY_BURST_THRESHOLD = 25;
 
 export interface IntegrityStatus {
   ok: boolean;
@@ -40,6 +44,8 @@ export interface IntegrityStatus {
     pending_review_stale: number;
     settled_total_credited: number;
     settled_total_rows: number;
+    burst_settlement_rails: string[];
+    burst_settlement_count: number;
   };
   issues: string[];
 }
@@ -168,6 +174,8 @@ export async function runIntegrityCheck(input: IntegrityInput = {}): Promise<Int
   let pendingReviewStale = 0;
   let settledTotalCredited = 0;
   let settledTotalRows = 0;
+  let burstSettlementRails: string[] = [];
+  let burstSettlementCount = 0;
   try {
     const cutoff = new Date(Date.now() - PENDING_REVIEW_TTL_MS);
     const stale = await prisma.railSettlement.findMany({
@@ -185,6 +193,31 @@ export async function runIntegrityCheck(input: IntegrityInput = {}): Promise<Int
     });
     settledTotalRows = settled.length;
     settledTotalCredited = settled.reduce((sum, s) => sum + (s.creditedAngel ?? 0), 0);
+
+    // 3b. Settlement-velocity anomaly (compromised-signer burst detection).
+    // A legitimate signer settles steadily; a stolen signer key mints rapidly. Flag any rail
+    // whose settled-settlement count within VELOCITY_WINDOW_MS exceeds the burst threshold.
+    const velocitySince = new Date(Date.now() - SETTLEMENT_VELOCITY_WINDOW_MS);
+    const recentSettled = await prisma.railSettlement.findMany({
+      where: { status: "SETTLED", settledAt: { gte: velocitySince } },
+      select: { railKey: true },
+    });
+    const perRail: Record<string, number> = {};
+    for (const s of recentSettled) {
+      perRail[s.railKey] = (perRail[s.railKey] ?? 0) + 1;
+    }
+    burstSettlementCount = 0;
+    for (const [railKey, count] of Object.entries(perRail)) {
+      if (count > SETTLEMENT_VELOCITY_BURST_THRESHOLD) {
+        burstSettlementRails.push(`${railKey}:${count}`);
+        burstSettlementCount += count;
+      }
+    }
+    if (burstSettlementRails.length > 0) {
+      issues.push(
+        `Settlement velocity anomaly (possible compromised signer): ${burstSettlementRails.join(", ")}`
+      );
+    }
   } catch {
     issues.push("railSettlement reconciliation read failed");
   }
@@ -211,6 +244,8 @@ export async function runIntegrityCheck(input: IntegrityInput = {}): Promise<Int
       pending_review_stale: pendingReviewStale,
       settled_total_credited: settledTotalCredited,
       settled_total_rows: settledTotalRows,
+      burst_settlement_rails: burstSettlementRails,
+      burst_settlement_count: burstSettlementCount,
     },
     issues,
   };

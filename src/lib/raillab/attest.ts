@@ -147,7 +147,13 @@ export async function runIntegrityAttestation(): Promise<SignedIntegrityAttestat
         lp_tokens_pool_side: 0,
         lp_invariant_ok: false,
       },
-      settlements: { pending_review_stale: 0, settled_total_credited: 0, settled_total_rows: 0 },
+      settlements: {
+        pending_review_stale: 0,
+        settled_total_credited: 0,
+        settled_total_rows: 0,
+        burst_settlement_rails: [],
+        burst_settlement_count: 0,
+      },
       issues: [`integrity check failed: ${message}`],
     };
   }
