@@ -5,6 +5,7 @@ const { prismaMock } = vi.hoisted(() => ({
     railSpec: { findUnique: vi.fn(), findMany: vi.fn(), updateMany: vi.fn(), update: vi.fn() },
     railTelemetry: { findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn() },
     railCandidate: { findMany: vi.fn() },
+    railSettlement: { findMany: vi.fn(), create: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
     adminAuditLog: { create: vi.fn() },
     moneySettlement: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
     fiatFix: { findFirst: vi.fn() },
@@ -198,6 +199,7 @@ describe("Rail Execution Runtime (Phase 20)", () => {
     it("quarantines a rail whose last 3 telemetry rows breach", async () => {
       prismaMock.railSpec.findMany.mockResolvedValue([enabledSpec()]);
       prismaMock.railSpec.findUnique.mockResolvedValue(enabledSpec());
+      prismaMock.railSettlement.findMany.mockResolvedValue([]); // no velocity burst
       prismaMock.railTelemetry.findMany.mockResolvedValue([
         { latencyMs: 99999, dedupeHits: 0, errorTranche: "NONE", settlementCount: 10 },
         { latencyMs: 99999, dedupeHits: 0, errorTranche: "NONE", settlementCount: 10 },
@@ -208,6 +210,25 @@ describe("Rail Execution Runtime (Phase 20)", () => {
 
       const { quarantined } = await autoQuarantineFailingRails();
       expect(quarantined).toEqual(["rail-1"]);
+    });
+
+    it("quarantines immediately on a settlement-velocity burst (possible compromised signer)", async () => {
+      prismaMock.railSpec.findMany.mockResolvedValue([enabledSpec()]);
+      prismaMock.railSpec.findUnique.mockResolvedValue(enabledSpec());
+      // 40 SETTLED within the window (threshold 25) -> burst.
+      prismaMock.railSettlement.findMany.mockResolvedValue(
+        Array.from({ length: 40 }, () => ({ railKey: "rail-1" }))
+      );
+      prismaMock.railTelemetry.findMany.mockResolvedValue([]); // even without telemetry breach
+      prismaMock.railSpec.updateMany.mockResolvedValue({ count: 1 });
+      prismaMock.adminAuditLog.create.mockResolvedValue({});
+
+      const { quarantined } = await autoQuarantineFailingRails();
+      expect(quarantined).toEqual(["rail-1"]);
+      // Quarantined via burst reason.
+      expect(prismaMock.adminAuditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ details: expect.stringContaining("velocity burst") }) })
+      );
     });
   });
 

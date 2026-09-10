@@ -22,6 +22,7 @@ import {
 import { runSmokeLadder } from "./smoke-test";
 import { runDiscovery } from "./discovery";
 import { isSlaBreach } from "./telemetry";
+import { SETTLEMENT_VELOCITY_WINDOW_MS, SETTLEMENT_VELOCITY_BURST_THRESHOLD } from "./integrity";
 import type { RailSpecShape } from "./types";
 
 export const FACTORY_COMMITMENT = "raillab_factory_agent";
@@ -322,7 +323,40 @@ export async function autoQuarantineFailingRails(): Promise<{
   const enabled = await prisma.railSpec.findMany({ where: { state: "ENABLED" } });
   const quarantined: string[] = [];
 
+  // Velocity-window burst detection (compromised-signer / griefing): a rail that settles
+  // anomalously fast is quarantined IMMEDIATELY — do not wait for 3 consecutive telemetry
+  // breaches, because a stolen signer key mints in bursts the SLA loop would only catch late.
+  const burstCounts: Record<string, number> = {};
+  let burstRails: string[] = [];
+  try {
+    const velocitySince = new Date(Date.now() - SETTLEMENT_VELOCITY_WINDOW_MS);
+    const recentSettled = await prisma.railSettlement.findMany({
+      where: { status: "SETTLED", settledAt: { gte: velocitySince } },
+      select: { railKey: true },
+    });
+    for (const s of recentSettled) {
+      burstCounts[s.railKey] = (burstCounts[s.railKey] ?? 0) + 1;
+    }
+    burstRails = Object.entries(burstCounts)
+      .filter(([, count]) => count > SETTLEMENT_VELOCITY_BURST_THRESHOLD)
+      .map(([railKey]) => railKey);
+  } catch {
+    // Burst-scan failure is non-fatal: fall back to the 3-consecutive-breach path only.
+  }
+
   for (const spec of enabled) {
+    // Immediate burst quarantine.
+    if (burstRails.includes(spec.railKey)) {
+      await quarantineRailSpec(
+        spec.id,
+        `auto-quarantine: settlement velocity burst (${
+          burstCounts[spec.railKey]
+        } SETTLED within window) — possible compromised signer`
+      );
+      quarantined.push(spec.railKey);
+      continue;
+    }
+
     const recent = await prisma.railTelemetry.findMany({
       where: { railKey: spec.railKey },
       orderBy: { seq: "desc" },
