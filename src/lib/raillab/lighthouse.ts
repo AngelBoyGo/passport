@@ -295,7 +295,7 @@ async function fetchRowSets(reasons: string[]): Promise<LighthouseRowSets> {
       "settlement",
       () =>
         prisma.railSettlement.findMany({
-          select: { createdAt: true, railKey: true, reference: true },
+          select: { createdAt: true, railKey: true, reference: true, status: true },
           take: LIGHTHOUSE_MAX_SCAN,
         }),
       reasons
@@ -328,7 +328,10 @@ async function fetchRowSets(reasons: string[]): Promise<LighthouseRowSets> {
     })),
     settlements: settlements.map((r: any) => ({
       at: r.createdAt.getTime(),
-      organic: isOrganicRow([r.railKey, r.reference]),
+      // Only COMPLETED settlements count as adoption. `settle()` persists a row even for a
+      // REJECTED (bad-signature) attempt, so counting all rows would let anyone without a
+      // signer key inflate the barometer by spamming garbage at /settle.
+      organic: r.status === "SETTLED" && isOrganicRow([r.railKey, r.reference]),
     })),
     rails: specs
       .filter((r: any) => r.state === "ENABLED")
@@ -341,6 +344,15 @@ async function fetchRowSets(reasons: string[]): Promise<LighthouseRowSets> {
 
 // ── Snapshot signing ──
 
+/**
+ * Cache policy for the lighthouse. A SEVERE/degraded reading must never be cached for 5
+ * minutes (agents would act on stale data), and the body is ISSUER-gated — so it is `private`
+ * (never stored by a shared cache, which would leak gated data to unauthenticated callers).
+ */
+export function lighthouseCacheControl(degraded: boolean): string {
+  return degraded ? "private, no-store, max-age=0" : "private, max-age=300";
+}
+
 function signSnapshot(payload: Record<string, unknown>): {
   content_hash: string;
   signature: string;
@@ -348,9 +360,23 @@ function signSnapshot(payload: Record<string, unknown>): {
 } {
   const contentHash = sha256Hex(canonicalJson(payload));
   const privateKeyHex = process.env.SIGNING_PRIVATE_KEY;
+  const hasKey =
+    typeof privateKeyHex === "string" &&
+    (privateKeyHex.length === 64 || privateKeyHex.length === 128);
+
+  // Fail CLOSED in production: a "signed" barometer that silently emits an empty signature is
+  // worse than an error, because consumers would treat unverified numbers as verified.
+  if (!hasKey && process.env.NODE_ENV === "production") {
+    throw new Error(
+      "SIGNING_PRIVATE_KEY is required in production to sign the Adoption Lighthouse snapshot"
+    );
+  }
+
   let signature = "";
-  if (privateKeyHex && (privateKeyHex.length === 64 || privateKeyHex.length === 128)) {
-    const pk = hexToBytes(privateKeyHex.length === 128 ? privateKeyHex.slice(0, 64) : privateKeyHex);
+  if (hasKey) {
+    const pk = hexToBytes(
+      privateKeyHex!.length === 128 ? privateKeyHex!.slice(0, 64) : privateKeyHex!
+    );
     signature = bytesToHex(sign(utf8ToBytes(contentHash), pk));
   }
   let publicKey = "";

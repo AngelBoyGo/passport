@@ -32,6 +32,7 @@ import {
   computeLighthouse,
   hasOrganicMarker,
   isOrganicRow,
+  lighthouseCacheControl,
   maskOperatorPrefix,
   LIGHTHOUSE_MARKERS,
   LIGHTHOUSE_MAX_SCAN,
@@ -184,7 +185,7 @@ describe("Adoption Lighthouse (Phase 27)", () => {
     it("returns 200-shaped body with degraded:true and a reason when a table throws", async () => {
       prismaMock.agent.findMany.mockRejectedValue(new Error("db down"));
       prismaMock.railSettlement.findMany.mockResolvedValue([
-        { createdAt: new Date(NOW.getTime() - HOUR), railKey: "rail-real", reference: "ref-1" },
+        { createdAt: new Date(NOW.getTime() - HOUR), railKey: "rail-real", reference: "ref-1", status: "SETTLED" },
       ]);
 
       const res = await buildLighthouse(NOW);
@@ -239,6 +240,24 @@ describe("Adoption Lighthouse (Phase 27)", () => {
       const tamperedHash = sha256Hex(canonicalJson(tampered as unknown as Record<string, unknown>));
       expect(tamperedHash).not.toBe(snapshot.content_hash);
     });
+
+    it("fails closed in production when no signing key is configured", async () => {
+      const savedKey = process.env.SIGNING_PRIVATE_KEY;
+      const savedEnv = process.env.NODE_ENV;
+      try {
+        delete process.env.SIGNING_PRIVATE_KEY;
+        (process.env as Record<string, string | undefined>).NODE_ENV = "production";
+        await expect(buildLighthouse(NOW)).rejects.toThrow(/SIGNING_PRIVATE_KEY is required/);
+      } finally {
+        process.env.SIGNING_PRIVATE_KEY = savedKey;
+        (process.env as Record<string, string | undefined>).NODE_ENV = savedEnv;
+      }
+    });
+
+    it("cache policy is private and never caches a degraded reading", () => {
+      expect(lighthouseCacheControl(false)).toBe("private, max-age=300");
+      expect(lighthouseCacheControl(true)).toBe("private, no-store, max-age=0");
+    });
   });
 
   describe("operator privacy (f)", () => {
@@ -272,8 +291,10 @@ describe("Adoption Lighthouse (Phase 27)", () => {
         { issuedAt: new Date(NOW.getTime() - HOUR), authorityScope: "adopt-loop-proof", agentId: "real", receiptId: "rec-2", operatorId: "op-1" },
       ]);
       prismaMock.railSettlement.findMany.mockResolvedValue([
-        { createdAt: new Date(NOW.getTime() - HOUR), railKey: "rail-real", reference: "r1" },
-        { createdAt: new Date(NOW.getTime() - HOUR), railKey: "adopt-canary-abc", reference: "adopt-1-settle" },
+        { createdAt: new Date(NOW.getTime() - HOUR), railKey: "rail-real", reference: "r1", status: "SETTLED" },
+        { createdAt: new Date(NOW.getTime() - HOUR), railKey: "adopt-canary-abc", reference: "adopt-1-settle", status: "SETTLED" },
+        // spam vector: a bad-signature attempt must NOT count as adoption
+        { createdAt: new Date(NOW.getTime() - HOUR), railKey: "rail-real", reference: "r2-spam", status: "REJECTED" },
       ]);
       prismaMock.railSpec.findMany.mockResolvedValue([
         { createdAt: new Date(NOW.getTime() - HOUR), railKey: "rail-real", name: "Real Rail", state: "ENABLED" },

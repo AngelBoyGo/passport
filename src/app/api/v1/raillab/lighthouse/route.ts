@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit, clientIpFromRequest, rateLimitResponse } from "@/lib/rateLimit";
 import { authenticateApiKey } from "@/lib/operator";
-import { buildLighthouse } from "@/lib/raillab/lighthouse";
+import { buildLighthouse, lighthouseCacheControl } from "@/lib/raillab/lighthouse";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
   const body = await buildLighthouse();
   return NextResponse.json(body, {
     headers: {
-      "Cache-Control": "public, max-age=300",
+      "Cache-Control": lighthouseCacheControl(body.lighthouse.degraded),
       "Access-Control-Allow-Origin": "*",
     },
   });
