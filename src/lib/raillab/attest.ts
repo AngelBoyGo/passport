@@ -226,6 +226,26 @@ export async function runIntegrityAttestation(): Promise<SignedIntegrityAttestat
       }
     }
 
+    // Phase 24: synchronous breach response — halt live execution + quarantine affected rails,
+    // then emit a signed, chained BreachResponse. Best-effort (never blocks the attestation).
+    if (isBreach) {
+      try {
+        const { respondToBreach } = await import("./breach-response");
+        await respondToBreach(status, body.attestationId);
+      } catch {
+        // Never let a breach-response failure suppress the attestation itself.
+      }
+      // When healthy, try to auto-revive the execution halt (only if the LATEST attestation
+      // is ok:true and newer than the halt). Rails stay QUARANTINED until ISSUER re-enable.
+    } else {
+      try {
+        const { clearHaltIfHealthy } = await import("./breach-response");
+        await clearHaltIfHealthy();
+      } catch {
+        // best-effort
+      }
+    }
+
     await pruneAttestations();
 
     return {

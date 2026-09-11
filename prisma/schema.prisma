@@ -1391,6 +1391,55 @@ model IntegrityAttestation {
   @@index([ok])
 }
 
+/// Execution safety interlock (Phase 24). Single-row KV: when liveExecutionHalted=true,
+/// `canExecuteLive` returns false for EVERY rail regardless of sandboxUrl — a durable, atomic,
+/// cryptographically-flagged hard stop that no rail can ride through.
+model ExecutionSafetyFlag {
+  id                    String   @id @default(cuid())
+  liveExecutionHalted   Boolean  @default(false)
+  haltedAt              DateTime?
+  reason                String?
+  causedByAttestationId String?
+  version               Int      @default(1)
+  updatedAt             DateTime @updatedAt
+}
+
+/// Era-based rail signer keys (Phase 24). Replaces the legacy single `signerCommitment` column
+/// with a versioned, rotatable key chain. `verifySettlementSignature` resolves the key valid at
+/// the time of the settlement, so an actively-rotated key invalidates the old one without
+/// breaking historical verification.
+model RailSignerKey {
+  id         String   @id @default(cuid())
+  railKey    String
+  publicKey  String
+  validFrom  DateTime @default(now())
+  validUntil DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([railKey, validFrom])
+  @@index([railKey, publicKey])
+}
+
+/// Signed, chained breach-response attestation (Phase 24). Idempotent per responseId (which is
+/// the causedByAttestationId). Each halt/revival is itself cryptographically verifiable.
+model BreachResponse {
+  id                    String   @id @default(cuid())
+  responseId            String   @unique
+  causedByAttestationId String
+  halted                Boolean
+  quarantinedRails      String[]
+  at                    DateTime
+  attestationHash       String
+  prevAttestationHash   String?
+  signature             String
+  publicKey             String
+  algorithm             String   @default("ed25519")
+  createdAt             DateTime @default(now())
+
+  @@index([causedByAttestationId])
+  @@index([at])
+}
+
 
 
 

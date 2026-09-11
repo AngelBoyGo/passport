@@ -102,8 +102,12 @@ export async function settle(
     throw new Error(`Rail '${railKey}' is not ENABLED (current: ${spec.state})`);
   }
 
+  // Resolve the signer key that is valid AT THE TIME OF SETTLEMENT: prefer the current
+  // era-based RailSignerKey; fall back to the legacy single `signerCommitment` column.
+  const { resolveLegacyOrEraKey } = await import("./breach-response");
+  const signerCommitment = await resolveLegacyOrEraKey(railKey) ?? spec.signerCommitment ?? null;
+
   const reference = input.reference;
-  const signerCommitment = spec.signerCommitment ?? null;
 
   // b. Verify signature (capture reason; final status decided after the dedupe lock).
   const sigCheck = await verifySettlementSignature(

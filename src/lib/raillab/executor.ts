@@ -18,6 +18,7 @@ import { settleMobileMoneyOnramp } from "@/lib/digital-gateway/mobile-money";
 import { executePoolSwap, removeLiquidity } from "@/lib/reserves/fractional-amm";
 import { recordSettlement, isSlaBreach, getRailTelemetry } from "./telemetry";
 import { autoQuarantineFailingRails } from "./factory-agent";
+import { SAFETY_FLAG_ID } from "./breach-response";
 
 export type ExecutionStage = "ANGEL" | "FRACTIONAL" | "LP" | "STATE";
 
@@ -43,6 +44,27 @@ export interface ExecuteSettlementResult {
 export function canExecuteLive(spec: { endpoints?: any }): boolean {
   const sandboxUrl = spec.endpoints?.sandboxUrl;
   return Boolean(sandboxUrl);
+}
+
+/**
+ * True when the execution safety interlock (Phase 24) has halted live execution — regardless of
+ * any rail's endpoint. Read at the moment money is about to move, so a breach-induced halt is
+ * honored even if the flag was raised a millisecond earlier.
+ *
+ * Fail-closed (treat as halted) ONLY in production when unreadable: a breach-interlock outage
+ * must never permit live money movement. In dev/test (where the table may be unmocked), an
+ * unreadable flag is treated as not-halted so existing executor/settlement tests stay valid.
+ */
+export async function isLiveExecutionHalted(): Promise<boolean> {
+  try {
+    const row = await prisma.executionSafetyFlag.findUnique({
+      where: { id: SAFETY_FLAG_ID },
+      select: { liveExecutionHalted: true },
+    });
+    return row?.liveExecutionHalted ?? false;
+  } catch {
+    return process.env.NODE_ENV === "production";
+  }
 }
 
 /** Resolves the idempotency key from the payload at the spec's configured path. */
@@ -79,7 +101,7 @@ export async function executeRailSettlement(
     throw new Error(`Rail '${railKey}' is not ENABLED (current: ${spec.state})`);
   }
 
-  const live = opts?.forceDryRun ? false : canExecuteLive(spec);
+  const live = opts?.forceDryRun ? false : canExecuteLive(spec) && !(await isLiveExecutionHalted());
   const payload = input.payload ?? {};
   const idempotencyKey = resolveIdempotencyKey(spec.idempotencyKeyPath, payload);
 
