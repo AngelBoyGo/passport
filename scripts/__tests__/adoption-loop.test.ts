@@ -41,27 +41,21 @@ type Handler = (url: string, init: RequestInit, calls: { url: string; init: Requ
   text?: string;
 };
 
-function jsonResponse(status: number, json: unknown) {
-  return new Response(JSON.stringify(json), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
-}
-
 /** Builds a scripted fetch that records calls and dispatches to `handler`. */
 function dispatchFetch(
   handler: Handler
 ): { fetchImpl: typeof globalThis.fetch; calls: { url: string; init: RequestInit }[] } {
   const calls: { url: string; init: RequestInit }[] = [];
-  const fetchImpl = (async (url: any, init: any) => {
-    calls.push({ url: String(url), init: init ?? {} });
-    const method = (init?.method ?? "GET").toUpperCase();
-    const path = String(url).replace(BASE_URL, "");
+  const fetchImpl = (async (input: RequestInfo | URL, init2?: RequestInit) => {
+    const url = new URL(input instanceof URL ? input.href : String(input));
+    const init: RequestInit = init2 ?? {};
+    calls.push({ url: url.toString(), init });
+    const method = (init.method ?? "GET").toUpperCase();
+    const path = url.toString().replace(BASE_URL, "");
     const result = handler(path, { ...init, method }, calls);
     if (result instanceof Response) return result;
-    const text = result.json !== undefined
-      ? JSON.stringify(result.json)
-      : result.text ?? "";
+    const text =
+      result.json !== undefined ? JSON.stringify(result.json) : result.text ?? "";
     return new Response(text, {
       status: result.status,
       headers: { "Content-Type": "application/json" },
@@ -218,7 +212,11 @@ function happyHandler(attestation: AttestationFixture): Handler {
       case path === "/api/v1/raillab/health/attestations/verify" && init.method === "POST":
         return {
           status: 200,
-          json: { valid: body.attestation_hash === attestation.attestationHash, reason: "ok" },
+          json: {
+            // maintainer-style: accept camelCase (loop) and legacy snake_case
+            valid: (body.attestationHash ?? body.attestation_hash) === attestation.attestationHash,
+            reason: "ok",
+          },
         };
       default:
         return { status: 404, json: { error: `no mock route for ${init.method} ${path}` } };
@@ -311,7 +309,7 @@ describe("adoption-loop runbook", () => {
 
   it("tamper-rejection: /verify returns false for the flipped hash (server-side check)", async () => {
     const attestation = await signedAttestation();
-    const { fetchImpl, calls } = dispatchFetch(happyHandler(attestation));
+    const { fetchImpl } = dispatchFetch(happyHandler(attestation));
     const report = await runAdoptionLoop({ ...cfg, fetchImpl }, {});
     expect(report.tamper_rejected).toBe(true);
     expect(report.tamper_flipped_hash).not.toBe(attestation.attestationHash);

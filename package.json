@@ -20,7 +20,7 @@
     "smoke:rwa": "tsx scripts/smoke-rwa-clearing.ts",
     "smoke:agent-enrollment": "tsx scripts/smoke-passport-enrollment.ts",
     "smoke:presentation": "tsx scripts/smoke-presentation.ts",
-    "smoke:adoption": "tsx scripts/adoption-loop.ts",
+    "smoke:adoption": "ADOPTION_LOOP_RUN=1 tsx scripts/adoption-loop.ts",
     "check:env": "tsx scripts/check-env.ts",
     "check:contract": "tsx scripts/check-passport-contract.ts",
     "load:baseline": "tsx scripts/load-baseline.ts",

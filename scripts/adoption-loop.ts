@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ASMC-3 Phase 26 — Adoption Proof Loop (live end-to-end trust runbook).
  *
  * Proves the entire passport palette against a LIVE deployment over plain HTTP, in a
@@ -497,6 +497,10 @@ export async function runAdoptionLoop(
       }),
       "receipt finalize"
     );
+    const finalizeStatus = String(finalize.status ?? "");
+    if (finalizeStatus !== "success" && finalizeStatus !== "finalized") {
+      throw new AdoptionLoopError(`receipt finalize returned status '${finalizeStatus}'`);
+    }
 
     const manifest = expectOk(
       await request(cfg, "GET", `/api/v1/receipts/${receiptId}/public-manifest`, {}),
@@ -634,36 +638,37 @@ export async function runAdoptionLoop(
   }
 
   // ── Step f: offline-verify LATEST attestation ──
-  let attestation: any = null;
+  let latestSigned: Record<string, unknown> | null = null;
   try {
     const latest = expectOk(
       await request(cfg, "GET", "/api/v1/raillab/health/attestations/latest", {}),
       "latest attestation"
     );
-    attestation = latest.attestation;
-    if (!attestation || typeof attestation !== "object") {
+    const raw = latest.attestation;
+    if (!raw || typeof raw !== "object") {
       throw new AdoptionLoopError("no attestation available yet");
     }
     const item = {
-      attestationId: String(attestation.attestation_id ?? ""),
-      checkedAt: String(attestation.checked_at ?? ""),
-      ok: Boolean(attestation.ok),
-      supplyConsistent: Boolean(attestation.supply_consistent),
-      fractionalConsistent: Boolean(attestation.fractional_consistent),
-      lpInvariantOk: Boolean(attestation.lp_invariant_ok),
-      pendingReviewStale: Number(attestation.pending_review_stale ?? 0),
-      settledTotalCredited: Number(attestation.settled_total_credited ?? 0),
-      settledTotalRows: Number(attestation.settled_total_rows ?? 0),
-      issues: Array.isArray(attestation.issues) ? (attestation.issues as string[]) : [],
-      prevAttestationHash: attestation.prev_attestation_hash ?? null,
-      attestationHash: String(attestation.attestation_hash ?? ""),
-      signature: String(attestation.signature ?? ""),
-      publicKey: attestation.public_key ?? null,
-      algorithm: String(attestation.algorithm ?? "ed25519"),
+      attestationId: String(raw.attestation_id ?? ""),
+      checkedAt: String(raw.checked_at ?? ""),
+      ok: Boolean(raw.ok),
+      supplyConsistent: Boolean(raw.supply_consistent),
+      fractionalConsistent: Boolean(raw.fractional_consistent),
+      lpInvariantOk: Boolean(raw.lp_invariant_ok),
+      pendingReviewStale: Number(raw.pending_review_stale ?? 0),
+      settledTotalCredited: Number(raw.settled_total_credited ?? 0),
+      settledTotalRows: Number(raw.settled_total_rows ?? 0),
+      issues: Array.isArray(raw.issues) ? (raw.issues as string[]) : [],
+      prevAttestationHash: raw.prev_attestation_hash ?? null,
+      attestationHash: String(raw.attestation_hash ?? ""),
+      signature: String(raw.signature ?? ""),
+      publicKey: raw.public_key ?? null,
+      algorithm: String(raw.algorithm ?? "ed25519"),
     };
+    latestSigned = item as unknown as Record<string, unknown>;
     const check = await verifyAttestationOffline(item);
     report.attestation_verified = check.valid;
-    report.attestation_chain_ok = Boolean(attestation.prev_attestation_hash !== null);
+    report.attestation_chain_ok = Boolean(raw.prev_attestation_hash !== null);
     if (!check.valid) {
       throw new AdoptionLoopError(
         `attestation ${item.attestationId.slice(0, 12)}… offline verify FAILED: ${check.reason ?? "unknown"}`
@@ -683,11 +688,12 @@ export async function runAdoptionLoop(
   }
 
   // ── Step g: tamper-check → /verify must return false ──
-  if (attestation && typeof attestation === "object") {
-    const flipped = flipAttestationHash(String(attestation.attestation_hash ?? ""));
+  if (latestSigned && typeof latestSigned === "object") {
+    const originalHash = String(latestSigned.attestationHash ?? "");
+    const flipped = flipAttestationHash(originalHash);
     report.tamper_flipped_hash = flipped;
     try {
-      const tampered: Record<string, unknown> = { ...attestation, attestation_hash: flipped };
+      const tampered = { ...latestSigned, attestationHash: flipped };
       const verifyRes = await request(cfg, "POST", "/api/v1/raillab/health/attestations/verify", {
         json: tampered,
       });
