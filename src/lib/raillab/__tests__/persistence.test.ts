@@ -56,8 +56,14 @@ function receiptRow(at: number, operatorId: string, organic = true) {
 function settlementRow(at: number, railKey: string, organic = true) {
   return { at, organic, railKey };
 }
-function railRow(railKey: string, authorizedBy: string, organic = true, at = COHORT) {
-  return { at, organic, railKey, authorizedBy };
+function railRow(
+  railKey: string,
+  authorizedBy: string,
+  organic = true,
+  at = COHORT,
+  state = "ENABLED"
+) {
+  return { at, organic, railKey, authorizedBy, state };
 }
 
 describe("Proof of Persistence (Phase 28)", () => {
@@ -146,6 +152,18 @@ describe("Proof of Persistence (Phase 28)", () => {
       const f = computeFunnel(rows, NOW, 30 * DAY);
       expect(f.enrolled).toBe(1);
       expect(f.evidenced).toBe(0);
+    });
+
+    it("attributes a settlement even if its rail was later quarantined/retired", () => {
+      const rows = emptyRows();
+      rows.agents = [agentRow(COHORT, "opA", "a1")];
+      rows.evidence = [evidenceRow(COHORT, "a1")];
+      rows.receipts = [receiptRow(COHORT, "opA")];
+      // Rail is now QUARANTINED, but its historical SETTLED activity must still count.
+      rows.rails = [railRow("rail-a", "opA", true, COHORT, "QUARANTINED")];
+      rows.settlements = [settlementRow(COHORT, "rail-a")];
+      const f = computeFunnel(rows, NOW, 30 * DAY);
+      expect(f.settled).toBe(1);
     });
   });
 

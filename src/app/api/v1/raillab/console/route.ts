@@ -52,6 +52,8 @@ export async function GET(request: NextRequest) {
         pending_review_stale: console.rails.pendingReviewStale,
       },
       severity: console.severity,
+      degraded: console.degraded,
+      degraded_reasons: console.degradedReasons,
       generated_at: console.generatedAt,
     },
   };

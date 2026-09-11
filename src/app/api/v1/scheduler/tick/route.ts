@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { checkInMemoryRateLimit, clientIpFromRequest } from "@/lib/rateLimit";
 import { runTick, type SchedulerDeps } from "@/lib/scheduler/scheduler-service";
+import { isSchedulerAuthorized } from "@/lib/scheduler/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -24,9 +25,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Production protection: require SCHEDULER_SECRET header
-  const secret = process.env.SCHEDULER_SECRET;
-  if (secret && request.headers.get("x-scheduler-secret") !== secret) {
+  // Fail-closed secret check (never open just because SCHEDULER_SECRET is unset in production).
+  if (!isSchedulerAuthorized(request.headers.get("x-scheduler-secret"), process.env.SCHEDULER_SECRET, process.env.NODE_ENV)) {
     return NextResponse.json({ error: "Forbidden: invalid scheduler secret" }, { status: 403 });
   }
 
@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
  * GET /api/v1/scheduler/tick — get the last tick status.
  * Returns a simple health check for the scheduler.
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   const lastTick = await prisma.agentEvidence.findFirst({
     where: { sourceType: "think_tank_scheduler_tick" },
     orderBy: { observedAt: "desc" },

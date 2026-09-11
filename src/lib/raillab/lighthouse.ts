@@ -255,7 +255,9 @@ function toMetricRows(rows: PersistenceRowSets): LighthouseRowSets {
       operatorId: r.operatorId,
     })),
     settlements: rows.settlements.map((r) => ({ at: r.at, organic: r.organic })),
-    rails: rows.rails.map((r) => ({ at: r.at, organic: r.organic })),
+    // `enabled_rails` is an ENABLED-only metric, but `fetchPersistenceRows` returns ALL rails so
+    // persistence can attribute settlements on rails that were later quarantined/retired.
+    rails: rows.rails.map((r) => ({ at: r.at, organic: r.organic && r.state === "ENABLED" })),
   };
 }
 

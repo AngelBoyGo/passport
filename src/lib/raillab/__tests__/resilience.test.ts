@@ -195,6 +195,9 @@ describe("Economic Resilience Report (Phase 29)", () => {
       expect(res.success).toBe(true);
       expect(res.resilience.degraded).toBe(true);
       expect(res.resilience.degraded_reasons.join(" ")).toContain("agentWallet: db down");
+      // A degraded report must never claim OK.
+      expect(res.resilience.summary.severity).not.toBe("OK");
+      expect(res.resilience.summary.severity).toBe("WARNING");
     });
 
     it("is read-only: never creates or mutates ledger rows (no fabricated mint)", async () => {

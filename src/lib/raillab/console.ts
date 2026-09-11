@@ -6,7 +6,6 @@
  * operators and autonomous agents can act on. Read-only over the ledgers — moves no money.
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { prisma } from "@/lib/db";
 import { getExecutionSafetyFlag } from "./breach-response";
 import { getLatestAttestation, verifyIntegrityAttestation, getIntegrityPublicKeyHex } from "./attest";
@@ -37,8 +36,10 @@ export interface TrustConsole {
     pendingReviewStale: number;
   };
   severity: TrustSeverity;
+  degraded: boolean;
+  degradedReasons: string[];
   generatedAt: string;
-  cacheControl: "public, max-age=30" | "no-store";
+  cacheControl: "private, max-age=30" | "no-store";
 }
 
 /**
@@ -123,6 +124,7 @@ export async function buildTrustConsole(): Promise<TrustConsole> {
   // Velocity alerts (same window/threshold as the integrity check).
   const velocitySince = new Date(Date.now() - SETTLEMENT_VELOCITY_WINDOW_MS);
   const velocityAlerts: string[] = [];
+  const degradedReasons: string[] = [];
   try {
     const recentSettled = await prisma.railSettlement.findMany({
       where: { status: "SETTLED", settledAt: { gte: velocitySince } },
@@ -136,7 +138,10 @@ export async function buildTrustConsole(): Promise<TrustConsole> {
       }
     }
   } catch {
+    // A failed scan is NOT the same as "no anomaly" — surface it so a partial outage never
+    // reads as OK. (Also recorded in velocityAlerts for backward-compatible consumers.)
     velocityAlerts.push("(velocity scan unavailable)");
+    degradedReasons.push("settlement velocity scan unavailable");
   }
 
   // pending_review_stale.
@@ -148,14 +153,18 @@ export async function buildTrustConsole(): Promise<TrustConsole> {
     });
   } catch {
     pendingReviewStale = 0;
+    // Fail-open guard: an unreadable count must tilt severity, not silently claim zero.
+    degradedReasons.push("pending-review scan unavailable");
   }
+
+  const degraded = degradedReasons.length > 0;
 
   // Severity tilt.
   const chainUnverified = !verified || !chainOk;
   const severity: TrustSeverity =
     safety.halted || chainUnverified
       ? "SEVERE"
-      : velocityAlerts.length > 0 || pendingReviewStale > 0
+      : velocityAlerts.length > 0 || pendingReviewStale > 0 || degraded
         ? "WARNING"
         : "OK";
 
@@ -177,7 +186,10 @@ export async function buildTrustConsole(): Promise<TrustConsole> {
       pendingReviewStale,
     },
     severity,
+    degraded,
+    degradedReasons,
     generatedAt: new Date().toISOString(),
-    cacheControl: severity === "SEVERE" ? "no-store" : "public, max-age=30",
+    // ISSUER-gated: never let a shared cache store the gated body (or a halt).
+    cacheControl: severity === "SEVERE" ? "no-store" : "private, max-age=30",
   };
 }

@@ -133,7 +133,16 @@ it("flags SEVERE when the attestation chain does not verify", async () => {
     const c = await buildTrustConsole();
     expect(c.severity).toBe("WARNING");
     expect(c.rails.velocityAlerts.length).toBe(1);
-    expect(c.cacheControl).toBe("public, max-age=30");
+    expect(c.cacheControl).toBe("private, max-age=30");
+  });
+
+  it("tilts to WARNING (never OK) when a settlement scan fails", async () => {
+    await mockHealthyBase();
+    prismaMock.railSettlement.count.mockRejectedValue(new Error("db down"));
+    const c = await buildTrustConsole();
+    expect(c.degraded).toBe(true);
+    expect(c.degradedReasons.join(" ")).toContain("pending-review");
+    expect(c.severity).toBe("WARNING");
   });
 
   it("handles a missing safety flag without crashing and stays OK when healthy", async () => {

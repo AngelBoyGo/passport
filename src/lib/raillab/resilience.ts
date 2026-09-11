@@ -255,7 +255,7 @@ export function sybilWashScenario(burst: number = SYBIL_WASH_SETTLEMENTS): Scena
     scenario: "sybil_wash",
     survives: detected,
     worst_case: detected
-      ? `contained: burst of ${burst} exceeds the ${threshold} tripwire`
+      ? `contained at ${burst} (tripwire ${threshold}); residual undetected capacity is ${threshold} settlements/rail/window`
       : `wash of ${burst} settlements slips under the ${threshold} tripwire (residual undetected capacity)`,
     detail,
   };
@@ -369,6 +369,12 @@ export async function buildResilience(now: Date = new Date()): Promise<Resilienc
   ];
   const summary = summarize(scenarios, baseline);
 
+  // Fail-closed surface: if part of the baseline was unreadable, the report cannot honestly
+  // claim OK — a consumer acting on severity alone must see at least WARNING.
+  if (reasons.length > 0 && summary.severity === "OK") {
+    summary.severity = "WARNING";
+  }
+
   const resilience: ResilienceBlock = {
     baseline,
     scenarios,
@@ -378,6 +384,7 @@ export async function buildResilience(now: Date = new Date()): Promise<Resilienc
       oracle_skew_steps: [...ORACLE_SKEW_STEPS],
       reserve_shortfall_steps: [...RESERVE_SHORTFALL_STEPS],
       sybil_wash_settlements: SYBIL_WASH_SETTLEMENTS,
+      sybil_wash_undetected: SYBIL_WASH_UNDETECTED,
       commodity_spot_usd_per_gram: { ...RESILIENCE_COMMODITY_SPOT_USD_PER_GRAM },
       warning_coverage_margin: RESILIENCE_WARNING_COVERAGE_MARGIN,
     },

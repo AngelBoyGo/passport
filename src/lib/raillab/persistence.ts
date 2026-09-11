@@ -112,6 +112,8 @@ export interface PersistenceRailRow {
   organic: boolean;
   railKey: string;
   authorizedBy: string | null;
+  /** Current rail state. Attribution uses ALL rails; the Lighthouse metric counts only ENABLED. */
+  state: string;
 }
 
 export interface PersistenceRowSets {
@@ -482,13 +484,12 @@ export async function fetchPersistenceRows(reasons: string[]): Promise<Persisten
       organic: r.status === "SETTLED" && isOrganicRow([r.railKey, r.reference]),
       railKey: r.railKey,
     })),
-    rails: specs
-      .filter((r: any) => r.state === "ENABLED")
-      .map((r: any) => ({
-        at: r.createdAt.getTime(),
-        organic: isOrganicRow([r.railKey, r.name]),
-        railKey: r.railKey,
-        authorizedBy: r.authorizedBy ?? null,
-      })),
+    rails: specs.map((r: any) => ({
+      at: r.createdAt.getTime(),
+      organic: isOrganicRow([r.railKey, r.name]),
+      railKey: r.railKey,
+      authorizedBy: r.authorizedBy ?? null,
+      state: r.state,
+    })),
   };
 }
