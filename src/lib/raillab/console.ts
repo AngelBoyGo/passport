@@ -57,7 +57,7 @@ async function verifyLatestAttestation(): Promise<{
   }
   const issues: string[] = [];
 
-  const { valid, reason } = await verifyIntegrityAttestation({
+const { valid, reason } = await verifyIntegrityAttestation({
     attestationId: latest.attestationId,
     checkedAt: latest.checkedAt.toISOString(),
     ok: latest.ok,
@@ -71,7 +71,10 @@ async function verifyLatestAttestation(): Promise<{
     prevAttestationHash: latest.prevAttestationHash,
     attestationHash: latest.attestationHash,
     signature: latest.signature,
-    publicKey: getIntegrityPublicKeyHex(),
+    // Verify against the key that ACTUALLY signed this attestation (stored on the row).
+    // Re-deriving from the CURRENT signing key would false-fail every historic attestation
+    // after a key rotation, permanently flagging SEVERE on a healthy ledger.
+    publicKey: latest.publicKey ?? getIntegrityPublicKeyHex(),
     algorithm: "ed25519",
   });
   const verified = valid;

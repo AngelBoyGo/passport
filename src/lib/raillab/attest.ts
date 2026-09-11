@@ -187,6 +187,7 @@ export async function runIntegrityAttestation(): Promise<SignedIntegrityAttestat
     const signature = pk
       ? bytesToHex(await sign(utf8ToBytes(attestationHash), pk))
       : "";
+    const publicKey = getIntegrityPublicKeyHex();
 
     await prisma.integrityAttestation.create({
       data: {
@@ -203,6 +204,7 @@ export async function runIntegrityAttestation(): Promise<SignedIntegrityAttestat
         prevAttestationHash: prev,
         attestationHash,
         signature,
+        publicKey,       // store the key that signed this attestation (rotation-safe)
         algorithm: "ed25519",
       },
     });

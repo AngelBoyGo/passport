@@ -1384,6 +1384,9 @@ model IntegrityAttestation {
   prevAttestationHash   String?
   attestationHash       String   @unique
   signature             String
+  publicKey             String? // Phase 25: the Ed25519 public key that signed THIS attestation.
+                               // Stored so offline verification works after the signing key rotates
+                               // (each attestation verifies against the key that actually signed it).
   algorithm             String   @default("ed25519")
   createdAt             DateTime @default(now())
 
