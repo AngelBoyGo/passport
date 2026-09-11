@@ -15,19 +15,24 @@
  * over canonicalJson(body without snapshot) so third parties can verify the numbers offline.
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { sign } from "@noble/ed25519";
 import { bytesToHex, hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
-import { prisma } from "@/lib/db";
 import { canonicalJson, sha256Hex } from "@/lib/receipt/canonical";
 import { getPublicKeyHex } from "@/lib/receipt/signer";
 import "@/lib/receipt/crypto";
+import {
+  LIGHTHOUSE_MARKERS,
+  LIGHTHOUSE_MAX_SCAN,
+  hasOrganicMarker,
+  isOrganicRow,
+  fetchPersistenceRows,
+  buildPersistence,
+  type PersistenceBlock,
+  type PersistenceRowSets,
+} from "./persistence";
 
-/** Markers that identify self-generated (non-organic) rows. `adopt-` subsumes `adopt-canary-`. */
-export const LIGHTHOUSE_MARKERS = ["adopt-", "adopt-canary-", "smoke:"] as const;
-
-/** Upper bound on rows scanned per table; exceeding it is surfaced as a degraded reason. */
-export const LIGHTHOUSE_MAX_SCAN = 100_000;
+// Re-exported so existing consumers/tests keep importing the organic filter from the Lighthouse.
+export { LIGHTHOUSE_MARKERS, LIGHTHOUSE_MAX_SCAN, hasOrganicMarker, isOrganicRow };
 
 export type LighthouseBucketKey = "24h" | "7d" | "30d" | "all";
 export type TrendDirection = "growing" | "flat" | "falling";
@@ -48,6 +53,7 @@ export type LighthouseTrend = {
 export interface LighthouseMetrics {
   buckets: Record<LighthouseBucketKey, LighthouseBucket>;
   trend: { "24h": LighthouseTrend; "7d": LighthouseTrend };
+  persistence: PersistenceBlock;
   excluded_markers: string[];
   organic_only: true;
   generated_at: string;
@@ -77,17 +83,6 @@ const WINDOW_MS: Record<Exclude<LighthouseBucketKey, "all">, number> = {
 };
 
 // ── Pure helpers (unit-tested) ──
-
-/** True when a value string carries any self-generated marker. */
-export function hasOrganicMarker(value: unknown): boolean {
-  if (typeof value !== "string" || value.length === 0) return false;
-  return LIGHTHOUSE_MARKERS.some((m) => value.includes(m));
-}
-
-/** True when NONE of the scanned values carry a marker (i.e. the row is organic). */
-export function isOrganicRow(values: unknown[]): boolean {
-  return !values.some(hasOrganicMarker);
-}
 
 /** Two-window delta: current vs equal preceding window. Equal → flat. */
 export function classifyTrend(previous: number, current: number): TrendDirection {
@@ -211,11 +206,25 @@ function trendFor(
   };
 }
 
+function emptyFunnel() {
+  return { enrolled: 0, evidenced: 0, receipted: 0, settled: 0, returned: 0 };
+}
+
+/** Empty persistence block — used by the pure core when no attribution rows are supplied. */
+function emptyPersistence(): PersistenceBlock {
+  return {
+    cohorts: [],
+    funnel: { "7d": emptyFunnel(), "30d": emptyFunnel(), all: emptyFunnel() },
+    integrity: { suspicious: false, reasons: [] },
+  };
+}
+
 /** Pure aggregation over already-fetched rows (the unit-tested core). */
 export function computeLighthouse(
   rows: LighthouseRowSets,
   now: Date = new Date(),
-  degradedReasons: string[] = []
+  degradedReasons: string[] = [],
+  persistence: PersistenceBlock = emptyPersistence()
 ): LighthouseMetrics {
   const nowMs = now.getTime();
   return {
@@ -229,6 +238,7 @@ export function computeLighthouse(
       "24h": trendFor("24h", nowMs, rows),
       "7d": trendFor("7d", nowMs, rows),
     },
+    persistence,
     excluded_markers: [...LIGHTHOUSE_MARKERS],
     organic_only: true,
     generated_at: now.toISOString(),
@@ -237,120 +247,32 @@ export function computeLighthouse(
   };
 }
 
-// ── Row fetching (degraded-mode per table; one dead feed never hides the rest) ──
+// ── Metric-row projection (the Lighthouse reuses the Phase-28 persisted fetch) ──
 
-async function safeScan<T>(
-  table: string,
-  fn: () => Promise<T[]>,
-  reasons: string[]
-): Promise<T[]> {
-  try {
-    const rows = await fn();
-    if (rows.length >= LIGHTHOUSE_MAX_SCAN) {
-      reasons.push(`${table}: scan truncated at ${LIGHTHOUSE_MAX_SCAN} rows (counts approximate)`);
-    }
-    return rows;
-  } catch (err) {
-    reasons.push(`${table}: ${err instanceof Error ? err.message : String(err)}`);
-    return [];
-  }
-}
-
-async function fetchRowSets(reasons: string[]): Promise<LighthouseRowSets> {
-  const [agents, evidence, receipts, settlements, specs] = await Promise.all([
-    safeScan(
-      "agent",
-      () =>
-        prisma.agent.findMany({
-          select: { createdAt: true, agentId: true, domain: true, operatorId: true },
-          take: LIGHTHOUSE_MAX_SCAN,
-        }),
-      reasons
-    ),
-    safeScan(
-      "evidence",
-      () =>
-        prisma.agentEvidence.findMany({
-          select: { createdAt: true, sourceUrl: true, externalTaskId: true, commitSha: true },
-          take: LIGHTHOUSE_MAX_SCAN,
-        }),
-      reasons
-    ),
-    safeScan(
-      "receipt",
-      () =>
-        prisma.receipt.findMany({
-          select: {
-            issuedAt: true,
-            authorityScope: true,
-            agentId: true,
-            receiptId: true,
-            operatorId: true,
-          },
-          take: LIGHTHOUSE_MAX_SCAN,
-        }),
-      reasons
-    ),
-    safeScan(
-      "settlement",
-      () =>
-        prisma.railSettlement.findMany({
-          select: { createdAt: true, railKey: true, reference: true, status: true },
-          take: LIGHTHOUSE_MAX_SCAN,
-        }),
-      reasons
-    ),
-    safeScan(
-      "railSpec",
-      () =>
-        prisma.railSpec.findMany({
-          select: { createdAt: true, railKey: true, name: true, state: true },
-          take: LIGHTHOUSE_MAX_SCAN,
-        }),
-      reasons
-    ),
-  ]);
-
+function toMetricRows(rows: PersistenceRowSets): LighthouseRowSets {
   return {
-    agents: agents.map((r: any) => ({
-      at: r.createdAt.getTime(),
-      organic: isOrganicRow([r.agentId, r.domain]),
+    agents: rows.agents.map((r) => ({ at: r.at, organic: r.organic, operatorId: r.operatorId })),
+    evidence: rows.evidence.map((r) => ({ at: r.at, organic: r.organic })),
+    receipts: rows.receipts.map((r) => ({
+      at: r.at,
+      organic: r.organic,
       operatorId: r.operatorId,
     })),
-    evidence: evidence.map((r: any) => ({
-      at: r.createdAt.getTime(),
-      organic: isOrganicRow([r.sourceUrl, r.externalTaskId, r.commitSha]),
-    })),
-    receipts: receipts.map((r: any) => ({
-      at: r.issuedAt.getTime(),
-      organic: isOrganicRow([r.authorityScope, r.agentId, r.receiptId]),
-      operatorId: r.operatorId,
-    })),
-    settlements: settlements.map((r: any) => ({
-      at: r.createdAt.getTime(),
-      // Only COMPLETED settlements count as adoption. `settle()` persists a row even for a
-      // REJECTED (bad-signature) attempt, so counting all rows would let anyone without a
-      // signer key inflate the barometer by spamming garbage at /settle.
-      organic: r.status === "SETTLED" && isOrganicRow([r.railKey, r.reference]),
-    })),
-    rails: specs
-      .filter((r: any) => r.state === "ENABLED")
-      .map((r: any) => ({
-        at: r.createdAt.getTime(),
-        organic: isOrganicRow([r.railKey, r.name]),
-      })),
+    settlements: rows.settlements.map((r) => ({ at: r.at, organic: r.organic })),
+    rails: rows.rails.map((r) => ({ at: r.at, organic: r.organic })),
   };
 }
 
 // ── Snapshot signing ──
 
 /**
- * Cache policy for the lighthouse. A SEVERE/degraded reading must never be cached for 5
- * minutes (agents would act on stale data), and the body is ISSUER-gated — so it is `private`
- * (never stored by a shared cache, which would leak gated data to unauthenticated callers).
+ * Cache policy for the lighthouse. A degraded reading OR a suspected-inflation reading must
+ * never be cached for 5 minutes (agents would act on stale/misleading data), and the body is
+ * ISSUER-gated — so it is `private` (never stored by a shared cache, which would leak gated
+ * data to unauthenticated callers).
  */
-export function lighthouseCacheControl(degraded: boolean): string {
-  return degraded ? "private, no-store, max-age=0" : "private, max-age=300";
+export function lighthouseCacheControl(degraded: boolean, suspicious = false): string {
+  return degraded || suspicious ? "private, no-store, max-age=0" : "private, max-age=300";
 }
 
 function signSnapshot(payload: Record<string, unknown>): {
@@ -394,8 +316,10 @@ function signSnapshot(payload: Record<string, unknown>): {
  */
 export async function buildLighthouse(now: Date = new Date()): Promise<LighthouseResponse> {
   const reasons: string[] = [];
-  const rows = await fetchRowSets(reasons);
-  const lighthouse = computeLighthouse(rows, now, reasons);
+  const pRows = await fetchPersistenceRows(reasons);
+  const metricRows = toMetricRows(pRows);
+  const persistence = buildPersistence(pRows, now);
+  const lighthouse = computeLighthouse(metricRows, now, reasons, persistence);
 
   const signedBody: Record<string, unknown> = {
     success: true,

@@ -31,7 +31,10 @@ export async function GET(request: NextRequest) {
   const body = await buildLighthouse();
   return NextResponse.json(body, {
     headers: {
-      "Cache-Control": lighthouseCacheControl(body.lighthouse.degraded),
+      "Cache-Control": lighthouseCacheControl(
+        body.lighthouse.degraded,
+        body.lighthouse.persistence.integrity.suspicious
+      ),
       "Access-Control-Allow-Origin": "*",
     },
   });

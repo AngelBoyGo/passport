@@ -71,6 +71,10 @@
   excluded via documented markers (`adopt-`, `adopt-canary-`, `smoke:`). Degrades with 200 +
   `degraded:true` instead of hiding data. Verify offline: sha256(canonicalJson(body minus
   `snapshot`)) then ed25519 against `snapshot.public_key`.
+- Proof of Persistence: `lighthouse.persistence` adds ISO-week cohorts with w1/w2/w3 retention,
+  the operator funnel (enrolled→evidenced→receipted→settled→returned, nested so it is monotonic),
+  and integrity flags (enroll-and-vanish, never-settled ratio). Only SETTLED settlements count —
+  a valid signer signature makes persistence costly to fake. Never cached when suspicious.
 - Docs: https://passport.metis.gold/docs/lighthouse
 
 ## Live adoption proof runbook (run the palette yourself)

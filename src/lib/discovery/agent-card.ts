@@ -177,7 +177,7 @@ export async function buildAgentCard(baseUrl: string): Promise<Record<string, un
       { type: "api", url: `${baseUrl}/api/health` },
       { type: "runbook", url: `${baseUrl}/scripts/adoption-loop`, description: "live adoption proof runbook" },
       { type: "runbook", url: `${baseUrl}/scripts/README-smoke.md`, description: "smoke harness usage" },
-      { type: "lighthouse", url: `${baseUrl}/api/v1/raillab/lighthouse`, description: "signed organic-adoption barometer" },
+      { type: "lighthouse", url: `${baseUrl}/api/v1/raillab/lighthouse`, description: "signed organic-adoption + persistence barometer" },
       { type: "documentation", url: `${baseUrl}/docs/lighthouse` },
     ],
   };

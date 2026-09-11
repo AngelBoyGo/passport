@@ -6,6 +6,29 @@ export interface PassportClientOptions {
   baseUrl: string;
 }
 
+export interface PersistenceCohort {
+  week: string;
+  size: number;
+  w1_retention: number;
+  w2_retention: number;
+  w3_retention: number;
+}
+
+export interface PersistenceFunnel {
+  enrolled: number;
+  evidenced: number;
+  receipted: number;
+  settled: number;
+  returned: number;
+}
+
+/** Proof-of-Persistence block (Phase 28) carried inside the signed Lighthouse response. */
+export interface LighthousePersistence {
+  cohorts: PersistenceCohort[];
+  funnel: { "7d": PersistenceFunnel; "30d": PersistenceFunnel; all: PersistenceFunnel };
+  integrity: { suspicious: boolean; reasons: string[] };
+}
+
 export interface IssueReceiptInput {
   agent_id: string;
   receipt_type: "custody" | "competence";
@@ -1743,8 +1766,9 @@ export class PassportClient {
 
   /**
    * Purview: Adoption Lighthouse — a signed, organic-only barometer of external adoption
-   * (level + 24h/7d trend), excluding self-generated rows (smoke harnesses, the adoption proof
-   * loop). Degrades gracefully rather than hiding data. ISSUER key required.
+   * (level + 24h/7d trend + Proof-of-Persistence cohorts/funnel/inflation), excluding
+   * self-generated rows (smoke harnesses, the adoption proof loop). Degrades gracefully rather
+   * than hiding data. ISSUER key required.
    */
   async getLighthouse(): Promise<{
     success: boolean;
@@ -1772,6 +1796,7 @@ export class PassportClient {
           "growing" | "flat" | "falling"
         >
       >;
+      persistence: LighthousePersistence;
       excluded_markers: string[];
       organic_only: true;
       generated_at: string;

@@ -65,11 +65,52 @@ export default function DocsLighthouse() {
     "excluded_markers": ["adopt-", "adopt-canary-", "smoke:"],
     "buckets": { "24h": { "enrolled_agents": 3, "settlements": 41, ... }, "7d": {...}, "30d": {...}, "all": {...} },
     "trend":   { "24h": { "settlements": "growing", ... }, "7d": {...} },
+    "persistence": {
+      "cohorts": [{ "week": "2026-W24", "size": 12, "w1_retention": 0.5, "w2_retention": 0.33, "w3_retention": 0.25 }],
+      "funnel": { "7d": { "enrolled": 40, "evidenced": 18, "receipted": 9, "settled": 6, "returned": 4 } },
+      "integrity": { "suspicious": false, "reasons": [] }
+    },
     "degraded": false,
     "degraded_reasons": []
   },
   "snapshot": { "content_hash": "…", "signature": "…", "public_key": "…", "algorithm": "ed25519" }
 }`}</pre>
+      </section>
+
+      <section>
+        <h2 className="text-xl font-semibold">Proof of Persistence — durable, not vanity</h2>
+        <p className="text-sm text-slate-600 mt-2">
+          A raw count answers &ldquo;how many showed up?&rdquo; — a number a Sybil can inflate for
+          free. The <code className="font-mono text-xs">persistence</code> block answers the only
+          question that compounds: <strong>did they come back and keep doing costly work?</strong>
+        </p>
+        <ul className="list-disc pl-5 text-sm text-slate-600 space-y-1">
+          <li>
+            <strong>Cohorts</strong> — each ISO week (UTC) of newly-seen operators, with{" "}
+            <code className="font-mono text-xs">w1/w2/w3_retention</code>: the fraction still
+            active one, two, three weeks later. A cohort is the week an operator was first seen
+            via a first Agent or Receipt.
+          </li>
+          <li>
+            <strong>Funnel</strong> — <code className="font-mono text-xs">enrolled → evidenced →
+            receipted → settled → returned</code>, deduped by operator and <em>nested</em> (each
+            stage requires the prior), so it is monotonic non-increasing by construction.
+            &ldquo;Returned&rdquo; means active in a week <em>after</em> their cohort.
+          </li>
+          <li>
+            <strong>Integrity</strong> — flags manufactured adoption: an{" "}
+            <em>enroll-and-vanish</em> cohort (size ≥ 10 with &lt; 10% week-1 retention), or a
+            &gt; 80% never-settled ratio over 7d. When{" "}
+            <code className="font-mono text-xs">integrity.suspicious</code> is true the reading is
+            never cached.
+          </li>
+        </ul>
+        <p className="text-sm text-slate-600 mt-2">
+          A settlement counts as activity <strong>only when <code className="font-mono text-xs">SETTLED</code></strong>{" "}
+          — it requires a valid rail signer signature — so the strongest persistence signal
+          cannot be manufactured by spamming bad-signature attempts at{" "}
+          <code className="font-mono text-xs">/settle</code>.
+        </p>
       </section>
 
       <section>
