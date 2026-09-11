@@ -15,11 +15,7 @@
  * over canonicalJson(body without snapshot) so third parties can verify the numbers offline.
  */
 
-import { sign } from "@noble/ed25519";
-import { bytesToHex, hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
-import { canonicalJson, sha256Hex } from "@/lib/receipt/canonical";
-import { getPublicKeyHex } from "@/lib/receipt/signer";
-import "@/lib/receipt/crypto";
+import { signReportPayload } from "./report-signing";
 import {
   LIGHTHOUSE_MARKERS,
   LIGHTHOUSE_MAX_SCAN,
@@ -275,41 +271,6 @@ export function lighthouseCacheControl(degraded: boolean, suspicious = false): s
   return degraded || suspicious ? "private, no-store, max-age=0" : "private, max-age=300";
 }
 
-function signSnapshot(payload: Record<string, unknown>): {
-  content_hash: string;
-  signature: string;
-  public_key: string;
-} {
-  const contentHash = sha256Hex(canonicalJson(payload));
-  const privateKeyHex = process.env.SIGNING_PRIVATE_KEY;
-  const hasKey =
-    typeof privateKeyHex === "string" &&
-    (privateKeyHex.length === 64 || privateKeyHex.length === 128);
-
-  // Fail CLOSED in production: a "signed" barometer that silently emits an empty signature is
-  // worse than an error, because consumers would treat unverified numbers as verified.
-  if (!hasKey && process.env.NODE_ENV === "production") {
-    throw new Error(
-      "SIGNING_PRIVATE_KEY is required in production to sign the Adoption Lighthouse snapshot"
-    );
-  }
-
-  let signature = "";
-  if (hasKey) {
-    const pk = hexToBytes(
-      privateKeyHex!.length === 128 ? privateKeyHex!.slice(0, 64) : privateKeyHex!
-    );
-    signature = bytesToHex(sign(utf8ToBytes(contentHash), pk));
-  }
-  let publicKey = "";
-  try {
-    publicKey = getPublicKeyHex();
-  } catch {
-    publicKey = "";
-  }
-  return { content_hash: contentHash, signature, public_key: publicKey };
-}
-
 /**
  * Builds the full, signed lighthouse response. Never throws on a DB failure: per-table errors
  * become `degraded_reasons` and the response is still returned (HTTP 200) with what it could see.
@@ -326,7 +287,7 @@ export async function buildLighthouse(now: Date = new Date()): Promise<Lighthous
     lighthouse,
     verify_instructions: LIGHTHOUSE_VERIFY_INSTRUCTIONS,
   };
-  const snapshot = signSnapshot(signedBody);
+  const snapshot = signReportPayload(signedBody);
 
   return {
     success: true,

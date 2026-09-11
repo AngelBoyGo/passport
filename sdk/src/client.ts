@@ -31,6 +31,43 @@ export interface LighthousePersistence {
   integrity: { suspicious: boolean; reasons: string[] };
 }
 
+export type ResilienceSeverity = "OK" | "WARNING" | "SEVERE";
+
+export interface ResilienceBaseline {
+  angel_supply: number;
+  angel_staked: number;
+  reserve_usd: number;
+  rate_usd: number;
+  redemption_rate_usd: number;
+  reserve_ratio: number;
+  redemption_liability_usd: number;
+  backing_ratio: number;
+  commodity_value_usd: number;
+  pools: { pair_symbol: string; angel_reserve: number; commodity_reserve: number }[];
+}
+
+export interface ResilienceScenarioResult {
+  scenario: "redemption_run" | "oracle_skew" | "reserve_shortfall" | "sybil_wash";
+  survives: boolean;
+  worst_case: string;
+  detail: string[];
+}
+
+/** Economic Resilience block (Phase 29) carried inside the signed report. */
+export interface ResilienceBlock {
+  baseline: ResilienceBaseline;
+  scenarios: ResilienceScenarioResult[];
+  summary: {
+    survives: boolean;
+    worst_scenario: string | null;
+    severity: ResilienceSeverity;
+  };
+  inputs: Record<string, unknown>;
+  degraded: boolean;
+  degraded_reasons: string[];
+  generated_at: string;
+}
+
 export interface IssueReceiptInput {
   agent_id: string;
   receipt_type: "custody" | "competence";
@@ -1817,6 +1854,31 @@ export class PassportClient {
     if (this.apiKey) headers.Authorization = `Bearer ${this.apiKey}`;
     const response = await fetchWithRetry(
       `${this.baseUrl}/api/v1/raillab/lighthouse`,
+      { method: "GET", headers }
+    );
+    return this.parseJsonResponse(response);
+  }
+
+  /**
+   * Purview: Economic Resilience Report — stress-tests the LIVE economy against adversarial
+   * conditions (redemption run, oracle skew, reserve shortfall, Sybil wash) and reports whether
+   * the sacred invariants survive. Signed and offline-verifiable. ISSUER key required.
+   */
+  async getResilience(): Promise<{
+    success: boolean;
+    resilience: ResilienceBlock;
+    verify_instructions: string;
+    snapshot: {
+      content_hash: string;
+      signature: string;
+      public_key: string;
+      algorithm: "ed25519";
+    };
+  }> {
+    const headers: Record<string, string> = { Accept: "application/json" };
+    if (this.apiKey) headers.Authorization = `Bearer ${this.apiKey}`;
+    const response = await fetchWithRetry(
+      `${this.baseUrl}/api/v1/raillab/resilience`,
       { method: "GET", headers }
     );
     return this.parseJsonResponse(response);

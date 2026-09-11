@@ -77,6 +77,14 @@
   a valid signer signature makes persistence costly to fake. Never cached when suspicious.
 - Docs: https://passport.metis.gold/docs/lighthouse
 
+## Economic Resilience Report (survivability under adversarial conditions, signed)
+- GET  /api/v1/raillab/resilience               — signed stress report (ISSUER key)
+  Scenarios run against a live baseline: redemption_run, oracle_skew, reserve_shortfall,
+  sybil_wash. Summary { survives, worst_scenario, severity: OK|WARNING|SEVERE }; inputs echoed
+  for reproducibility. SEVERE/WARNING never cached. Verify offline with the same key as
+  /receipts/monetary (sha256 canonicalJson body minus `snapshot`, then ed25519).
+- Docs: https://passport.metis.gold/docs/resilience
+
 ## Live adoption proof runbook (run the palette yourself)
 - Runbook: /scripts/adoption-loop (npm run smoke:adoption) — enrolls an agent, posts signed
   evidence, issues+finalizes a receipt, provisions a dry-run-safe canary rail and settles it via
