@@ -31,9 +31,15 @@ export const PERSISTENCE_COHORT_WEEKS = 8;
 
 /** Inflation thresholds (exported so the definition is testable + auditable). */
 export const INFLATION_SETTLED_RATIO_THRESHOLD = 0.8;
-export const INFLATION_MIN_SAMPLE = 5;
+export const INFLATION_MIN_SAMPLE = 10;
 export const INFLATION_MIN_COHORT_SIZE = 10;
 export const INFLATION_LOW_RETENTION_THRESHOLD = 0.1;
+/**
+ * Grace before a new operator is eligible for the never-settled ratio. Settlement requires an
+ * ENABLED rail the operator authorized, which takes time to provision — judging operators the
+ * day they appear would mark every growing network as manufactured.
+ */
+export const INFLATION_SETTLEMENT_GRACE_MS = 3 * 24 * 3600_000;
 
 const WEEK_MS = 7 * 24 * 3600_000;
 const DAY_MS = 24 * 3600_000;
@@ -198,6 +204,13 @@ export interface PersistenceCohort {
   w1_retention: number;
   w2_retention: number;
   w3_retention: number;
+  /**
+   * True once the week-1 retention window has fully elapsed (`start + 2 weeks <= now`). The most
+   * recent cohorts are immature: their w1 value is structurally 0 because the window has not
+   * happened yet, so integrity checks must ignore them (otherwise a growing network is flagged
+   * "enroll-and-vanish" the moment it gains 10 operators).
+   */
+  mature: boolean;
 }
 
 function round3(n: number): number {
@@ -228,6 +241,8 @@ export function computePersistence(rows: PersistenceRowSets, now: Date): Persist
       w1_retention: retention(1),
       w2_retention: retention(2),
       w3_retention: retention(3),
+      // The week-1 window [start+1w, start+2w) is fully elapsed only when start+2w <= nowWeek.
+      mature: start + 2 * WEEK_MS <= nowWeek,
     });
   }
   return cohorts;
@@ -295,9 +310,9 @@ export interface InflationReport {
 
 /**
  * Flags manufactured adoption:
- *   - enroll-and-vanish: a recent cohort (size >= MIN_COHORT_SIZE) with < 10% week-1 retention;
- *   - never-settled ratio: over 7d, > 80% of newly-seen operators never produced a SETTLED
- *     settlement (with a minimum sample so tiny networks are not libelled).
+ *   - enroll-and-vanish: a MATURE cohort (size >= MIN_COHORT_SIZE) with < 10% week-1 retention;
+ *   - never-settled ratio: over 7d, > 80% of newly-seen operators (past a 3-day grace) never
+ *     produced a SETTLED settlement (with a minimum sample so tiny networks are not libelled).
  */
 export function detectInflation(rows: PersistenceRowSets, now: Date): InflationReport {
   const { firstSeen, eventsByOperator } = deriveOperatorModel(rows);
@@ -310,8 +325,10 @@ export function detectInflation(rows: PersistenceRowSets, now: Date): InflationR
   }
 
   const since7 = nowMs - 7 * DAY_MS;
+  // Only operators that have had the grace period to provision a rail + settle are eligible.
+  const eligibleCutoff = nowMs - INFLATION_SETTLEMENT_GRACE_MS;
   const enrolled7 = [...firstSeen.entries()]
-    .filter(([, at]) => at >= since7 && at <= nowMs)
+    .filter(([, at]) => at >= since7 && at <= eligibleCutoff)
     .map(([op]) => op);
 
   if (enrolled7.length >= INFLATION_MIN_SAMPLE) {
@@ -325,7 +342,13 @@ export function detectInflation(rows: PersistenceRowSets, now: Date): InflationR
   }
 
   for (const cohort of computePersistence(rows, now)) {
-    if (cohort.size >= INFLATION_MIN_COHORT_SIZE && cohort.w1_retention < INFLATION_LOW_RETENTION_THRESHOLD) {
+    // Only mature cohorts have a meaningful w1 window; the current/previous cohorts would
+    // otherwise read w1=0 by construction and libel a growing network.
+    if (
+      cohort.mature &&
+      cohort.size >= INFLATION_MIN_COHORT_SIZE &&
+      cohort.w1_retention < INFLATION_LOW_RETENTION_THRESHOLD
+    ) {
       reasons.push(
         `enroll-and-vanish: cohort ${cohort.week} (size ${cohort.size}) has w1_retention ${cohort.w1_retention} < ${INFLATION_LOW_RETENTION_THRESHOLD}`
       );

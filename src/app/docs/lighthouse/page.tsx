@@ -66,7 +66,7 @@ export default function DocsLighthouse() {
     "buckets": { "24h": { "enrolled_agents": 3, "settlements": 41, ... }, "7d": {...}, "30d": {...}, "all": {...} },
     "trend":   { "24h": { "settlements": "growing", ... }, "7d": {...} },
     "persistence": {
-      "cohorts": [{ "week": "2026-W24", "size": 12, "w1_retention": 0.5, "w2_retention": 0.33, "w3_retention": 0.25 }],
+      "cohorts": [{ "week": "2026-W24", "size": 12, "w1_retention": 0.5, "w2_retention": 0.33, "w3_retention": 0.25, "mature": true }],
       "funnel": { "7d": { "enrolled": 40, "evidenced": 18, "receipted": 9, "settled": 6, "returned": 4 } },
       "integrity": { "suspicious": false, "reasons": [] }
     },
@@ -89,7 +89,10 @@ export default function DocsLighthouse() {
             <strong>Cohorts</strong> — each ISO week (UTC) of newly-seen operators, with{" "}
             <code className="font-mono text-xs">w1/w2/w3_retention</code>: the fraction still
             active one, two, three weeks later. A cohort is the week an operator was first seen
-            via a first Agent or Receipt.
+            via a first Agent or Receipt. <code className="font-mono text-xs">mature</code> is
+            false until the week-1 window has fully elapsed — immature cohorts read{" "}
+            <code className="font-mono text-xs">w1_retention: 0</code> by construction and are
+            never used to flag inflation.
           </li>
           <li>
             <strong>Funnel</strong> — <code className="font-mono text-xs">enrolled → evidenced →
@@ -99,8 +102,9 @@ export default function DocsLighthouse() {
           </li>
           <li>
             <strong>Integrity</strong> — flags manufactured adoption: an{" "}
-            <em>enroll-and-vanish</em> cohort (size ≥ 10 with &lt; 10% week-1 retention), or a
-            &gt; 80% never-settled ratio over 7d. When{" "}
+            <em>enroll-and-vanish</em> cohort (mature, size ≥ 10, with &lt; 10% week-1 retention),
+            or a &gt; 80% never-settled ratio over 7d among operators past a 3-day grace (so a
+            network is not libelled the day it grows). When{" "}
             <code className="font-mono text-xs">integrity.suspicious</code> is true the reading is
             never cached.
           </li>

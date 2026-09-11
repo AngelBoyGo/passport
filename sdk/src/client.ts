@@ -12,6 +12,8 @@ export interface PersistenceCohort {
   w1_retention: number;
   w2_retention: number;
   w3_retention: number;
+  /** False until the week-1 retention window has fully elapsed (its w1 value is provisional). */
+  mature: boolean;
 }
 
 export interface PersistenceFunnel {

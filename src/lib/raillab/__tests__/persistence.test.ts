@@ -104,6 +104,15 @@ describe("Proof of Persistence (Phase 28)", () => {
       expect(cohorts[cohorts.length - 1]!.week).toBe(isoWeekKey(NOW));
       expect(cohorts.every((c) => c.size === 0 && c.w1_retention === 0)).toBe(true);
     });
+
+    it("marks the current and previous cohorts immature; older cohorts mature", () => {
+      const cohorts = computePersistence(emptyRows(), NOW);
+      // last two entries are the current and the immediately preceding ISO week
+      expect(cohorts[cohorts.length - 1]!.mature).toBe(false);
+      expect(cohorts[cohorts.length - 2]!.mature).toBe(false);
+      // everything two or more weeks old has a fully-elapsed w1 window
+      expect(cohorts.slice(0, cohorts.length - 2).every((c) => c.mature)).toBe(true);
+    });
   });
 
   describe("conversion funnel (c)", () => {
@@ -168,14 +177,41 @@ describe("Proof of Persistence (Phase 28)", () => {
       expect(report.reasons).toEqual([]);
     });
 
+    it("does NOT flag an immature (current-week) cohort even at size, because w1 has not elapsed", () => {
+      // 10 operators enrolled THIS week, each already settled (so the never-settled check is
+      // silenced). Their w1 window is in the future, so they must not be labelled vanish.
+      const rows = emptyRows();
+      const nowMs = NOW.getTime();
+      for (let i = 0; i < INFLATION_MIN_COHORT_SIZE; i++) {
+        rows.agents.push(agentRow(nowMs - 3600_000, `op${i}`, `a${i}`));
+        rows.rails.push(railRow(`rail-${i}`, `op${i}`, true, nowMs - 3600_000));
+        rows.settlements.push(settlementRow(nowMs - 1800_000, `rail-${i}`));
+      }
+      const report = detectInflation(rows, NOW);
+      expect(report.reasons.join(" ")).not.toContain("enroll-and-vanish");
+      expect(report.suspicious).toBe(false);
+    });
+
     it("flags a never-settled ratio over 7d once the sample is large enough", () => {
       const rows = emptyRows();
+      // 10 operators first seen 4 days ago (past the 3-day grace) who never settled.
       for (let i = 0; i < INFLATION_MIN_SAMPLE; i++) {
-        rows.agents.push(agentRow(NOW.getTime() - 2 * DAY, `new${i}`, `na${i}`));
+        rows.agents.push(agentRow(NOW.getTime() - 4 * DAY, `new${i}`, `na${i}`));
       }
       const report = detectInflation(rows, NOW);
       expect(report.suspicious).toBe(true);
       expect(report.reasons.join(" ")).toContain("never-settled");
+    });
+
+    it("does NOT flag fresh enrollments still inside the settlement grace period", () => {
+      const rows = emptyRows();
+      // Same count, but enrolled < 3 days ago → not yet expected to have settled.
+      for (let i = 0; i < INFLATION_MIN_SAMPLE; i++) {
+        rows.agents.push(agentRow(NOW.getTime() - 12 * 3600_000, `fresh${i}`, `fa${i}`));
+      }
+      const report = detectInflation(rows, NOW);
+      expect(report.reasons.join(" ")).not.toContain("never-settled");
+      expect(report.suspicious).toBe(false);
     });
   });
 
