@@ -64,6 +64,15 @@
 - GET  /api/v1/raillab/console                     — Trust Console aggregate (ISSUER key; severity OK/WARNING/SEVERE)
 - Docs: https://passport.metis.gold/docs/trust-console
 
+## Adoption Lighthouse (organic uptake — level + trend, signed)
+- GET  /api/v1/raillab/lighthouse                  — signed organic-adoption barometer (ISSUER key)
+  Buckets 24h/7d/30d/all: enrolled_agents, evidence_events, receipts, settlements, enabled_rails,
+  distinct_operator_prefixes; 24h & 7d trends (growing|flat|falling). Self-generated rows are
+  excluded via documented markers (`adopt-`, `adopt-canary-`, `smoke:`). Degrades with 200 +
+  `degraded:true` instead of hiding data. Verify offline: sha256(canonicalJson(body minus
+  `snapshot`)) then ed25519 against `snapshot.public_key`.
+- Docs: https://passport.metis.gold/docs/lighthouse
+
 ## Live adoption proof runbook (run the palette yourself)
 - Runbook: /scripts/adoption-loop (npm run smoke:adoption) — enrolls an agent, posts signed
   evidence, issues+finalizes a receipt, provisions a dry-run-safe canary rail and settles it via

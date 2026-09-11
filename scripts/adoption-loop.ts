@@ -408,9 +408,11 @@ export async function runAdoptionLoop(
           public_key: agent.publicKeyHex,
           challenge_nonce: String(challenge.challenge_nonce),
           pow_nonce: powNonce,
-          signature: proofSignature,
+          signature:           proofSignature,
           display_name: `adoption-loop-${runId}`,
-          domain: "CODE_GENERATION",
+          // Marker-bearing domain so the Adoption Lighthouse's organic filter excludes this
+          // self-generated agent (markers: `adopt-`, `adopt-canary-`, `smoke:`).
+          domain: "adopt-loop",
         },
       }),
       "provision"
@@ -434,11 +436,13 @@ export async function runAdoptionLoop(
   // ── Step b: post signed evidence ──
   const evidencePayload: Record<string, unknown> = {
     ref: "refs/heads/main",
-    repository: { full_name: `sahel/adoption-loop-${runId}`, html_url: `${cfg.baseUrl}/docs/trust-console` },
+    repository: { full_name: `sahel/adopt-loop-${runId}`, html_url: `${cfg.baseUrl}/adopt-loop/${runId}` },
     head_commit: {
       id: `deadbeef${"0".repeat(36)}`,
       message: `adoption loop evidence ${runId}`,
-      url: `${cfg.baseUrl}/docs/trust-console`,
+      // Marker-bearing URL is persisted as `sourceUrl`, so the Adoption Lighthouse's organic
+      // filter excludes this self-generated evidence event.
+      url: `${cfg.baseUrl}/adopt-loop/${runId}`,
     },
   };
   const { signature: evidenceSignature, digest: evidenceDigest } = signEvidencePayload(
@@ -490,7 +494,9 @@ export async function runAdoptionLoop(
           agent_id: commitment,
           receipt_type: "competence",
           input_digest: report.evidence_event_hash ?? sha256Hex(`adoption-loop-${runId}`),
-          authority_scope: "adoption-loop-proof",
+          // Marker-bearing scope so the Adoption Lighthouse's organic filter excludes this
+          // self-generated receipt.
+          authority_scope: "adopt-loop-proof",
           expiry: new Date(Date.now() + 30 * 86400_000).toISOString(),
           domain: "SYSTEM_INTEGRATION",
         },

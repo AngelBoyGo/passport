@@ -14,6 +14,7 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
           <DocLink href="/docs/integrations">Integrations</DocLink>
           <DocLink href="/docs/sdk">SDK (free & open-source)</DocLink>
           <DocLink href="/docs/trust-console">Trust Console</DocLink>
+          <DocLink href="/docs/lighthouse">Adoption Lighthouse</DocLink>
         </nav>
       </aside>
       <article className="min-w-0 flex-1 md:pl-12">{children}</article>

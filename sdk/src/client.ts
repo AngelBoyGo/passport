@@ -1741,6 +1741,60 @@ export class PassportClient {
     return this.parseJsonResponse(response);
   }
 
+  /**
+   * Purview: Adoption Lighthouse — a signed, organic-only barometer of external adoption
+   * (level + 24h/7d trend), excluding self-generated rows (smoke harnesses, the adoption proof
+   * loop). Degrades gracefully rather than hiding data. ISSUER key required.
+   */
+  async getLighthouse(): Promise<{
+    success: boolean;
+    lighthouse: {
+      buckets: Record<
+        "24h" | "7d" | "30d" | "all",
+        {
+          enrolled_agents: number;
+          evidence_events: number;
+          receipts: number;
+          settlements: number;
+          enabled_rails: number;
+          distinct_operator_prefixes: number;
+        }
+      >;
+      trend: Record<
+        "24h" | "7d",
+        Record<
+          | "enrolled_agents"
+          | "evidence_events"
+          | "receipts"
+          | "settlements"
+          | "enabled_rails"
+          | "distinct_operator_prefixes",
+          "growing" | "flat" | "falling"
+        >
+      >;
+      excluded_markers: string[];
+      organic_only: true;
+      generated_at: string;
+      degraded: boolean;
+      degraded_reasons: string[];
+    };
+    verify_instructions: string;
+    snapshot: {
+      content_hash: string;
+      signature: string;
+      public_key: string;
+      algorithm: "ed25519";
+    };
+  }> {
+    const headers: Record<string, string> = { Accept: "application/json" };
+    if (this.apiKey) headers.Authorization = `Bearer ${this.apiKey}`;
+    const response = await fetchWithRetry(
+      `${this.baseUrl}/api/v1/raillab/lighthouse`,
+      { method: "GET", headers }
+    );
+    return this.parseJsonResponse(response);
+  }
+
   private async parseJsonResponse<T>(response: Response): Promise<T> {
     const body = await response.json().catch(() => ({}));
     if (!response.ok) {
