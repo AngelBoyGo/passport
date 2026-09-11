@@ -165,11 +165,22 @@ export async function respondToBreach(
     };
   }
 
-  // a. Durable halt (atomic tripwire): only flips false->true when not already halted.
+  // a. Durable halt (atomic tripwire). Use an UPSERT with a guarded update so:
+//    - the very FIRST breach CREATES the flag row (a plain updateMany would silently affect
+//      0 rows and leave the interlock dead), and
+//    - a concurrent flip (already halted) is a 0-row update, NOT an error (P2025 would throw).
   if (classification.haltLive) {
-    await prisma.executionSafetyFlag.updateMany({
-      where: { id: SAFETY_FLAG_ID, liveExecutionHalted: false },
-      data: {
+    await prisma.executionSafetyFlag.upsert({
+      where: { id: SAFETY_FLAG_ID },
+      create: {
+        id: SAFETY_FLAG_ID,
+        liveExecutionHalted: true,
+        haltedAt: new Date(),
+        reason: status.issues.slice(0, 5).join(" | ") || "integrity breach",
+        causedByAttestationId,
+        version: 1,
+      },
+      update: {
         liveExecutionHalted: true,
         haltedAt: new Date(),
         reason: status.issues.slice(0, 5).join(" | ") || "integrity breach",

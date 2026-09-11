@@ -6,7 +6,7 @@ import { canonicalJson } from "@/lib/receipt/canonical";
 const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
     integrityAttestation: { findFirst: vi.fn(), findUnique: vi.fn(), create: vi.fn(), count: vi.fn(), findMany: vi.fn() },
-    executionSafetyFlag: { findUnique: vi.fn(), updateMany: vi.fn(), update: vi.fn() },
+    executionSafetyFlag: { findUnique: vi.fn(), updateMany: vi.fn(), update: vi.fn(), upsert: vi.fn(), create: vi.fn() },
     railSignerKey: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
     breachResponse: { findUnique: vi.fn(), create: vi.fn(), findMany: vi.fn() },
     railSpec: { findUnique: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() },
@@ -110,6 +110,7 @@ describe("Verifiable Breach Response & Execution Safety Interlock (Phase 24)", (
   describe("respondToBreach", () => {
     it("sets the durable halt + emits a signed, chained response (idempotent per attestation)", async () => {
       prismaMock.breachResponse.findUnique.mockResolvedValue(null);
+      prismaMock.executionSafetyFlag.upsert.mockResolvedValue({});
       prismaMock.executionSafetyFlag.updateMany.mockResolvedValue({ count: 1 });
       prismaMock.railSpec.findMany.mockResolvedValue([]); // no rails to quarantine (supply breach -> none)
       prismaMock.integrityAttestation.findUnique.mockResolvedValue({ attestationHash: "hash-prev" });
@@ -121,12 +122,7 @@ describe("Verifiable Breach Response & Execution Safety Interlock (Phase 24)", (
       expect(resp.halted).toBe(true);
       expect(resp.causedByAttestationId).toBe("attest_breach_1");
       expect(resp.signature).toBeTruthy();
-      expect(prismaMock.executionSafetyFlag.updateMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({ id: "global", liveExecutionHalted: false }),
-          data: expect.objectContaining({ liveExecutionHalted: true }),
-        })
-      );
+      expect(prismaMock.executionSafetyFlag.upsert).toHaveBeenCalled();
       // Chained + persisted.
       expect(prismaMock.breachResponse.create).toHaveBeenCalled();
       expect(resp.prevAttestationHash).toBe("hash-prev");
@@ -154,6 +150,7 @@ describe("Verifiable Breach Response & Execution Safety Interlock (Phase 24)", (
 
     it("quarantines ENABLED rails of matching kinds atomically", async () => {
       prismaMock.breachResponse.findUnique.mockResolvedValue(null);
+      prismaMock.executionSafetyFlag.upsert.mockResolvedValue({});
       prismaMock.executionSafetyFlag.updateMany.mockResolvedValue({ count: 1 });
       prismaMock.railSpec.findMany.mockResolvedValue([
         { id: "s_frac", railKey: "rail-frac", ledgerKind: "FRACTIONAL", version: 1, state: "ENABLED" },
@@ -170,6 +167,29 @@ describe("Verifiable Breach Response & Execution Safety Interlock (Phase 24)", (
       expect(resp.quarantinedRails).toContain("rail-frac");
       expect(prismaMock.railSpec.findMany).toHaveBeenCalled(); // envelope: both kinds
     });
+
+    it("CREATES the safety-flag row on the FIRST-ever breach (regression: updateMany-on-missing-row was a silent no-op)", async () => {
+      prismaMock.breachResponse.findUnique.mockResolvedValue(null);
+      prismaMock.railSpec.findMany.mockResolvedValue([]);
+      prismaMock.integrityAttestation.findUnique.mockResolvedValue({ attestationHash: "p" });
+      prismaMock.breachResponse.create.mockResolvedValue({ id: "br_first" });
+
+      // The halt must go through UPSERT (create-if-absent), so the very FIRST breach sets the
+      // interlock. A plain updateMany on a non-existent row would affect 0 rows and leave the
+      // hard-stop dead (the bug this regression guards).
+      const upsertMock = vi.fn().mockResolvedValue({ id: "global", liveExecutionHalted: true });
+      prismaMock.executionSafetyFlag.upsert.mockImplementation(upsertMock);
+
+      const resp = await respondToBreach(statusWith({ supply: false }), "attest_first");
+
+      expect(resp.halted).toBe(true);
+      expect(upsertMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: "global" },
+          create: expect.objectContaining({ id: "global", liveExecutionHalted: true }),
+        })
+      );
+    });
   });
 
   describe("verifyBreachResponse", () => {
@@ -180,7 +200,7 @@ describe("Verifiable Breach Response & Execution Safety Interlock (Phase 24)", (
       // Can't easily call signBreachResponse (internal), so build + sign manually via a public path:
       // We instead verify a response produced by respondToBreach is valid (end-to-end).
       prismaMock.breachResponse.findUnique.mockResolvedValue(null);
-      prismaMock.executionSafetyFlag.updateMany.mockResolvedValue({ count: 1 });
+      prismaMock.executionSafetyFlag.upsert.mockResolvedValue({});
       prismaMock.railSpec.findMany.mockResolvedValue([]);
       prismaMock.integrityAttestation.findUnique.mockResolvedValue({ attestationHash: "p" });
       prismaMock.breachResponse.create.mockResolvedValue({ id: "br3" });
