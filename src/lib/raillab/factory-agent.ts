@@ -449,3 +449,76 @@ export function canonicalSpecShape(spec: RailSpecShape): string {
     feeBps: spec.feeBps,
   });
 }
+
+// ── Adoption canary provisioning (Phase 26) ──
+
+/**
+ * Provisions an ENABLED ANGEL rail that the CALLER owns for the adoption proof loop.
+ *
+ * The canary is dry-run-safe by construction: it carries NO `endpoints.sandboxUrl`, so
+ * `canExecuteLive` is always false and no settlement can move real money (the executor
+ * stays in dry-run). Idempotent on `railKey`: a second provision attempt returns the
+ * existing ENABLED rail instead of minting a duplicate.
+ */
+export async function provisionAdoptionCanary(input: {
+  railKey: string;
+  name: string;
+  category: string;
+  providerKey: string;
+  kycTier: string;
+  feeBps: number;
+  signerCommitment: string;
+  authorizedBy: string;
+}): Promise<{ id: string; railKey: string; state: string }> {
+  if (!/^[0-9a-f]{64}$/i.test(input.signerCommitment)) {
+    throw new Error("signer_commitment must be a 64-hex Ed25519 public key");
+  }
+  if (!input.authorizedBy || input.authorizedBy.trim().length === 0) {
+    throw new Error("authorizedBy is required to provision a canary rail");
+  }
+
+  const existing = await prisma.railSpec.findUnique({ where: { railKey: input.railKey } });
+  if (existing) {
+    if (existing.state !== "ENABLED") {
+      throw new Error(
+        `Canary rail '${input.railKey}' already exists in state ${existing.state}; keep or retire it before re-provisioning`
+      );
+    }
+    return { id: existing.id, railKey: existing.railKey, state: existing.state };
+  }
+
+  const spec = await prisma.railSpec.create({
+    data: {
+      railKey: input.railKey,
+      name: input.name,
+      category: input.category,
+      providerKey: input.providerKey,
+      ledgerKind: "ANGEL",
+      kycTier: input.kycTier,
+      feeBps: input.feeBps,
+      idempotencyKeyPath: "external_reference",
+      authorCommitment: input.authorizedBy,
+      state: "PROPOSED",
+    },
+  });
+
+  await provisionSpec(spec.id);
+  await smokeTestSpec(spec.id);
+  await enableRailSpec(spec.id, input.authorizedBy);
+  await prisma.railSpec.update({
+    where: { id: spec.id },
+    data: { signerCommitment: input.signerCommitment.toLowerCase() },
+  });
+  await prisma.adminAuditLog
+    .create({
+      data: {
+        operatorId: input.authorizedBy,
+        action: "raillab_adoption_canary",
+        targetId: spec.id,
+        details: JSON.stringify({ railKey: input.railKey }),
+      },
+    })
+    .catch(() => null);
+
+  return { id: spec.id, railKey: spec.railKey, state: "ENABLED" };
+}

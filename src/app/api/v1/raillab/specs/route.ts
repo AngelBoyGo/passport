@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit, clientIpFromRequest, rateLimitResponse } from "@/lib/rateLimit";
+import { authenticateApiKey } from "@/lib/operator";
+import { provisionAdoptionCanary } from "@/lib/raillab/factory-agent";
 import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -55,4 +57,76 @@ export async function GET(request: NextRequest) {
       },
     }
   );
+}
+
+/**
+ * POST /api/v1/raillab/specs — provision an ENABLED, caller-owned adoption canary rail.
+ *
+ * The Phase-26 adoption proof loop needs a rail it can settle with a signature it controls.
+ * This ISSUER-only route provisions such a rail (idempotent on rail_key): the canary is
+ * dry-run-safe by construction (no sandbox endpoint → canExecuteLive=false), so the caller
+ * proves the full /settle signature-gated flow WITHOUT any rail ever moving live money.
+ */
+export async function POST(request: NextRequest) {
+  const ip = clientIpFromRequest(request.headers);
+  const rate = await checkRateLimit(`raillab:specs:post:${ip}`, 15, 60_000);
+  if (!rate.allowed) {
+    return NextResponse.json({ error: "Rate limit exceeded" }, rateLimitResponse(rate, 15));
+  }
+
+  const operator = await authenticateApiKey(request.headers.get("authorization"));
+  if (!operator || operator.apiKeyRole === "HOLDER") {
+    return NextResponse.json(
+      { error: "Unauthorized: ISSUER key required" },
+      { status: 401 }
+    );
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json();
+  } catch {
+    body = {};
+  }
+
+  const railKey = String(body.rail_key || body.railKey || "").trim();
+  const name = String(body.name || "Adoption Canary").trim();
+  const category = String(body.category || "PAYMENT").toUpperCase();
+  const providerKey = String(body.provider_key || body.providerKey || "agent_api").toLowerCase();
+  const kycTier = String(body.kyc_tier || body.kycTier || "NONE").toUpperCase();
+  const feeBps = Math.max(0, Number(body.fee_bps ?? body.feeBps ?? 0));
+  const signerCommitment = String(body.signer_commitment || body.signerCommitment || "").trim().toLowerCase();
+
+  if (!railKey || !/^[a-z0-9._-]{1,64}$/i.test(railKey)) {
+    return NextResponse.json(
+      { error: "rail_key must be a simple railway slug (letters/digits/._-)" },
+      { status: 400 }
+    );
+  }
+  if (!signerCommitment || !/^[0-9a-f]{64}$/i.test(signerCommitment)) {
+    return NextResponse.json(
+      { error: "signer_commitment must be a 64-hex Ed25519 public key the caller holds the private key for" },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const result = await provisionAdoptionCanary({
+      railKey,
+      name,
+      category,
+      providerKey,
+      kycTier,
+      feeBps,
+      signerCommitment,
+      authorizedBy: operator.id,
+    });
+    return NextResponse.json(
+      { success: true, id: result.id, rail_key: result.railKey, state: result.state },
+      { status: 200 }
+    );
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
 }

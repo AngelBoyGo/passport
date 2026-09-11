@@ -64,6 +64,15 @@
 - GET  /api/v1/raillab/console                     — Trust Console aggregate (ISSUER key; severity OK/WARNING/SEVERE)
 - Docs: https://passport.metis.gold/docs/trust-console
 
+## Live adoption proof runbook (run the palette yourself)
+- Runbook: /scripts/adoption-loop (npm run smoke:adoption) — enrolls an agent, posts signed
+  evidence, issues+finalizes a receipt, provisions a dry-run-safe canary rail and settles it via
+  the signature-gated webhook, reads the Trust Console, offline-verifies the latest integrity
+  attestation hash+signature, and proves tamper-rejection. Exits 0 iff every trust invariant holds.
+- Usage: scripts/README-smoke.md (BASE_URL + API_KEY env; optional SCHEDULER_SECRET, --cron flag).
+- The proof is machine-readable JSON: { ok, steps[], attestation_verified, tamper_rejected,
+  console_severity } — run it yourselves, don't take our word for it.
+
 ## TypeScript quickstart
 ```bash
 npm install @passport7/sdk

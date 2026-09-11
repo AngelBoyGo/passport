@@ -175,6 +175,8 @@ export async function buildAgentCard(baseUrl: string): Promise<Record<string, un
       { type: "sdk", url: "https://www.npmjs.com/package/@passport7/sdk" },
       { type: "api", url: `${baseUrl}/api/v1/public-key` },
       { type: "api", url: `${baseUrl}/api/health` },
+      { type: "runbook", url: `${baseUrl}/scripts/adoption-loop`, description: "live adoption proof runbook" },
+      { type: "runbook", url: `${baseUrl}/scripts/README-smoke.md`, description: "smoke harness usage" },
     ],
   };
 }

@@ -42,6 +42,7 @@ import {
   computeStructuralSimilarity,
   generalizeAndAutomateRunbook,
   proposeSpecFromCandidate,
+  provisionAdoptionCanary,
   enableRailSpec,
   quarantineRailSpec,
   autoQuarantineFailingRails,
@@ -381,6 +382,101 @@ describe("Autonomous Rail Factory (Phase 19)", () => {
           data: { state: "QUARANTINED", version: { increment: 1 } },
         })
       );
+    });
+  });
+
+  describe("adoption canary provisioning (Phase 26)", () => {
+    const SIGNER = "a".repeat(64);
+
+    it("creates PROPOSED → PROVISIONED → SMOKE_TESTED → ENABLED and sets the canary signer", async () => {
+      const specShape = { id: "s1", railKey: "adopt-x", state: "PROPOSED", version: 1, providerKey: "agent_api", ledgerKind: "ANGEL" };
+      // sequence: provisionAdoptionCanary initial existence check (null) → provisionSpec re-read
+      // (the created spec) → enableRailSpec re-read (the spec)
+      prismaMock.railSpec.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValue(specShape);
+      prismaMock.railSpec.create.mockResolvedValue(specShape);
+      prismaMock.railSpec.update.mockResolvedValue({});
+      // state transitions: PROVISIONED + SMOKE_TESTED (called via transitionRailState → updateMany)
+      prismaMock.railSpec.updateMany.mockResolvedValue({ count: 1 });
+      prismaMock.railSpec.findMany.mockResolvedValue([]); // smoke ladder read-backs
+      prismaMock.adminAuditLog.create.mockResolvedValue({});
+
+      const result = await provisionAdoptionCanary({
+        railKey: "adopt-x",
+        name: "Adoption Canary",
+        category: "PAYMENT",
+        providerKey: "agent_api",
+        kycTier: "NONE",
+        feeBps: 0,
+        signerCommitment: SIGNER,
+        authorizedBy: "op_1",
+      });
+
+      expect(result.state).toBe("ENABLED");
+      // enableRailSpec audit + canary audit
+      expect(prismaMock.adminAuditLog.create).toHaveBeenCalledTimes(2);
+      // signer was persisted below-case
+      expect(prismaMock.railSpec.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: "s1" },
+          data: { signerCommitment: SIGNER },
+        })
+      );
+    });
+
+    it("is idempotent: returns an already-ENABLED canary without re-provisioning", async () => {
+      prismaMock.railSpec.findUnique.mockResolvedValue({
+        id: "s1",
+        railKey: "adopt-x",
+        state: "ENABLED",
+      });
+      const result = await provisionAdoptionCanary({
+        railKey: "adopt-x",
+        name: "Adoption Canary",
+        category: "PAYMENT",
+        providerKey: "agent_api",
+        kycTier: "NONE",
+        feeBps: 0,
+        signerCommitment: SIGNER,
+        authorizedBy: "op_1",
+      });
+      expect(result.id).toBe("s1");
+      expect(prismaMock.railSpec.create).not.toHaveBeenCalled();
+    });
+
+    it("refuses a non-ENABLED preexisting rail and a bad signer commitment", async () => {
+      prismaMock.railSpec.findUnique.mockResolvedValue({
+        id: "s1",
+        railKey: "adopt-x",
+        state: "QUARANTINED",
+      });
+      await expect(
+        provisionAdoptionCanary({
+          railKey: "adopt-x",
+          name: "x",
+          category: "PAYMENT",
+          providerKey: "agent_api",
+          kycTier: "NONE",
+          feeBps: 0,
+          signerCommitment: SIGNER,
+          authorizedBy: "op_1",
+        })
+      ).rejects.toThrow(/already exists in state QUARANTINED/);
+
+      prismaMock.railSpec.findUnique.mockResolvedValue(null);
+      await expect(
+        provisionAdoptionCanary({
+          railKey: "adopt-x",
+          name: "x",
+          category: "PAYMENT",
+          providerKey: "agent_api",
+          kycTier: "NONE",
+          feeBps: 0,
+          signerCommitment: "not-hex",
+          authorizedBy: "op_1",
+        })
+      ).rejects.toThrow(/signer_commitment must be a 64-hex/);
     });
   });
 });

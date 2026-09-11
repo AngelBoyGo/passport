@@ -36,7 +36,9 @@ export async function GET(request: NextRequest) {
         prev_attestation_hash: row.prevAttestationHash,
         attestation_hash: row.attestationHash,
         signature: row.signature,
-        public_key: undefined,
+        // The key that actually signed this attestation (rotation-safe offline verify).
+        // Null on legacy rows created before the publicKey column.
+        public_key: row.publicKey,
         algorithm: row.algorithm,
       },
     },
