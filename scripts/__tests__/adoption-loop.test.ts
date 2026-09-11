@@ -175,14 +175,23 @@ function happyHandler(attestation: AttestationFixture): Handler {
         };
       case path === "/api/v1/receipts/rec_test_0001/finalize" && init.method === "POST":
         return { status: 200, json: { receipt_id: "rec_test_0001", status: "success" } };
+      case path === "/api/v1/receipts/monetary":
+        return {
+          status: 200,
+          json: {
+            public_key: bytesToHex(getPublicForTest()),
+            receipt: { epoch: 1, P: 1, S: 0, R: 0 },
+          },
+        };
       case path === "/api/v1/receipts/rec_test_0001/public-manifest":
         return {
           status: 200,
           json: {
             receipt_id: "rec_test_0001",
+            // Real server contract: NO public_key on the manifest — the verifier must fetch
+            // the passport public key from /receipts/monetary instead.
             commitment_hash: sha256Hex("manifest-content"),
             signature: bytesToHex(sign(utf8ToBytes(sha256Hex("manifest-content")), secretForTest())),
-            public_key: bytesToHex(getPublicForTest()),
             verification_status: "verified",
           },
         };
@@ -255,7 +264,7 @@ describe("adoption-loop runbook", () => {
     expect(report.enroll_commitment).toMatch(/^[0-9a-f]{64}$/i);
     expect(report.evidence_event_hash).toMatch(/^[0-9a-f]{64}$/i);
     expect(report.receipt_manifest_verified).toBe(true);
-    expect(report.rail_key).toBe(`adopt-${cfg.runId}`);
+    expect(report.rail_key).toBe(`adopt-canary-${sha256Hex(API_KEY).slice(0, 16)}`);
     expect(report.settle_status).toBe("SETTLED");
     expect(report.console_severity).toBe("OK");
     expect(report.attestation_verified).toBe(true);
@@ -317,24 +326,29 @@ describe("adoption-loop runbook", () => {
     expect(report.attestation_verified).toBe(true);
   });
 
-  it("idempotent re-run: same runId reuses the same rail + references (no duplicates)", async () => {
+  it("idempotent re-run: DIFFERENT runIds reuse the SAME canary rail (no duplicate rails)", async () => {
     const attestation = await signedAttestation();
     const { fetchImpl, calls: calls1 } = dispatchFetch(happyHandler(attestation));
     const first = await runAdoptionLoop({ ...cfg, fetchImpl }, {});
     const { fetchImpl: fetchImpl2, calls: calls2 } = dispatchFetch(happyHandler(attestation));
-    const second = await runAdoptionLoop({ ...cfg, fetchImpl: fetchImpl2 }, {});
+    const second = await runAdoptionLoop(
+      { ...cfg, runId: "20260911130000-abcdef02", fetchImpl: fetchImpl2 },
+      {}
+    );
     expect(first.ok).toBe(true);
     expect(second.ok).toBe(true);
-    expect(first.run_id).toBe(second.run_id);
-    // The canary rail + settlement reference are run-tagged and deterministic.
+    expect(first.run_id).not.toBe(second.run_id);
+    // The canary rail is scoped to the OPERATOR (not the run): re-runs reuse it, so the
+    // deployment never accumulates duplicate canary rails across runs.
     expect(first.rail_key).toBe(second.rail_key);
-    expect(first.rail_key).toContain(cfg.runId!);
+    expect(first.rail_key).toContain("adopt-canary-");
+    // Settlement references stay run-unique → idempotent on (railKey, reference).
     const settleRefs1 = calls1.filter((c) => c.url.endsWith("/api/v1/raillab/settle"));
     const settleRefs2 = calls2.filter((c) => c.url.endsWith("/api/v1/raillab/settle"));
     expect(settleRefs1.length).toBe(1);
     expect(settleRefs2.length).toBe(1);
     const toRef = (init: RequestInit) => JSON.parse(init.body as string).reference as string;
-    expect(toRef(settleRefs1[0]!.init)).toBe(toRef(settleRefs2[0]!.init));
+    expect(toRef(settleRefs1[0]!.init)).not.toBe(toRef(settleRefs2[0]!.init));
   });
 
   it("--cron runs discover + tick before the loop", async () => {

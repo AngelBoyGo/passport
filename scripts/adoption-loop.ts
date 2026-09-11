@@ -57,6 +57,21 @@ export function newKeypair(): { secretKeyHex: string; publicKeyHex: string; secr
   };
 }
 
+/**
+ * Deterministic Ed25519 keypair from a 64-hex seed. Used for the canary signer so it is
+ * STABLE across runs: re-runs derive the same keypair → the settlement signature always
+ * matches the signer committed on the reused canary rail (idempotent, no duplicate mint).
+ */
+export function keypairFromSeed(seedHex: string): { secretKeyHex: string; publicKeyHex: string; secretKey: Uint8Array } {
+  const seed = hexToBytes(seedHex.slice(0, 64).padEnd(64, "0"));
+  const { secretKey, publicKey } = keygen(seed);
+  return {
+    secretKeyHex: bytesToHex(secretKey),
+    publicKeyHex: bytesToHex(publicKey),
+    secretKey,
+  };
+}
+
 /** Mirrors hashIntegrityAttestation's canonical body exactly (snake_case keys, sorted). */
 export function hashIntegrityAttestation(body: {
   attestationId: string;
@@ -508,12 +523,20 @@ export async function runAdoptionLoop(
     );
     const contentHash = String(manifest.commitment_hash ?? "");
     const sig = String(manifest.signature ?? "");
-    const pub = String(manifest.public_key ?? "");
     if (!/^[0-9a-f]{64}$/i.test(contentHash) || !/^[0-9a-f]{128}$/i.test(sig)) {
       throw new AdoptionLoopError("public-manifest missing commitment_hash/signature");
     }
-    if (!pub || !/^[0-9a-f]{64}$/i.test(pub)) {
-      throw new AdoptionLoopError("public-manifest missing a 64-hex public_key");
+
+    // The manifest carries the issuer's signing key under 64-hex `signature` + `commitment_hash`
+    // but NOT the verifying public key. Fetch the canonical passport public key from the
+    // monetary receipt endpoint — the SAME signing key signs receipts — then verify offline.
+    const monetary = expectOk(
+      await request(cfg, "GET", "/api/v1/receipts/monetary", {}),
+      "monetary receipt (public key source)"
+    );
+    const pub = String(monetary.public_key ?? "");
+    if (!/^[0-9a-f]{64}$/i.test(pub)) {
+      throw new AdoptionLoopError("monetary receipt did not expose a 64-hex public_key");
     }
     manifestVerified = await verify(
       hexToBytes(sig),
@@ -527,7 +550,7 @@ export async function runAdoptionLoop(
     record(
       "receipt",
       true,
-      `receipt ${receiptId} issued+finalized; manifest Ed25519 verified offline`
+      `receipt ${receiptId} issued+finalized; manifest Ed25519 verified offline (${pub.slice(0, 12)}…)`
     );
   } catch (err) {
     record(
@@ -538,14 +561,19 @@ export async function runAdoptionLoop(
   }
 
   // ── Step d: provision canary rail + settle (signature-gated) ──
-  const canaryKeypair = newKeypair();
-  const railKey = `adopt-${runId}`;
+  // The canary is scoped to the operator (stable rail + stable signer key), so re-runs NEVER
+  // mint duplicate rails or settlement identities — they reuse the single existing canary and
+  // only mint fresh run-tagged settlement references. Idempotent on the HTTP + DB layers.
+  const canarySeed = sha256Hex(`adoption-canary-v1:${cfg.apiKey}`);
+  const canaryKeypair = keypairFromSeed(canarySeed);
+  const canaryRailKey = `adopt-canary-${sha256Hex(cfg.apiKey).slice(0, 16)}`;
+  const railKey = canaryRailKey;
   try {
     const spec = expectOk(
       await request(cfg, "POST", "/api/v1/raillab/specs", {
         json: {
           rail_key: railKey,
-          name: `Adoption Canary ${runId}`,
+          name: `Adoption Canary (operator ${sha256Hex(cfg.apiKey).slice(0, 8)})`,
           category: "PAYMENT",
           provider_key: "agent_api",
           ledger_kind: "ANGEL",

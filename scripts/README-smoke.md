@@ -15,7 +15,7 @@ Against a running deployment (`BASE_URL`, `API_KEY` — an ISSUER key — and op
 | ---- | ----------------- | -------------- |
 | enroll | Agent PoW challenge + Ed25519 proof-of-possession | 64-hex subject commitment returned |
 | evidence | Signed evidence ingestion bound to the agent key | event commitment hash returned |
-| receipt | Issue + finalize a receipt; offline verify its Ed25519 | `public-manifest` signature **verifies** offline |
+| receipt | Issue + finalize a receipt; offline verify its Ed25519 | `public-manifest` signature **verifies** offline (against the passport public key from `/receipts/monetary`) |
 | provision_rail | ISSUER provisions a caller-owned canary rail | rail becomes ENABLED (idempotent by `rail_key`) |
 | settle | Signature-gated `/settle` webhook | status is exactly `SETTLED` |
 | console | Trust Console aggregate | severity ∈ {OK, WARNING} |
@@ -45,7 +45,10 @@ npm run smoke:adoption -- --cron
 
 The canary rail is **dry-run safe by construction**: it is provisioned without any sandbox
 endpoint, so `canExecuteLive` is false and the `/settle` it drives never moves real money.
-Every reference is run-tagged (`adopt-<runid>-…`), so repeated runs never mint duplicates.
+The canary identity is **scoped to the operator** (rail key + signer key are derived
+deterministically from `API_KEY`), so re-runs reuse a single canary instead of minting a new
+rail each time — no duplicate rails accumulate. Settlement references are run-tagged
+(`adopt-<runid>-…`), so each run performs a fresh, idempotent-by-reference settlement.
 
 ## The report
 
@@ -59,7 +62,7 @@ Every reference is run-tagged (`adopt-<runid>-…`), so repeated runs never mint
   "evidence_event_hash": "<64-hex>",
   "receipt_id": "rec_...",
   "receipt_manifest_verified": true,
-  "rail_key": "adopt-20260911123000-a1b2c3d4",
+  "rail_key": "adopt-canary-a1b2c3d4e5f60718",
   "settle_status": "SETTLED",
   "settle_live": false,
   "console_severity": "OK",
