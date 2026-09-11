@@ -13,6 +13,7 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
           <p className="mb-2 mt-6 font-semibold text-slate-900">Guides</p>
           <DocLink href="/docs/integrations">Integrations</DocLink>
           <DocLink href="/docs/sdk">SDK (free & open-source)</DocLink>
+          <DocLink href="/docs/trust-console">Trust Console</DocLink>
         </nav>
       </aside>
       <article className="min-w-0 flex-1 md:pl-12">{children}</article>

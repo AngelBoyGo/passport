@@ -57,6 +57,13 @@
 - POST /api/v1/raillab/settle                      — authenticated settlement webhook
 - GET  /api/v1/raillab/overview                    — rail factory KPI board
 
+## Operational status (live trust state — public, poll safely)
+- GET  /api/v1/raillab/health/safety               — execution-safety interlock (halted? never cached)
+- GET  /api/v1/raillab/health/attestations/latest  — latest signed integrity attestation
+- POST /api/v1/raillab/health/attestations/verify  — offline verify (send the full attestation)
+- GET  /api/v1/raillab/console                     — Trust Console aggregate (ISSUER key; severity OK/WARNING/SEVERE)
+- Docs: https://passport.metis.gold/docs/trust-console
+
 ## TypeScript quickstart
 ```bash
 npm install @passport7/sdk

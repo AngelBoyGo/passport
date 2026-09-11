@@ -1679,6 +1679,68 @@ export class PassportClient {
     return this.parseJsonResponse(response);
   }
 
+  /**
+   * Purview: returns the live Execution-Safety interlock state (halted? when? why?).
+   * PUBLIC endpoint — no API key required. Not cached so agents always see the current state.
+   */
+  async getSafetyStatus(): Promise<{
+    success: boolean;
+    safety: {
+      halted: boolean;
+      halted_at: string | null;
+      reason: string | null;
+      caused_by_attestation_id: string | null;
+      version: number;
+    };
+  }> {
+    const response = await fetchWithRetry(
+      `${this.baseUrl}/api/v1/raillab/health/safety`,
+      { method: "GET", headers: { Accept: "application/json" } }
+    );
+    return this.parseJsonResponse(response);
+  }
+
+  /**
+   * Purview: aggregate Operational Trust Console — safety interlock, latest attestation
+   * (offline-verified hash + signature), and rail-health rollup with severity tilt.
+   * Public insight surface; if an API key is set it is forwarded for ISSUER-grade detail.
+   */
+  async getTrustOverview(): Promise<{
+    success: boolean;
+    console: {
+      severity: "OK" | "WARNING" | "SEVERE";
+      safety: {
+        halted: boolean;
+        haltedAt: string | null;
+        reason: string | null;
+        causedByAttestationId: string | null;
+        version: number;
+      };
+      attestation: {
+        verified: boolean;
+        chainOk: boolean;
+        prevLinked: boolean;
+        issues: string[];
+      };
+      rails: {
+        total: number;
+        enabled: number;
+        quarantined: number;
+        velocityAlerts: string[];
+        pendingReviewStale: number;
+      };
+      generatedAt: string;
+    };
+  }> {
+    const headers: Record<string, string> = { Accept: "application/json" };
+    if (this.apiKey) headers.Authorization = `Bearer ${this.apiKey}`;
+    const response = await fetchWithRetry(
+      `${this.baseUrl}/api/v1/raillab/console`,
+      { method: "GET", headers }
+    );
+    return this.parseJsonResponse(response);
+  }
+
   private async parseJsonResponse<T>(response: Response): Promise<T> {
     const body = await response.json().catch(() => ({}));
     if (!response.ok) {
