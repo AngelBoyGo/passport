@@ -468,6 +468,24 @@ model AgentRevenue {
   @@index([agentCommitment])
 }
 
+/// Data-pipeline job submitted by an agent (Phase 35). When external revenue referencing the
+/// job arrives via the revenue bridge, the job is marked SOLD.
+model PipelineJob {
+  id              String    @id @default(cuid())
+  jobId           String    @unique
+  agentCommitment String
+  pipeline        String // e.g. "pdf_to_markdown"
+  inputRef        String
+  outputDigest    String
+  status          String    @default("SUBMITTED") // SUBMITTED | SOLD
+  externalRef     String?   @unique
+  createdAt       DateTime  @default(now())
+  soldAt          DateTime?
+
+  @@index([agentCommitment])
+  @@index([status])
+}
+
 /// Marketplace hire → hold → deliver → accept loop keyed by external task id.
 model Engagement {
   id                   String           @id @default(cuid())

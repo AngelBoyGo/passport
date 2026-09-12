@@ -88,10 +88,14 @@ describe("compute dispute arbitration", () => {
     });
 
     it("resolves RELEASE on a majority at quorum", async () => {
-      prismaMock.computeDisputeVote.findMany.mockResolvedValue([{ vote: "RELEASE" }, { vote: "RELEASE" }, { vote: "REFUND" }]);
+      prismaMock.computeDisputeVote.findMany.mockResolvedValue([{ vote: "RELEASE", jurorCommitment: "j1" }, { vote: "RELEASE", jurorCommitment: "j2" }, { vote: "REFUND", jurorCommitment: "j3" }]);
       const r = await castDisputeVote({ disputeId: DISPUTE, jurorCommitment: JUROR, vote: "RELEASE", signature: voteSig("RELEASE") });
       expect(r).toMatchObject({ ok: true, status: "RESOLVED", resolution: "RELEASE" });
-      expect(marketMock.releaseCompute).toHaveBeenCalledWith(expect.objectContaining({ force: true }));
+      const call = marketMock.releaseCompute.mock.calls[0][0];
+      expect(call.force).toBe(true);
+      // majority (2) rewarded from escrow; minority (1) slashed
+      expect(call.settlement.jurorRewards).toHaveLength(2);
+      expect(call.settlement.slashes).toEqual([{ commitment: "j3", amount: 1 }]);
     });
 
     it("resolves REFUND on a REFUND majority (ties default to REFUND)", async () => {

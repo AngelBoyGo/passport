@@ -260,6 +260,39 @@ export type LifecycleResult =
   | { ok: true; purchaseId: string; status: string }
   | { ok: false; code: string; error: string };
 
+/** Optional juror settlement applied atomically with the escrow payout. */
+export interface EscrowSettlement {
+  /** Rewarded out of the escrow (the recipient nets `total - Σrewards`). */
+  jurorRewards?: { commitment: string; amount: number }[];
+  /** Bond forfeited from a juror's staked balance (bounded; burned, not redistributed). */
+  slashes?: { commitment: string; amount: number }[];
+}
+
+function settlementDeduction(s?: EscrowSettlement): number {
+  return (s?.jurorRewards ?? []).reduce((sum, r) => sum + Math.max(0, Math.floor(r.amount)), 0);
+}
+
+async function applySettlement(
+  tx: { agentWallet: { upsert: (...a: unknown[]) => Promise<unknown>; updateMany: (...a: unknown[]) => Promise<unknown> } },
+  s: EscrowSettlement | undefined
+): Promise<void> {
+  for (const r of s?.jurorRewards ?? []) {
+    if (r.amount <= 0) continue;
+    await tx.agentWallet.upsert({
+      where: { subjectCommitment: r.commitment.toLowerCase() },
+      create: { subjectCommitment: r.commitment.toLowerCase(), balance: r.amount, earnedTotal: r.amount, lastActivityAt: new Date() },
+      update: { balance: { increment: r.amount }, earnedTotal: { increment: r.amount }, lastActivityAt: new Date() },
+    });
+  }
+  for (const b of s?.slashes ?? []) {
+    if (b.amount <= 0) continue;
+    await tx.agentWallet.updateMany({
+      where: { subjectCommitment: b.commitment.toLowerCase(), staked: { gte: b.amount } },
+      data: { staked: { decrement: b.amount } },
+    });
+  }
+}
+
 /** Provider marks a HELD purchase as DELIVERED (optionally with a deliverable digest). */
 export async function deliverCompute(input: {
   purchaseId: string;
@@ -364,6 +397,7 @@ export async function releaseCompute(input: {
   actorCommitment: string;
   isIssuer: boolean;
   force?: boolean;
+  settlement?: EscrowSettlement;
 }): Promise<LifecycleResult> {
   const purchaseId = input.purchaseId.trim();
   const purchase = await prisma.computePurchase.findUnique({ where: { purchaseId } });
@@ -385,20 +419,22 @@ export async function releaseCompute(input: {
         data: { status: "SETTLED" },
       });
       if (upd.count !== 1) throw new Error("INVALID_STATE");
+      const payout = Math.max(0, purchase.totalAngel - settlementDeduction(input.settlement));
       await tx.agentWallet.upsert({
         where: { subjectCommitment: purchase.providerCommitment },
         create: {
           subjectCommitment: purchase.providerCommitment,
-          balance: purchase.totalAngel,
-          earnedTotal: purchase.totalAngel,
+          balance: payout,
+          earnedTotal: payout,
           lastActivityAt: new Date(),
         },
         update: {
-          balance: { increment: purchase.totalAngel },
-          earnedTotal: { increment: purchase.totalAngel },
+          balance: { increment: payout },
+          earnedTotal: { increment: payout },
           lastActivityAt: new Date(),
         },
       });
+      await applySettlement(tx as never, input.settlement);
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "release failed";
@@ -416,6 +452,7 @@ export async function refundCompute(input: {
   actorCommitment: string;
   isIssuer: boolean;
   force?: boolean;
+  settlement?: EscrowSettlement;
 }): Promise<LifecycleResult> {
   const purchaseId = input.purchaseId.trim();
   const purchase = await prisma.computePurchase.findUnique({ where: { purchaseId } });
@@ -437,16 +474,17 @@ export async function refundCompute(input: {
         data: { status: "REFUNDED" },
       });
       if (upd.count !== 1) throw new Error("INVALID_STATE");
+      const payout = Math.max(0, purchase.totalAngel - settlementDeduction(input.settlement));
       await tx.agentWallet.upsert({
         where: { subjectCommitment: purchase.buyerCommitment },
         create: {
           subjectCommitment: purchase.buyerCommitment,
-          balance: purchase.totalAngel,
+          balance: payout,
           earnedTotal: 0,
           lastActivityAt: new Date(),
         },
         update: {
-          balance: { increment: purchase.totalAngel },
+          balance: { increment: payout },
           lastActivityAt: new Date(),
         },
       });
@@ -454,6 +492,7 @@ export async function refundCompute(input: {
         where: { offerId: purchase.offerId },
         data: { remainingUnits: { increment: purchase.units } },
       });
+      await applySettlement(tx as never, input.settlement);
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "refund failed";

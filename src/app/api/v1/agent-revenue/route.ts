@@ -48,6 +48,7 @@ export async function POST(request: NextRequest) {
       externalRef: String(body.external_ref ?? body.externalRef ?? ""),
       grossUsdCents: Number(body.gross_usd_cents ?? body.grossUsdCents),
       signature: request.headers.get("x-revenue-signature") ?? undefined,
+      pipelineJobId: body.pipeline_job_id != null ? String(body.pipeline_job_id) : undefined,
     },
     { trusted }
   );

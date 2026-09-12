@@ -170,6 +170,27 @@ describe("compute marketplace", () => {
     expect(tx.computeOffer.update).toHaveBeenCalled(); // capacity restored
   });
 
+  it("applies a juror settlement: pays provider net, rewards majority, slashes minority", async () => {
+    const tx = txMock();
+    prismaMock.$transaction.mockImplementation(async (fn: (t: unknown) => Promise<unknown>) => fn(tx));
+    prismaMock.computePurchase.findUnique.mockResolvedValue({
+      purchaseId: "p1", offerId: "gpu-hours", buyerCommitment: BUYER, providerCommitment: PROVIDER,
+      units: 3, totalAngel: 30, status: "DELIVERED",
+    });
+    const r = await releaseCompute({
+      purchaseId: "p1", actorCommitment: BUYER, isIssuer: true, force: true,
+      settlement: { jurorRewards: [{ commitment: "j1", amount: 1 }], slashes: [{ commitment: "m1", amount: 1 }] },
+    });
+    expect(r).toMatchObject({ ok: true, status: "SETTLED" });
+    const providerCall = tx.agentWallet.upsert.mock.calls.find(
+      (c: unknown[]) => (c[0] as { where: { subjectCommitment: string } }).where.subjectCommitment === PROVIDER
+    );
+    expect((providerCall![0] as { update: { balance: { increment: number } } }).update.balance.increment).toBe(29);
+    expect(tx.agentWallet.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { subjectCommitment: "m1", staked: { gte: 1 } } })
+    );
+  });
+
   it("only the provider may deliver; only a party may release", async () => {
     prismaMock.computePurchase.findUnique.mockResolvedValue({
       purchaseId: "p1", offerId: "gpu-hours", buyerCommitment: BUYER, providerCommitment: PROVIDER,

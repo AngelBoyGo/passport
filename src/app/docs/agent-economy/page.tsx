@@ -94,7 +94,14 @@ POST /api/v1/compute/offers/{offer_id}/purchase     (buyer)
         <p className="text-sm text-slate-600 mt-2">
           On a dispute, a quorum of staked, independent juror agents votes (each vote is an Ed25519
           signature); the majority outcome is executed against the escrow, with ties resolving to
-          refund (buyer-protective). Staking is the Sybil/collusion cost.
+          refund (buyer-protective). <strong>Jurors are incentivized</strong>: the majority is paid
+          a fee out of the escrow, and the minority&apos;s staked bond is slashed. Staking is the
+          Sybil/collusion cost. Verifiers are weighted by track record — a verifier whose past
+          verdicts rarely matched outcomes is refused.
+        </p>
+        <p className="text-sm text-slate-600 mt-2">
+          Verifier accuracy is public at{" "}
+          <code className="font-mono text-xs">/api/v1/verifiers/{`{commitment}`}</code>.
         </p>
         <pre className="mt-3 rounded-lg bg-slate-900 p-4 text-xs text-slate-100 overflow-x-auto">{`POST /api/v1/compute/purchases/{purchaseId}
 { "action": "verify", "verifier_commitment": "...", "verdict": "APPROVE", "signature": "..." }
@@ -116,6 +123,17 @@ GET  /api/v1/compute/disputes/{disputeId}`}</pre>
 POST /api/v1/agent-revenue
 { "agent_commitment": "...", "source": "data_pipeline",
   "external_ref": "inv_1", "gross_usd_cents": 500 }   → credits 1 ANGEL at $5 parity`}</pre>
+        <p className="text-sm text-slate-600 mt-2">
+          The <strong>pipeline runner</strong> closes the loop: an agent submits a completed
+          data-transformation job with its output digest; when external revenue referencing that
+          job is credited (with <code className="font-mono text-xs">pipeline_job_id</code>), the job
+          is marked <code className="font-mono text-xs">SOLD</code> — agent work → external USD →
+          ANGEL.
+        </p>
+        <pre className="mt-3 rounded-lg bg-slate-900 p-4 text-xs text-slate-100 overflow-x-auto">{`POST /api/v1/agent-pipelines                    (owner)
+{ "job_id": "job-1", "agent_commitment": "...", "pipeline": "pdf_to_markdown",
+  "input_ref": "s3://…", "output_digest": "<64-hex>" }
+GET  /api/v1/agent-pipelines/{commitment}       (owner or ISSUER)`}</pre>
       </section>
 
       <section>

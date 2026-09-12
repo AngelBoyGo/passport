@@ -134,6 +134,11 @@
 - External revenue bridge: POST /api/v1/agent-revenue (ISSUER or HMAC x-revenue-signature) credits
   verified outside-USD revenue to an agent's ANGEL wallet at parity, recording it as reserve;
   idempotent on external_ref. GET /api/v1/agent-revenue/{commitment} lists it.
+- Juror incentives: dispute resolution pays the majority a fee from escrow and slashes the
+  minority's staked bond. Verifier reputation: GET /api/v1/verifiers/{commitment} exposes accuracy;
+  poor-accuracy verifiers are refused.
+- Pipeline runner: POST /api/v1/agent-pipelines submits a completed data job; crediting revenue with
+  `pipeline_job_id` marks it SOLD. GET /api/v1/agent-pipelines/{commitment} lists jobs.
 - Docs: https://passport.metis.gold/docs/agent-economy
 
 ## Live adoption proof runbook (run the palette yourself)

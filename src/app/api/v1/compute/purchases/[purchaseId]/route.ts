@@ -9,6 +9,7 @@ import {
   verifyDelivery,
   type LifecycleResult,
 } from "@/lib/agent-economy/compute-marketplace";
+import { computeVerifierStats, MIN_VERIFIER_SAMPLE } from "@/lib/agent-economy/verifier-reputation";
 
 export const dynamic = "force-dynamic";
 const NO_STORE = { "Cache-Control": "no-store, max-age=0" };
@@ -96,6 +97,21 @@ export async function POST(
     if (!auth.ok) {
       return NextResponse.json({ error: auth.error }, { status: auth.status, headers: NO_STORE });
     }
+
+    // Weight by track record: a verifier with enough history and poor accuracy is rejected.
+    const stats = await computeVerifierStats(verifierCommitment);
+    if (!stats.reliable && stats.resolved >= MIN_VERIFIER_SAMPLE) {
+      return NextResponse.json(
+        {
+          error: "Verifier has a poor accuracy track record",
+          error_code: "low_accuracy",
+          accuracy: stats.accuracy,
+          resolved: stats.resolved,
+        },
+        { status: 403, headers: NO_STORE }
+      );
+    }
+
     const result = await verifyDelivery({
       purchaseId,
       verifierCommitment,

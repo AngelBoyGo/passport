@@ -12,6 +12,7 @@ import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 import { prisma } from "@/lib/db";
 import { PARITY_USD } from "@/lib/monetary/parity";
+import { markJobSold } from "./pipeline";
 
 /** USD cents → whole ANGEL at the current parity anchor. */
 export function usdCentsToAngel(grossUsdCents: number): number {
@@ -60,7 +61,7 @@ export type RevenueResult =
  * Credits verified external revenue to an agent. `trusted` (ISSUER) skips the HMAC check.
  */
 export async function creditExternalRevenue(
-  input: RevenueFields & { signature?: string },
+  input: RevenueFields & { signature?: string; pipelineJobId?: string },
   opts: { trusted: boolean } = { trusted: false }
 ): Promise<RevenueResult> {
   const agentCommitment = input.agentCommitment.toLowerCase();
@@ -133,6 +134,9 @@ export async function creditExternalRevenue(
           metadata: JSON.stringify({ agent_commitment: agentCommitment, source, external_ref: externalRef }),
         },
       });
+      if (input.pipelineJobId) {
+        await markJobSold(tx as never, input.pipelineJobId, externalRef);
+      }
       return created;
     });
 

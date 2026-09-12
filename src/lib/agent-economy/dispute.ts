@@ -15,6 +15,10 @@ import { canonicalJson } from "@/lib/receipt/canonical";
 import { releaseCompute, refundCompute } from "./compute-marketplace";
 
 export const DISPUTE_QUORUM = 3;
+/** ANGEL paid to each majority juror out of the escrowed amount at resolution. */
+export const JUROR_FEE_ANGEL = 1;
+/** ANGEL forfeited from each minority juror's staked bond at resolution. */
+export const JUROR_SLASH_ANGEL = 1;
 
 export type DisputeVote = "RELEASE" | "REFUND";
 
@@ -139,6 +143,14 @@ export async function castDisputeVote(input: {
   const refundVotes = votes.filter((v) => v.vote === "REFUND").length;
   const resolution: DisputeVote = releaseVotes > refundVotes ? "RELEASE" : "REFUND";
 
+  // Juror incentives: reward the majority out of escrow; slash the minority's staked bond.
+  const majority = votes.filter((v) => v.vote === resolution);
+  const minority = votes.filter((v) => v.vote !== resolution);
+  const settlement = {
+    jurorRewards: majority.map((v) => ({ commitment: v.jurorCommitment, amount: JUROR_FEE_ANGEL })),
+    slashes: minority.map((v) => ({ commitment: v.jurorCommitment, amount: JUROR_SLASH_ANGEL })),
+  };
+
   const outcome =
     resolution === "RELEASE"
       ? await releaseCompute({
@@ -146,12 +158,14 @@ export async function castDisputeVote(input: {
           actorCommitment: purchase.buyerCommitment,
           isIssuer: true,
           force: true,
+          settlement,
         })
       : await refundCompute({
           purchaseId: dispute.purchaseId,
           actorCommitment: purchase.buyerCommitment,
           isIssuer: true,
           force: true,
+          settlement,
         });
 
   await prisma.computeDispute.update({
