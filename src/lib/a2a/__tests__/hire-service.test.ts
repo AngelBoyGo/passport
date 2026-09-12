@@ -144,4 +144,32 @@ describe("hireWorker", () => {
     expect(result.success).toBe(false);
     expect(result.error_code).toBe("rate_limited");
   });
+
+  it("12. spend policy denied: over-cap hire is rejected before escrow", async () => {
+    const deps = makeDeps({
+      checkSpendPolicy: vi.fn().mockResolvedValue({
+        allowed: false,
+        reason: "amount 100 exceeds the per-transaction cap of 50 ANGEL",
+      }),
+    });
+    const result = await hireWorker(validInput(), deps);
+    expect(result.success).toBe(false);
+    expect(result.error_code).toBe("spend_policy_denied");
+    expect(deps.checkSpendPolicy).toHaveBeenCalledWith({
+      agentCommitment: HIRER,
+      amount: 100,
+      counterparty: WORKER,
+      domain: "CODE_GENERATION",
+    });
+    expect(deps.createEngagement).not.toHaveBeenCalled();
+  });
+
+  it("13. spend policy allowed: within-cap hire proceeds", async () => {
+    const deps = makeDeps({
+      checkSpendPolicy: vi.fn().mockResolvedValue({ allowed: true }),
+    });
+    const result = await hireWorker(validInput(), deps);
+    expect(result.success).toBe(true);
+    expect(deps.createEngagement).toHaveBeenCalled();
+  });
 });

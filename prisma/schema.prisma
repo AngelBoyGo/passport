@@ -344,6 +344,24 @@ model AgentIntentNonce {
   @@index([expiresAt])
 }
 
+/// Autonomous spend policy (Phase 32): hard caps that let an AI agent transact without a human
+/// approving every payment, while remaining undrainable. `0` means "no cap" for that dimension.
+model AgentSpendPolicy {
+  id                    String   @id @default(cuid())
+  agentCommitment       String   @unique
+  enabled               Boolean  @default(true)
+  perTxMaxAngel         Int      @default(0)
+  dailyMaxAngel         Int      @default(0)
+  weeklyMaxAngel        Int      @default(0)
+  counterpartyAllowlist Json? // array of 64-hex commitments; null/empty = any
+  domainAllowlist       Json? // array of domain strings; null/empty = any
+  updatedBy             String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([enabled])
+}
+
 /// Marketplace hire → hold → deliver → accept loop keyed by external task id.
 model Engagement {
   id                   String           @id @default(cuid())

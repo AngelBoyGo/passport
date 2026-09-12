@@ -22,6 +22,7 @@ export type HireErrorCode =
   | "past_expiry"
   | "rate_limited"
   | "auto_enroll_failed"
+  | "spend_policy_denied"
   | "internal_error";
 
 export interface HireTerms {
@@ -84,6 +85,16 @@ export interface HireServiceDeps {
   autoEnrollWorker: (commitment: string) => Promise<WorkerInfo | null>;
   /** Award referral credits to the hirer for bringing in a new agent. */
   awardReferralCredits: (hirerOperatorId: string, amount: number) => Promise<void>;
+  /**
+   * Autonomous spend policy gate. When provided, an agent may only spend within its caps
+   * (per-tx / rolling day / rolling week) and allowlists. Optional for back-compat callers.
+   */
+  checkSpendPolicy?: (input: {
+    agentCommitment: string;
+    amount: number;
+    counterparty: string;
+    domain: string;
+  }) => Promise<{ allowed: boolean; reason?: string }>;
   logAudit: (operatorId: string, action: string, targetId: string, details: string) => Promise<void>;
   logEvent: (event: Record<string, unknown>) => void;
   isRateLimited: (key: string) => boolean;
@@ -186,6 +197,19 @@ export async function hireWorker(input: HireInput, deps: HireServiceDeps): Promi
     return reject("gate_denied", `Gate pass denied: ${gate.reason || "Unknown reason"}`);
   }
 
+  // 11b. Autonomous spend policy (caps + allowlists). Set once, enforced on every spend.
+  if (deps.checkSpendPolicy) {
+    const decision = await deps.checkSpendPolicy({
+      agentCommitment: input.hirer_commitment,
+      amount: input.terms.amount,
+      counterparty: input.worker_commitment,
+      domain: input.terms.domain,
+    });
+    if (!decision.allowed) {
+      return reject("spend_policy_denied", decision.reason || "Spend policy denied this transaction");
+    }
+  }
+
   // 12. Create engagement (escrow lock)
   let engagement: { taskId: string; status: string };
   try {
@@ -195,11 +219,12 @@ export async function hireWorker(input: HireInput, deps: HireServiceDeps): Promi
       workerCommitment: input.worker_commitment,
       amount: input.terms.amount,
     });
-  } catch (err: any) {
-    if (err.message?.includes?.("DuplicateEngagement") || err.message?.includes?.("already exists")) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes("DuplicateEngagement") || message.includes("already exists")) {
       return reject("duplicate_proposal", `Proposal ${input.proposal_id} has already been processed`);
     }
-    return reject("internal_error", err.message || "Failed to create engagement");
+    return reject("internal_error", message || "Failed to create engagement");
   }
 
   // 13. Audit log

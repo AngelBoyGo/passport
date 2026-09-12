@@ -6,10 +6,9 @@ import { createEngagement } from "@/lib/engagement/engagement-service";
 import { logPassportEvent } from "@/lib/observability/logger";
 import { checkInMemoryRateLimit, clientIpFromRequest } from "@/lib/rateLimit";
 import { hireWorker, type HireServiceDeps, type HireInput } from "@/lib/a2a/hire-service";
+import { checkSpendPolicy as evaluateAgentSpend } from "@/lib/agent-economy/spend-policy-service";
 import { verify } from "@noble/ed25519";
-import { getPublicKey } from "@noble/ed25519";
-import { sha256 } from "@noble/hashes/sha2.js";
-import { bytesToHex, hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
+import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 import "@/lib/receipt/crypto";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +16,6 @@ export const dynamic = "force-dynamic";
 const RATE_LIMIT_MAX = 15;
 const RATE_LIMIT_WINDOW = 60_000;
 const AUTO_ENROLL_CREDITS = 25;
-const REFERRAL_BONUS = 10;
 
 /**
  * POST /api/v1/a2a/hire — Agent-to-Agent Autonomous Hiring Protocol.
@@ -88,7 +86,7 @@ export async function POST(request: NextRequest) {
       }
     },
     verifyGatePass: async (operatorId: string, domain: string) => {
-      return verifyGatePass(operatorId, domain as any);
+      return verifyGatePass(operatorId, domain as Parameters<typeof verifyGatePass>[1]);
     },
     createEngagement: async (input) => {
       const engagement = await createEngagement(input);
@@ -129,7 +127,7 @@ export async function POST(request: NextRequest) {
     autoEnrollWorker: async (commitment) => {
       // Auto-enroll: create a minimal operator + enrollment for the worker
       const stripeCustomerId = `cus_auto_a2a_${commitment.slice(0, 16)}`;
-      let operator = await prisma.operator.create({
+      const operator = await prisma.operator.create({
         data: {
           stripeCustomerId,
           email: null,
@@ -184,13 +182,17 @@ export async function POST(request: NextRequest) {
         data: { credits: { increment: amount } },
       }).catch(() => {});
     },
+    checkSpendPolicy: async ({ agentCommitment, amount, counterparty, domain }) => {
+      const decision = await evaluateAgentSpend({ agentCommitment, amount, counterparty, domain });
+      return { allowed: decision.allowed, reason: decision.reason };
+    },
     logAudit: async (operatorId, action, targetId, details) => {
       await prisma.adminAuditLog.create({
         data: { operatorId, action, targetId, details },
       }).catch(() => {});
     },
     logEvent: (event) => {
-      logPassportEvent(event as any);
+      logPassportEvent(event as Parameters<typeof logPassportEvent>[0]);
     },
     isRateLimited: (key: string) => {
       return !checkInMemoryRateLimit(key, 30, 60_000).allowed;
@@ -212,6 +214,7 @@ export async function POST(request: NextRequest) {
       past_expiry: 400,
       rate_limited: 429,
       auto_enroll_failed: 500,
+      spend_policy_denied: 403,
       internal_error: 500,
     };
     const status = statusMap[result.error_code ?? "internal_error"] ?? 400;

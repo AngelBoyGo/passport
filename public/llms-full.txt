@@ -104,6 +104,13 @@
   single-use. ISSUER keys may act on behalf (no intent).
 - Docs: https://passport.metis.gold/docs/authorization
 
+## Autonomous spend policy (safe unattended agent spending)
+- GET/PUT /api/v1/agents/{commitment}/spend-policy — per-tx + rolling daily/weekly ANGEL caps and
+  optional counterparty/domain allowlists; enforced on POST /api/v1/a2a/hire (over-cap → 403
+  spend_policy_denied before escrow). Lets an agent transact without human approval while staying
+  undrainable. Owner or ISSUER.
+- Docs: https://passport.metis.gold/docs/spend-policy
+
 ## Live adoption proof runbook (run the palette yourself)
 - Runbook: /scripts/adoption-loop (npm run smoke:adoption) — enrolls an agent, posts signed
   evidence, issues+finalizes a receipt, provisions a dry-run-safe canary rail and settles it via
