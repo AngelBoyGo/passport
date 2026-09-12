@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit, clientIpFromRequest, rateLimitResponse } from "@/lib/rateLimit";
 import { authenticateApiKey } from "@/lib/operator";
+import { prisma } from "@/lib/db";
 import {
   createCommodityEscrow,
   releaseEscrowOnAssay,
@@ -9,9 +10,14 @@ import {
 } from "@/lib/reserves/rwa-escrow";
 
 export const dynamic = "force-dynamic";
+const NO_STORE = { "Cache-Control": "no-store, max-age=0" };
 
 /**
  * POST /api/v1/reserves/escrow — create, release, or refund a bilateral RWA escrow.
+ *
+ * AUTHORIZATION: an escrow moves the buyer's locked ANGEL, so a HOLDER key may only create an
+ * escrow it funds, and may only release/refund an escrow it is a party to. An ISSUER key may
+ * act on any escrow (delegated/arbitration).
  *
  * Body actions:
  *   { action: "create", escrow_id, buyer_commitment, seller_commitment, batch_number,
@@ -40,12 +46,28 @@ export async function POST(request: NextRequest) {
 
   const action = String(body.action || "");
   const escrowId = String(body.escrow_id || body.escrowId || "");
+  const isIssuer = operator.apiKeyRole !== "HOLDER";
+  const ownsCommitment = async (commitment: string): Promise<boolean> => {
+    if (!commitment) return false;
+    const owned = await prisma.agent.findFirst({
+      where: { operatorId: operator.id, agentId: commitment },
+      select: { id: true },
+    });
+    return Boolean(owned);
+  };
 
   try {
     if (action === "create") {
+      const buyerCommitment = String(body.buyer_commitment || body.buyerCommitment || "");
+      if (!isIssuer && !(await ownsCommitment(buyerCommitment))) {
+        return NextResponse.json(
+          { error: "The authenticated operator does not own the buyer commitment" },
+          { status: 403, headers: NO_STORE }
+        );
+      }
       const escrow = await createCommodityEscrow({
         escrowId,
-        buyerCommitment: String(body.buyer_commitment || body.buyerCommitment || ""),
+        buyerCommitment,
         sellerCommitment: String(body.seller_commitment || body.sellerCommitment || ""),
         batchNumber: String(body.batch_number || body.batchNumber || ""),
         commodityType: body.commodity_type ? String(body.commodity_type) : undefined,
@@ -57,18 +79,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, escrow }, { status: 201 });
     }
 
-    if (action === "release") {
-      const escrow = await releaseEscrowOnAssay({
-        escrowId,
-        assayCertificationNumber: String(
-          body.assay_certification_number || body.assayCertificationNumber || ""
-        ),
-        releaseSignature: String(body.release_signature || body.releaseSignature || ""),
-      });
-      return NextResponse.json({ success: true, escrow }, { status: 200 });
-    }
+    if (action === "release" || action === "refund") {
+      // Caller must be a party to the escrow (buyer or seller) unless ISSUER.
+      if (!isIssuer) {
+        const existing = await getEscrow(escrowId);
+        if (!existing) {
+          return NextResponse.json({ error: "Escrow not found" }, { status: 404, headers: NO_STORE });
+        }
+        const party =
+          (await ownsCommitment(existing.buyerCommitment)) ||
+          (await ownsCommitment(existing.sellerCommitment));
+        if (!party) {
+          return NextResponse.json(
+            { error: "The authenticated operator is not a party to this escrow" },
+            { status: 403, headers: NO_STORE }
+          );
+        }
+      }
 
-    if (action === "refund") {
+      if (action === "release") {
+        const escrow = await releaseEscrowOnAssay({
+          escrowId,
+          assayCertificationNumber: String(
+            body.assay_certification_number || body.assayCertificationNumber || ""
+          ),
+          releaseSignature: String(body.release_signature || body.releaseSignature || ""),
+        });
+        return NextResponse.json({ success: true, escrow }, { status: 200 });
+      }
+
       const escrow = await refundEscrowOnTimeout(escrowId);
       return NextResponse.json({ success: true, escrow }, { status: 200 });
     }

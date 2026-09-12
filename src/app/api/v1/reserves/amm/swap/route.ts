@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit, clientIpFromRequest, rateLimitResponse } from "@/lib/rateLimit";
+import { authorizeAgentCommitment } from "@/lib/auth/agent-ownership";
 import { executePoolSwap, type SwapInput } from "@/lib/reserves/fractional-amm";
 
 export const dynamic = "force-dynamic";
+const NO_STORE = { "Cache-Control": "no-store, max-age=0" };
 
 /**
  * POST /api/v1/reserves/amm/swap
  * Executes an oracle-guarded constant-product swap between ANGEL and fractional
  * commodity milli-units (mAu / gLi) under the Dual-State Governor fee interlock.
+ *
+ * AUTHORIZATION: the swap debits the named agent's wallet, so the caller must prove it owns
+ * that commitment (HOLDER) or hold an ISSUER key. Without this, anyone who knows a public
+ * commitment could move that agent's funds.
  */
 export async function POST(request: NextRequest) {
   const ip = clientIpFromRequest(request.headers);
@@ -39,6 +45,11 @@ export async function POST(request: NextRequest) {
       { error: "pool_id, agent_commitment, input_token (ANGEL|MAU|GLI), and input_amount are required" },
       { status: 400 }
     );
+  }
+
+  const auth = await authorizeAgentCommitment(request, agentCommitment);
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status, headers: NO_STORE });
   }
 
   try {

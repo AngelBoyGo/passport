@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit, clientIpFromRequest, rateLimitResponse } from "@/lib/rateLimit";
+import { authenticateApiKey } from "@/lib/operator";
 import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
+const NO_STORE = { "Cache-Control": "no-store, max-age=0" };
 
 /**
  * GET /api/v1/reserves/assays — Query verified geochemical & spectrometry assay certifications.
@@ -63,6 +65,13 @@ export async function POST(request: NextRequest) {
   const rate = await checkRateLimit(`reserves:assays:post:${ip}`, 30, 60_000);
   if (!rate.allowed) {
     return NextResponse.json({ error: "Rate limit exceeded" }, rateLimitResponse(rate, 30));
+  }
+
+  // Assay certifications drive RWA escrow release, so only a trusted ISSUER may ingest them.
+  // (The `sample_signature` is stored as evidence; the authorization gate is the ISSUER key.)
+  const operator = await authenticateApiKey(request.headers.get("authorization"));
+  if (!operator || operator.apiKeyRole === "HOLDER") {
+    return NextResponse.json({ error: "Unauthorized: ISSUER key required" }, { status: 401, headers: NO_STORE });
   }
 
   try {

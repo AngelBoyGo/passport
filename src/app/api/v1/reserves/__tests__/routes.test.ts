@@ -7,6 +7,11 @@ import { GET as getAssays, POST as postAssays } from "../assays/route";
 import { prisma } from "@/lib/db";
 import * as porService from "@/lib/reserves/por-service";
 
+// Assay ingestion now requires an ISSUER key (it can drive RWA escrow release).
+vi.mock("@/lib/operator", () => ({
+  authenticateApiKey: vi.fn(async () => ({ id: "op_issuer", apiKeyRole: "ISSUER" })),
+}));
+
 describe("Reserves API Endpoints", () => {
   beforeEach(() => {
     vi.restoreAllMocks();

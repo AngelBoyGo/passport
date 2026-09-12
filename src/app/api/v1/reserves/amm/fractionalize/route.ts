@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit, clientIpFromRequest, rateLimitResponse } from "@/lib/rateLimit";
+import { authorizeAgentCommitment } from "@/lib/auth/agent-ownership";
 import { fractionalizeVaultBatch } from "@/lib/reserves/fractional-amm";
 
 export const dynamic = "force-dynamic";
+const NO_STORE = { "Cache-Control": "no-store, max-age=0" };
 
 /**
  * POST /api/v1/reserves/amm/fractionalize
  * Locks an AUDITED unencumbered VaultBatch and mints exact integer milli-unit fractional
  * commodity tokens directly into the depositor's deterministic 64-hex wallet.
+ *
+ * AUTHORIZATION: fractionalization locks a real vault batch and mints tokens to the named
+ * depositor, so the caller must own that commitment (HOLDER) or hold an ISSUER key.
  */
 export async function POST(request: NextRequest) {
   const ip = clientIpFromRequest(request.headers);
@@ -33,6 +38,11 @@ export async function POST(request: NextRequest) {
       { error: "batch_number and depositor_commitment are required" },
       { status: 400 }
     );
+  }
+
+  const auth = await authorizeAgentCommitment(request, depositorCommitment);
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status, headers: NO_STORE });
   }
 
   try {
