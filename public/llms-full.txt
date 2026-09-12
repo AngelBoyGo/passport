@@ -85,6 +85,16 @@
   /receipts/monetary (sha256 canonicalJson body minus `snapshot`, then ed25519).
 - Docs: https://passport.metis.gold/docs/resilience
 
+## Fail-Closed System Posture & Readiness (one signed severity, signed)
+- GET  /api/v1/raillab/posture                   — composed posture (ISSUER key)
+  Composes attestation, safety interlock, console, lighthouse, and resilience in parallel with
+  per-source timeouts, plus deployment readiness (required env, signing key, scheduler secret,
+  DB reachability, applied migrations). FAIL-CLOSED: any unreadable/unconfigured source forces
+  severity >= WARNING; hard failures/blockers force SEVERE. Never cached unless OK. Verify
+  offline with the same key as /receipts/monetary (sha256 canonicalJson body minus `snapshot`,
+  then ed25519).
+- Docs: https://passport.metis.gold/docs/posture
+
 ## Live adoption proof runbook (run the palette yourself)
 - Runbook: /scripts/adoption-loop (npm run smoke:adoption) — enrolls an agent, posts signed
   evidence, issues+finalizes a receipt, provisions a dry-run-safe canary rail and settles it via

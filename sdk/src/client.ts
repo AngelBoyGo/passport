@@ -68,6 +68,36 @@ export interface ResilienceBlock {
   generated_at: string;
 }
 
+export interface ReadinessCheck {
+  name: string;
+  ok: boolean;
+  blocking: boolean;
+  detail: string;
+}
+
+/** Fail-Closed System Posture block (Phase 30). */
+export interface PostureBlock {
+  severity: ResilienceSeverity;
+  ready: boolean;
+  surfaces: {
+    attestation: { verified: boolean; chain_ok: boolean; unavailable?: boolean; detail?: string };
+    safety: { halted: boolean; reason: string | null; unavailable?: boolean; detail?: string };
+    console: { severity: ResilienceSeverity; degraded: boolean; unavailable?: boolean; detail?: string };
+    lighthouse: { degraded: boolean; suspicious: boolean; unavailable?: boolean; detail?: string };
+    resilience: {
+      severity: ResilienceSeverity;
+      survives: boolean;
+      unavailable?: boolean;
+      detail?: string;
+    };
+  };
+  checks: ReadinessCheck[];
+  blockers: string[];
+  degraded: boolean;
+  degraded_reasons: string[];
+  generated_at: string;
+}
+
 export interface IssueReceiptInput {
   agent_id: string;
   receipt_type: "custody" | "competence";
@@ -1879,6 +1909,31 @@ export class PassportClient {
     if (this.apiKey) headers.Authorization = `Bearer ${this.apiKey}`;
     const response = await fetchWithRetry(
       `${this.baseUrl}/api/v1/raillab/resilience`,
+      { method: "GET", headers }
+    );
+    return this.parseJsonResponse(response);
+  }
+
+  /**
+   * Purview: Fail-Closed System Posture & Readiness — one signed severity composing attestation,
+   * the safety interlock, console, lighthouse, and resilience, plus deployment readiness. Any
+   * unreadable/unconfigured source forces >= WARNING; hard failures force SEVERE. ISSUER key.
+   */
+  async getPosture(): Promise<{
+    success: boolean;
+    posture: PostureBlock;
+    verify_instructions: string;
+    snapshot: {
+      content_hash: string;
+      signature: string;
+      public_key: string;
+      algorithm: "ed25519";
+    };
+  }> {
+    const headers: Record<string, string> = { Accept: "application/json" };
+    if (this.apiKey) headers.Authorization = `Bearer ${this.apiKey}`;
+    const response = await fetchWithRetry(
+      `${this.baseUrl}/api/v1/raillab/posture`,
       { method: "GET", headers }
     );
     return this.parseJsonResponse(response);
