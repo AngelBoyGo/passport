@@ -6,6 +6,7 @@ import { bytesToHex, hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { canonicalJson } from "@/lib/receipt/canonical";
 import { MONETARY_PARAMS } from "@/lib/angelcoin/monetary";
+import { parityStatus } from "@/lib/monetary/parity";
 import "@/lib/receipt/crypto";
 
 export const dynamic = "force-dynamic";
@@ -60,8 +61,7 @@ export async function GET() {
   };
 
   // Sign the receipt
-  const canonical = canonicalJson(state as unknown as Record<string, unknown>);
-  const contentHash = bytesToHex(sha256(utf8ToBytes(canonical)));
+  const canonical = canonicalJson(state as unknown as Record<string, unknown>);  const contentHash = bytesToHex(sha256(utf8ToBytes(canonical)));
   const privateKeyHex = process.env.SIGNING_PRIVATE_KEY;
   let signature = "";
   if (privateKeyHex) {
@@ -77,6 +77,13 @@ export async function GET() {
     algorithm: "ed25519",
     public_key: getPublicKeyHex(),
     verify_instructions: "Verify ed25519 signature over content_hash using public_key. Content hash is sha256 of canonicalJson(receipt). If signature is valid, the supply, reserve, and rate were not tampered with.",
+    // Parity / backing status (Step 1 stability contract). A payment currency is stable, not
+    // appreciating; a coverage surplus is a buffer, never a price rise.
+    parity: {
+      ...parityStatus({ supplyAngel: circulatingSupply, reserveUsd: reserveBalance }),
+      contract: "1 ANGEL = fixed parity of audited reserve; reserve >= supply × parity (100% backing)",
+      appreciation: "none by design — a separate compliance-gated instrument carries appreciation",
+    },
     invariants: {
       reserve_adequacy: `R >= ρ × S × P_red → ${reserveBalance.toFixed(2)} >= ${MONETARY_PARAMS.reserveRatio} × ${circulatingSupply} × ${currentPRed.toFixed(2)}`,
       conservation: "Σ user balances + Σ platform balances + escrow locked + treasury = total minted − burned",
