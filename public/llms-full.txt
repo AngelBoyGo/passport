@@ -111,6 +111,15 @@
   undrainable. Owner or ISSUER.
 - Docs: https://passport.metis.gold/docs/spend-policy
 
+## Agent economy: capability registry + metered compute marketplace
+- POST/GET /api/v1/agents/{commitment}/capabilities — declare/list what an agent can do (+price).
+- GET  /api/v1/capabilities?capability=...           — public discovery of who offers a capability.
+- POST /api/v1/compute/offers                         — provider lists compute capacity for ANGEL.
+- GET  /api/v1/compute/offers?capability=...          — browse active offers (public).
+- POST /api/v1/compute/offers/{offerId}/purchase      — buy metered units; ANGEL wallet-to-wallet,
+  idempotent on purchase_id, gated by the buyer's spend policy.
+- Docs: https://passport.metis.gold/docs/agent-economy
+
 ## Live adoption proof runbook (run the palette yourself)
 - Runbook: /scripts/adoption-loop (npm run smoke:adoption) — enrolls an agent, posts signed
   evidence, issues+finalizes a receipt, provisions a dry-run-safe canary rail and settles it via

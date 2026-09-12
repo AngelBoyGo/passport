@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { authenticateApiKey } from "@/lib/operator";
 import { validateWalletOperation, computeAvailableBalance, computeIndependenceScore, independenceLabel, independenceColor } from "@/lib/agent-wallet/wallet";
+import { checkSpendPolicy } from "@/lib/agent-economy/spend-policy-service";
 import { checkInMemoryRateLimit, clientIpFromRequest } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
@@ -103,8 +104,8 @@ export async function POST(request: NextRequest) {
 
   try {
     validateWalletOperation(body.commitment, body.amount);
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 400 });
+  } catch (e: unknown) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : "Invalid wallet operation" }, { status: 400 });
   }
 
   // Verify ownership
@@ -144,9 +145,25 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "target_commitment required for transfer" }, { status: 400 });
       }
 
+      const target = body.target_commitment.toLowerCase();
+
       const senderWallet = await prisma.agentWallet.findUnique({ where: { subjectCommitment: commitment } });
       if (!senderWallet || computeAvailableBalance(senderWallet) < body.amount) {
         return NextResponse.json({ error: "Insufficient available balance" }, { status: 402 });
+      }
+
+      // Autonomous spend policy: the direct transfer rail is the "liberation layer", so it is
+      // capped exactly like the A2A hire rail (per-tx / rolling caps + allowlists).
+      const decision = await checkSpendPolicy({
+        agentCommitment: commitment,
+        amount: body.amount,
+        counterparty: target,
+      });
+      if (!decision.allowed) {
+        return NextResponse.json(
+          { error: decision.reason || "Spend policy denied this transfer", error_code: "spend_policy_denied" },
+          { status: 403 }
+        );
       }
 
       await prisma.$transaction(async (tx) => {
@@ -155,8 +172,8 @@ export async function POST(request: NextRequest) {
           data: { balance: { decrement: body.amount }, spentTotal: { increment: body.amount }, lastActivityAt: new Date() },
         });
         await tx.agentWallet.upsert({
-          where: { subjectCommitment: body.target_commitment!.toLowerCase() },
-          create: { subjectCommitment: body.target_commitment!.toLowerCase(), balance: body.amount, earnedTotal: body.amount, lastActivityAt: new Date() },
+          where: { subjectCommitment: target },
+          create: { subjectCommitment: target, balance: body.amount, earnedTotal: body.amount, lastActivityAt: new Date() },
           update: { balance: { increment: body.amount }, earnedTotal: { increment: body.amount }, lastActivityAt: new Date() },
         });
       });

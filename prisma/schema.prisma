@@ -362,6 +362,63 @@ model AgentSpendPolicy {
   @@index([enabled])
 }
 
+/// Agent capability registry (Phase 32): what an agent can do, and at what price — so other
+/// agents can discover and hire it. `(agentCommitment, capability)` is unique.
+model AgentCapability {
+  id              String   @id @default(cuid())
+  agentCommitment String
+  capability      String
+  description     String?
+  version         String?
+  endpointUrl     String?
+  priceAngel      Int      @default(0)
+  unit            String   @default("task")
+  verified        Boolean  @default(false)
+  active          Boolean  @default(true)
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([agentCommitment, capability])
+  @@index([capability])
+  @@index([active])
+}
+
+/// Metered compute marketplace (Phase 32): an agent sells inference/compute units for ANGEL.
+model ComputeOffer {
+  id                 String   @id @default(cuid())
+  offerId            String   @unique
+  providerCommitment String
+  capability         String // e.g. "llm.inference"
+  description        String?
+  unit               String   @default("1k_tokens")
+  priceAngelPerUnit  Int
+  capacityUnits      Int
+  remainingUnits     Int
+  status             String   @default("ACTIVE") // ACTIVE | EXHAUSTED | RETIRED
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([capability, status])
+  @@index([providerCommitment])
+}
+
+/// A purchase of compute units from a ComputeOffer (buyer pays ANGEL to the provider).
+model ComputePurchase {
+  id                 String   @id @default(cuid())
+  purchaseId         String   @unique
+  offerId            String
+  buyerCommitment    String
+  providerCommitment String
+  units              Int
+  totalAngel         Int
+  status             String   @default("SETTLED") // SETTLED | REFUNDED
+  createdAt          DateTime @default(now())
+
+  @@index([offerId])
+  @@index([buyerCommitment])
+}
+
 /// Marketplace hire → hold → deliver → accept loop keyed by external task id.
 model Engagement {
   id                   String           @id @default(cuid())

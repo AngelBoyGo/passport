@@ -12,7 +12,12 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
 const ROOT = process.cwd();
-const DIRS = ["src/app/api/v1/reserves", "src/app/api/v1/raillab"];
+const DIRS = [
+  "src/app/api/v1/reserves",
+  "src/app/api/v1/raillab",
+  "src/app/api/v1/agents",
+  "src/app/api/v1/compute",
+];
 const MUTATING = /export\s+async\s+function\s+(POST|PUT|PATCH|DELETE)\b/;
 const MARKER =
   /authorizeResource|requireIssuer|authenticateApiKey|verifyAgentIntent|sessionFromRequest|SCHEDULER_SECRET|x-scheduler-secret|verifyPayloadSignature|verifySettlementSignature|timingSafeEqual|constructEvent|verifyBridgeWebhook|requireAdmin/;
