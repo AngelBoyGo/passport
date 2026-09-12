@@ -72,7 +72,9 @@ export async function POST(
       provider_commitment: result.providerCommitment,
       units: result.units,
       total_angel: result.totalAngel,
+      status: result.status,
       deduped: result.deduped,
+      escrow: "Funds are HELD until you release (or refund) the purchase.",
     },
     { status: 201, headers: NO_STORE }
   );

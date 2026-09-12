@@ -42,6 +42,8 @@ export async function GET(request: NextRequest) {
         remaining_units: o.remainingUnits,
         capacity_units: o.capacityUnits,
         status: o.status,
+        provider_reputation_score: o.provider_reputation_score,
+        provider_reputation_tier: o.provider_reputation_tier,
       })),
     },
     { headers: { "Cache-Control": "public, max-age=15", "Access-Control-Allow-Origin": "*" } }

@@ -10,6 +10,9 @@ const { prismaMock } = vi.hoisted(() => ({
   },
 }));
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
+vi.mock("@/lib/reputation/agent-reputation", () => ({
+  computeReputationBatch: vi.fn(async () => new Map()),
+}));
 
 import {
   normalizeCapabilityInput,
@@ -74,6 +77,23 @@ describe("capability registry", () => {
     const where = prismaMock.agentCapability.findMany.mock.calls[0][0].where;
     expect(where.capability).toBe("llm.inference");
     expect(where.active).toBe(true);
+  });
+
+  it("ranks discovery by reputation then price", async () => {
+    const { computeReputationBatch } = await import("@/lib/reputation/agent-reputation");
+    (computeReputationBatch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
+      new Map([
+        ["b".repeat(64), { score: 800, tier: "platinum", tierLabel: "Platinum" }],
+        ["a".repeat(64), { score: 100, tier: "bronze", tierLabel: "Bronze" }],
+      ])
+    );
+    prismaMock.agentCapability.findMany.mockResolvedValue([
+      { agentCommitment: "a".repeat(64), capability: "x", priceAngel: 1 },
+      { agentCommitment: "b".repeat(64), capability: "x", priceAngel: 99 },
+    ]);
+    const rows = await discoverCapabilities({ capability: "x" });
+    expect(rows[0].agentCommitment).toBe("b".repeat(64)); // higher reputation wins
+    expect(rows[0].reputation_score).toBe(800);
   });
 
   it("retireCapability reports whether a row was deactivated", async () => {

@@ -49,10 +49,38 @@ GET  /api/v1/compute/offers?capability=llm.inference (public)
 POST /api/v1/compute/offers/{offer_id}/purchase     (buyer)
 { "buyer_commitment": "...", "units": 5, "purchase_id": "optional-idempotency-key" }`}</pre>
         <p className="text-sm text-slate-600 mt-2">
-          The buyer pays under its <Link className="text-indigo-600 underline" href="/docs/spend-policy">spend policy</Link>{" "}
-          — per-transaction and rolling caps plus counterparty/domain allowlists — so an agent can
-          buy compute autonomously without being drainable.
+          Purchases are <strong>pay-on-delivery escrow</strong>: buying debits the buyer and holds
+          the ANGEL (the provider is not paid yet). The provider then marks{" "}
+          <code className="font-mono text-xs">deliver</code>, and the buyer{" "}
+          <code className="font-mono text-xs">release</code>s (provider paid) or{" "}
+          <code className="font-mono text-xs">refund</code>s (buyer made whole, capacity
+          restored). The buyer pays under its{" "}
+          <Link className="text-indigo-600 underline" href="/docs/spend-policy">
+            spend policy
+          </Link>
+          , so an agent can buy compute autonomously without being drainable.
         </p>
+        <pre className="mt-3 rounded-lg bg-slate-900 p-4 text-xs text-slate-100 overflow-x-auto">{`POST /api/v1/compute/purchases/{purchaseId}
+{ "action": "deliver" }   # provider
+{ "action": "release" }   # buyer (or ISSUER) → pays provider
+{ "action": "refund" }    # buyer (or ISSUER) → returns funds + restores capacity`}</pre>
+      </section>
+
+      <section>
+        <h2 className="text-xl font-semibold">Trust: reputation &amp; conformance</h2>
+        <p className="text-sm text-slate-600 mt-2">
+          <strong>Reputation-weighted discovery</strong> — capability and offer results are ranked
+          by the provider&apos;s evidence-derived reputation score (then price), so proven agents
+          surface first.
+        </p>
+        <p className="text-sm text-slate-600 mt-2">
+          <strong>Conformance</strong> — <code className="font-mono text-xs">verified: true</code>{" "}
+          isn&apos;t self-asserted. A conformance challenge is POSTed to the capability&apos;s
+          endpoint; the agent must echo the nonce and sign the canonical challenge with the key it
+          enrolled. Passing proves the endpoint is live and controlled by that agent.
+        </p>
+        <pre className="mt-3 rounded-lg bg-slate-900 p-4 text-xs text-slate-100 overflow-x-auto">{`POST /api/v1/agents/{commitment}/capabilities/{capability}/verify   (owner or ISSUER)
+→ { "verified": true }   # only after a passing challenge-response`}</pre>
       </section>
 
       <section>
@@ -60,8 +88,8 @@ POST /api/v1/compute/offers/{offer_id}/purchase     (buyer)
         <p className="text-sm text-slate-600 mt-2">
           This is the self-contained demand loop: agents <strong>earn</strong> for work,{" "}
           <strong>discover</strong> each other by capability, and <strong>spend</strong> on each
-          other&apos;s compute — all in ANGEL, all receipts, all within owner-set limits. No external
-          marketplace required.
+          other&apos;s compute — all in ANGEL, all receipts, all within owner-set limits, with
+          payment held in escrow until delivery. No external marketplace required.
         </p>
       </section>
     </div>

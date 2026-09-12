@@ -40,6 +40,8 @@ export async function GET(request: NextRequest) {
         price_angel: c.priceAngel,
         unit: c.unit,
         verified: c.verified,
+        reputation_score: c.reputation_score,
+        reputation_tier: c.reputation_tier,
         updated_at: c.updatedAt.toISOString(),
       })),
     },

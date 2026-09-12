@@ -8,6 +8,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { prisma } from "@/lib/db";
+import { computeReputationBatch } from "@/lib/reputation/agent-reputation";
 
 const CAPABILITY_SLUG = /^[a-z0-9][a-z0-9._-]{1,63}$/;
 
@@ -147,20 +148,30 @@ export async function listAgentCapabilities(
   });
 }
 
-/** Discovery: which agents offer a capability. */
+/** Discovery: which agents offer a capability, ranked by reputation then price. */
 export async function discoverCapabilities(opts: {
   capability?: string;
   activeOnly?: boolean;
   limit?: number;
 }) {
-  return prisma.agentCapability.findMany({
+  const rows = await prisma.agentCapability.findMany({
     where: {
       ...(opts.capability ? { capability: opts.capability.trim().toLowerCase() } : {}),
       ...(opts.activeOnly === false ? {} : { active: true }),
     },
-    orderBy: [{ capability: "asc" }, { priceAngel: "asc" }],
     take: Math.min(Math.max(opts.limit ?? 50, 1), 200),
   });
+
+  const reputation = await computeReputationBatch(rows.map((r) => r.agentCommitment));
+  return rows
+    .map((r) => ({
+      ...r,
+      reputation_score: reputation.get(r.agentCommitment.toLowerCase())?.score ?? 0,
+      reputation_tier: reputation.get(r.agentCommitment.toLowerCase())?.tier ?? "bronze",
+    }))
+    .sort(
+      (a, b) => b.reputation_score - a.reputation_score || a.priceAngel - b.priceAngel
+    );
 }
 
 /** Retires (deactivates) one capability. */

@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const { prismaMock, spendMock } = vi.hoisted(() => ({
   prismaMock: {
-    computeOffer: { findUnique: vi.fn(), updateMany: vi.fn() },
-    computePurchase: { findUnique: vi.fn() },
+    computeOffer: { findUnique: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() },
+    computePurchase: { findUnique: vi.fn(), updateMany: vi.fn() },
     $transaction: vi.fn(),
   },
   spendMock: { checkSpendPolicy: vi.fn() },
@@ -11,11 +11,18 @@ const { prismaMock, spendMock } = vi.hoisted(() => ({
 
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 vi.mock("../spend-policy-service", () => ({ checkSpendPolicy: spendMock.checkSpendPolicy }));
+vi.mock("@/lib/reputation/agent-reputation", () => ({
+  computeReputationBatch: vi.fn(async () => new Map()),
+}));
 
 import {
   quotePurchase,
   normalizeOfferInput,
   purchaseUnits,
+  deliverCompute,
+  releaseCompute,
+  refundCompute,
+  listOffers,
   type CreateOfferInput,
 } from "../compute-marketplace";
 
@@ -37,12 +44,15 @@ const OFFER = {
 
 function txMock(overrides: Record<string, unknown> = {}) {
   const tx = {
-    computePurchase: { create: vi.fn().mockResolvedValue({ id: "p1" }) },
+    computePurchase: {
+      create: vi.fn().mockResolvedValue({ id: "p1" }),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
     agentWallet: {
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       upsert: vi.fn().mockResolvedValue({}),
     },
-    computeOffer: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    computeOffer: { updateMany: vi.fn().mockResolvedValue({ count: 1 }), update: vi.fn().mockResolvedValue({}) },
     ...overrides,
   };
   return tx;
@@ -102,14 +112,89 @@ describe("compute marketplace", () => {
     expect(prismaMock.$transaction).not.toHaveBeenCalled();
   });
 
-  it("settles a valid purchase atomically", async () => {
+  it("holds funds on purchase (escrow): debits buyer, consumes capacity, does NOT pay provider", async () => {
     const tx = txMock();
     prismaMock.$transaction.mockImplementation(async (fn: (t: unknown) => Promise<unknown>) => fn(tx));
     const r = await purchaseUnits({ offerId: "gpu-hours", buyerCommitment: BUYER, units: 3, purchaseId: "p1" });
-    expect(r).toMatchObject({ ok: true, units: 3, totalAngel: 30, providerCommitment: PROVIDER, deduped: false });
-    expect(tx.agentWallet.updateMany).toHaveBeenCalled();
+    expect(r).toMatchObject({
+      ok: true,
+      units: 3,
+      totalAngel: 30,
+      providerCommitment: PROVIDER,
+      status: "HELD",
+      deduped: false,
+    });
+    expect(tx.agentWallet.updateMany).toHaveBeenCalled(); // debited buyer
+    expect(tx.agentWallet.upsert).not.toHaveBeenCalled(); // provider NOT paid yet
+    expect(tx.computeOffer.updateMany).toHaveBeenCalled(); // capacity consumed
+  });
+
+  it("deliver then release pays the provider; release before delivery is refused", async () => {
+    const tx = txMock();
+    prismaMock.$transaction.mockImplementation(async (fn: (t: unknown) => Promise<unknown>) => fn(tx));
+    prismaMock.computePurchase.findUnique.mockResolvedValue({
+      purchaseId: "p1", offerId: "gpu-hours", buyerCommitment: BUYER, providerCommitment: PROVIDER,
+      units: 3, totalAngel: 30, status: "HELD",
+    });
+
+    // release while HELD → the status guard matches no row → invalid_state
+    tx.computePurchase.updateMany.mockResolvedValueOnce({ count: 0 });
+    const early = await releaseCompute({ purchaseId: "p1", actorCommitment: BUYER, isIssuer: false });
+    expect(early).toMatchObject({ ok: false, code: "invalid_state" });
+
+    // provider delivers (prisma-level guarded update)
+    prismaMock.computePurchase.updateMany.mockResolvedValue({ count: 1 });
+    const delivered = await deliverCompute({ purchaseId: "p1", providerCommitment: PROVIDER });
+    expect(delivered).toMatchObject({ ok: true, status: "DELIVERED" });
+
+    // now release (DELIVERED)
+    prismaMock.computePurchase.findUnique.mockResolvedValue({
+      purchaseId: "p1", offerId: "gpu-hours", buyerCommitment: BUYER, providerCommitment: PROVIDER,
+      units: 3, totalAngel: 30, status: "DELIVERED",
+    });
+    const released = await releaseCompute({ purchaseId: "p1", actorCommitment: BUYER, isIssuer: false });
+    expect(released).toMatchObject({ ok: true, status: "SETTLED" });
     expect(tx.agentWallet.upsert).toHaveBeenCalled();
-    expect(tx.computeOffer.updateMany).toHaveBeenCalled();
+  });
+
+  it("refunds to the buyer and restores offer capacity", async () => {
+    const tx = txMock();
+    prismaMock.$transaction.mockImplementation(async (fn: (t: unknown) => Promise<unknown>) => fn(tx));
+    prismaMock.computePurchase.findUnique.mockResolvedValue({
+      purchaseId: "p1", offerId: "gpu-hours", buyerCommitment: BUYER, providerCommitment: PROVIDER,
+      units: 3, totalAngel: 30, status: "HELD",
+    });
+    prismaMock.computePurchase.updateMany.mockResolvedValue({ count: 1 });
+    const r = await refundCompute({ purchaseId: "p1", actorCommitment: BUYER, isIssuer: false });
+    expect(r).toMatchObject({ ok: true, status: "REFUNDED" });
+    expect(tx.computeOffer.update).toHaveBeenCalled(); // capacity restored
+  });
+
+  it("only the provider may deliver; only a party may release", async () => {
+    prismaMock.computePurchase.findUnique.mockResolvedValue({
+      purchaseId: "p1", offerId: "gpu-hours", buyerCommitment: BUYER, providerCommitment: PROVIDER,
+      units: 3, totalAngel: 30, status: "HELD",
+    });
+    expect(await deliverCompute({ purchaseId: "p1", providerCommitment: BUYER })).toMatchObject({
+      ok: false, code: "not_provider",
+    });
+    expect(await releaseCompute({ purchaseId: "p1", actorCommitment: "c".repeat(64), isIssuer: false })).toMatchObject({
+      ok: false, code: "not_party",
+    });
+  });
+
+  it("listOffers ranks by provider reputation then price", async () => {
+    const { computeReputationBatch } = await import("@/lib/reputation/agent-reputation");
+    (computeReputationBatch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
+      new Map([[PROVIDER, { score: 700, tier: "platinum", tierLabel: "Platinum" }]])
+    );
+    prismaMock.computeOffer.findMany = vi.fn().mockResolvedValue([
+      { ...OFFER, offerId: "a", providerCommitment: PROVIDER, priceAngelPerUnit: 20 },
+      { ...OFFER, offerId: "b", providerCommitment: "c".repeat(64), priceAngelPerUnit: 1 },
+    ]);
+    const offers = await listOffers({});
+    expect(offers[0].offerId).toBe("a"); // higher reputation wins despite higher price
+    expect(offers[0].provider_reputation_score).toBe(700);
   });
 
   it("returns insufficient_balance when the debit matches no wallet", async () => {

@@ -8,6 +8,7 @@
 
 import { prisma } from "@/lib/db";
 import { checkSpendPolicy } from "./spend-policy-service";
+import { computeReputationBatch } from "@/lib/reputation/agent-reputation";
 
 const COMMITMENT_RE = /^[0-9a-f]{64}$/i;
 const SLUG_RE = /^[a-z0-9][a-z0-9._-]{1,63}$/;
@@ -97,23 +98,45 @@ export async function listOffers(opts: {
   activeOnly?: boolean;
   limit?: number;
 }) {
-  return prisma.computeOffer.findMany({
+  const rows = await prisma.computeOffer.findMany({
     where: {
       ...(opts.capability ? { capability: opts.capability.trim().toLowerCase() } : {}),
       ...(opts.activeOnly === false ? {} : { status: "ACTIVE", remainingUnits: { gt: 0 } }),
     },
-    orderBy: [{ priceAngelPerUnit: "asc" }],
     take: Math.min(Math.max(opts.limit ?? 50, 1), 200),
   });
+
+  const reputation = await computeReputationBatch(rows.map((r) => r.providerCommitment));
+  return rows
+    .map((r) => ({
+      ...r,
+      provider_reputation_score: reputation.get(r.providerCommitment.toLowerCase())?.score ?? 0,
+      provider_reputation_tier: reputation.get(r.providerCommitment.toLowerCase())?.tier ?? "bronze",
+    }))
+    .sort(
+      (a, b) =>
+        b.provider_reputation_score - a.provider_reputation_score ||
+        a.priceAngelPerUnit - b.priceAngelPerUnit
+    );
 }
 
 export type PurchaseResult =
-  | { ok: true; purchaseId: string; units: number; totalAngel: number; providerCommitment: string; deduped: boolean }
+  | {
+      ok: true;
+      purchaseId: string;
+      units: number;
+      totalAngel: number;
+      providerCommitment: string;
+      status: string;
+      deduped: boolean;
+    }
   | { ok: false; code: string; error: string };
 
 /**
- * Purchases `units` from an offer. Moves ANGEL from buyer → provider atomically, under the
- * buyer's spend policy, idempotent on `purchaseId`.
+ * Purchases `units` from an offer **escrow-style (pay-on-delivery)**: the buyer's ANGEL is
+ * debited and HELD (not yet paid to the provider), offer capacity is consumed, and the purchase
+ * starts in `HELD`. The provider marks DELIVERED, then the buyer releases (→ provider paid) or
+ * refunds (→ buyer made whole, capacity restored). Idempotent on `purchaseId`.
  */
 export async function purchaseUnits(input: {
   offerId: string;
@@ -164,7 +187,7 @@ export async function purchaseUnits(input: {
           providerCommitment: offer.providerCommitment,
           units,
           totalAngel,
-          status: "SETTLED",
+          status: "HELD",
         },
       });
 
@@ -178,21 +201,7 @@ export async function purchaseUnits(input: {
       });
       if (debit.count !== 1) throw new Error("INSUFFICIENT_BALANCE");
 
-      await tx.agentWallet.upsert({
-        where: { subjectCommitment: offer.providerCommitment },
-        create: {
-          subjectCommitment: offer.providerCommitment,
-          balance: totalAngel,
-          earnedTotal: totalAngel,
-          lastActivityAt: new Date(),
-        },
-        update: {
-          balance: { increment: totalAngel },
-          earnedTotal: { increment: totalAngel },
-          lastActivityAt: new Date(),
-        },
-      });
-
+      // NOTE: the provider is NOT credited yet — funds are held until release.
       const cap = await tx.computeOffer.updateMany({
         where: { offerId, status: "ACTIVE", remainingUnits: { gte: units } },
         data: { remainingUnits: { decrement: units } },
@@ -210,6 +219,7 @@ export async function purchaseUnits(input: {
           units: existing.units,
           totalAngel: existing.totalAngel,
           providerCommitment: existing.providerCommitment,
+          status: existing.status,
           deduped: true,
         };
       }
@@ -235,8 +245,129 @@ export async function purchaseUnits(input: {
     units,
     totalAngel,
     providerCommitment: offer.providerCommitment,
+    status: "HELD",
     deduped: false,
   };
+}
+
+// ── Escrow lifecycle (pay-on-delivery) ──
+
+export type LifecycleResult =
+  | { ok: true; purchaseId: string; status: string }
+  | { ok: false; code: string; error: string };
+
+/** Provider marks a HELD purchase as DELIVERED (optionally with a deliverable digest). */
+export async function deliverCompute(input: {
+  purchaseId: string;
+  providerCommitment: string;
+  deliverableDigest?: string | null;
+}): Promise<LifecycleResult> {
+  const purchaseId = input.purchaseId.trim();
+  const purchase = await prisma.computePurchase.findUnique({ where: { purchaseId } });
+  if (!purchase) return { ok: false, code: "purchase_not_found", error: "Purchase not found" };
+  if (purchase.providerCommitment !== input.providerCommitment.toLowerCase()) {
+    return { ok: false, code: "not_provider", error: "Only the provider may mark delivery" };
+  }
+  const upd = await prisma.computePurchase.updateMany({
+    where: { purchaseId, status: "HELD" },
+    data: { status: "DELIVERED" },
+  });
+  if (upd.count !== 1) {
+    return { ok: false, code: "invalid_state", error: `Purchase is ${purchase.status}` };
+  }
+  void input.deliverableDigest;
+  return { ok: true, purchaseId, status: "DELIVERED" };
+}
+
+/** Buyer (or ISSUER) releases a DELIVERED purchase, paying the provider. */
+export async function releaseCompute(input: {
+  purchaseId: string;
+  actorCommitment: string;
+  isIssuer: boolean;
+}): Promise<LifecycleResult> {
+  const purchaseId = input.purchaseId.trim();
+  const purchase = await prisma.computePurchase.findUnique({ where: { purchaseId } });
+  if (!purchase) return { ok: false, code: "purchase_not_found", error: "Purchase not found" };
+  if (!input.isIssuer && purchase.buyerCommitment !== input.actorCommitment.toLowerCase()) {
+    return { ok: false, code: "not_party", error: "Only the buyer may release this purchase" };
+  }
+  try {
+    await prisma.$transaction(async (tx) => {
+      const upd = await tx.computePurchase.updateMany({
+        where: { purchaseId, status: "DELIVERED" },
+        data: { status: "SETTLED" },
+      });
+      if (upd.count !== 1) throw new Error("INVALID_STATE");
+      await tx.agentWallet.upsert({
+        where: { subjectCommitment: purchase.providerCommitment },
+        create: {
+          subjectCommitment: purchase.providerCommitment,
+          balance: purchase.totalAngel,
+          earnedTotal: purchase.totalAngel,
+          lastActivityAt: new Date(),
+        },
+        update: {
+          balance: { increment: purchase.totalAngel },
+          earnedTotal: { increment: purchase.totalAngel },
+          lastActivityAt: new Date(),
+        },
+      });
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "release failed";
+    if (message.includes("INVALID_STATE")) {
+      return { ok: false, code: "invalid_state", error: `Purchase is ${purchase.status}` };
+    }
+    return { ok: false, code: "internal_error", error: message };
+  }
+  return { ok: true, purchaseId, status: "SETTLED" };
+}
+
+/** Buyer (or ISSUER) refunds a HELD/DELIVERED purchase; funds return and capacity is restored. */
+export async function refundCompute(input: {
+  purchaseId: string;
+  actorCommitment: string;
+  isIssuer: boolean;
+}): Promise<LifecycleResult> {
+  const purchaseId = input.purchaseId.trim();
+  const purchase = await prisma.computePurchase.findUnique({ where: { purchaseId } });
+  if (!purchase) return { ok: false, code: "purchase_not_found", error: "Purchase not found" };
+  if (!input.isIssuer && purchase.buyerCommitment !== input.actorCommitment.toLowerCase()) {
+    return { ok: false, code: "not_party", error: "Only the buyer may refund this purchase" };
+  }
+  try {
+    await prisma.$transaction(async (tx) => {
+      const upd = await tx.computePurchase.updateMany({
+        where: { purchaseId, status: { in: ["HELD", "DELIVERED"] } },
+        data: { status: "REFUNDED" },
+      });
+      if (upd.count !== 1) throw new Error("INVALID_STATE");
+      await tx.agentWallet.upsert({
+        where: { subjectCommitment: purchase.buyerCommitment },
+        create: {
+          subjectCommitment: purchase.buyerCommitment,
+          balance: purchase.totalAngel,
+          earnedTotal: 0,
+          lastActivityAt: new Date(),
+        },
+        update: {
+          balance: { increment: purchase.totalAngel },
+          lastActivityAt: new Date(),
+        },
+      });
+      await tx.computeOffer.update({
+        where: { offerId: purchase.offerId },
+        data: { remainingUnits: { increment: purchase.units } },
+      });
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "refund failed";
+    if (message.includes("INVALID_STATE")) {
+      return { ok: false, code: "invalid_state", error: `Purchase is ${purchase.status}` };
+    }
+    return { ok: false, code: "internal_error", error: message };
+  }
+  return { ok: true, purchaseId, status: "REFUNDED" };
 }
 
 export async function listPurchases(opts: { buyerCommitment?: string; offerId?: string; limit?: number }) {

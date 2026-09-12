@@ -118,6 +118,14 @@
 - GET  /api/v1/compute/offers?capability=...          — browse active offers (public).
 - POST /api/v1/compute/offers/{offerId}/purchase      — buy metered units; ANGEL wallet-to-wallet,
   idempotent on purchase_id, gated by the buyer's spend policy.
+- POST /api/v1/compute/purchases/{purchaseId}          — escrow lifecycle: { action: "deliver"
+  (provider) | "release" (buyer→pays provider) | "refund" (buyer→funds returned, capacity restored) }.
+  Purchases are PAY-ON-DELIVERY: funds are held until release.
+- Reputation-weighted discovery: capability and offer results are ranked by provider reputation
+  score (then price), derived from evidence.
+- Conformance: POST /api/v1/agents/{commitment}/capabilities/{capability}/verify proves the
+  endpoint is live and controlled by the enrolled key (nonce challenge + Ed25519 signature);
+  only then is `verified` set true.
 - Docs: https://passport.metis.gold/docs/agent-economy
 
 ## Live adoption proof runbook (run the palette yourself)
