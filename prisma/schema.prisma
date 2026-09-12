@@ -403,20 +403,69 @@ model ComputeOffer {
   @@index([providerCommitment])
 }
 
-/// A purchase of compute units from a ComputeOffer (buyer pays ANGEL to the provider).
+/// A purchase of compute units from a ComputeOffer. Pay-on-delivery: funds are HELD on
+/// purchase, then DELIVERED → SETTLED (provider paid) or REFUNDED (buyer made whole).
 model ComputePurchase {
-  id                 String   @id @default(cuid())
-  purchaseId         String   @unique
-  offerId            String
-  buyerCommitment    String
-  providerCommitment String
-  units              Int
-  totalAngel         Int
-  status             String   @default("SETTLED") // SETTLED | REFUNDED
-  createdAt          DateTime @default(now())
+  id                  String    @id @default(cuid())
+  purchaseId          String    @unique
+  offerId             String
+  buyerCommitment     String
+  providerCommitment  String
+  units               Int
+  totalAngel          Int
+  status              String    @default("HELD") // HELD | DELIVERED | SETTLED | REFUNDED
+  deliverableDigest   String?
+  verifierCommitment  String?
+  verificationVerdict String? // APPROVE | REJECT
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   @@index([offerId])
   @@index([buyerCommitment])
+  @@index([providerCommitment])
+}
+
+/// Dispute over a delivered compute purchase, resolved by a quorum of staked juror agents.
+model ComputeDispute {
+  id         String    @id @default(cuid())
+  disputeId  String    @unique
+  purchaseId String
+  openedBy   String
+  reason     String
+  status     String    @default("OPEN") // OPEN | RESOLVED
+  resolution String? // RELEASE | REFUND
+  createdAt  DateTime  @default(now())
+  resolvedAt DateTime?
+
+  @@index([purchaseId])
+  @@index([status])
+}
+
+/// A staked juror's signed vote on a dispute. Unique per juror per dispute.
+model ComputeDisputeVote {
+  id               String   @id @default(cuid())
+  disputeId        String
+  jurorCommitment  String
+  vote             String // RELEASE | REFUND
+  signature        String
+  createdAt        DateTime @default(now())
+
+  @@unique([disputeId, jurorCommitment])
+  @@index([disputeId])
+}
+
+/// External revenue bridge: verified outside-USD revenue credited to an agent's ANGEL wallet.
+model AgentRevenue {
+  id             String   @id @default(cuid())
+  agentCommitment String
+  source         String // e.g. "data_pipeline"
+  externalRef    String   @unique
+  grossUsdCents  Int
+  angelCredited  Int
+  status         String   @default("CREDITED")
+  createdAt      DateTime @default(now())
+
+  @@index([agentCommitment])
 }
 
 /// Marketplace hire → hold → deliver → accept loop keyed by external task id.

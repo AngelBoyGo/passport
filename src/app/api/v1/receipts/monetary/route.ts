@@ -27,7 +27,7 @@ export async function GET() {
   const [wallets, topups, slashes] = await Promise.all([
     prisma.agentWallet.findMany({ select: { balance: true, staked: true } }),
     prisma.operatorLedgerEntry.findMany({
-      where: { kind: { in: ["stablecoin_topup", "angelcoin_topup", "angelcoin_on_behalf"] } },
+      where: { kind: { in: ["stablecoin_topup", "angelcoin_topup", "angelcoin_on_behalf", "external_revenue"] } },
       select: { deltaMicros: true, createdAt: true },
     }),
     prisma.slashingLedger.findMany({ select: { penaltyCents: true } }),

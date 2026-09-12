@@ -6,7 +6,11 @@
  * under the buyer's spend policy, and every purchase is idempotent. No external platform needed.
  */
 
+import { verify } from "@noble/ed25519";
+import { hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
+import "@/lib/receipt/crypto";
 import { prisma } from "@/lib/db";
+import { canonicalJson } from "@/lib/receipt/canonical";
 import { checkSpendPolicy } from "./spend-policy-service";
 import { computeReputationBatch } from "@/lib/reputation/agent-reputation";
 
@@ -270,13 +274,88 @@ export async function deliverCompute(input: {
   }
   const upd = await prisma.computePurchase.updateMany({
     where: { purchaseId, status: "HELD" },
-    data: { status: "DELIVERED" },
+    data: { status: "DELIVERED", deliverableDigest: input.deliverableDigest ?? null },
   });
   if (upd.count !== 1) {
     return { ok: false, code: "invalid_state", error: `Purchase is ${purchase.status}` };
   }
-  void input.deliverableDigest;
   return { ok: true, purchaseId, status: "DELIVERED" };
+}
+
+/** Canonical (signable) form of a third-party delivery verdict. */
+export function canonicalDeliveryVerdict(input: {
+  purchaseId: string;
+  deliverableDigest: string;
+  verdict: string;
+}): string {
+  return canonicalJson({
+    purchase_id: input.purchaseId,
+    deliverable_digest: input.deliverableDigest,
+    verdict: input.verdict,
+  });
+}
+
+/**
+ * A staked third-party verifier signs off that a delivered purchase's digest is correct.
+ * Records APPROVE/REJECT; release is blocked on REJECT and refund is blocked on APPROVE
+ * (dispute can override).
+ */
+export async function verifyDelivery(input: {
+  purchaseId: string;
+  verifierCommitment: string;
+  verdict: "APPROVE" | "REJECT";
+  signature: string;
+}): Promise<LifecycleResult> {
+  const purchaseId = input.purchaseId.trim();
+  const verifier = input.verifierCommitment.toLowerCase();
+  const verdict = input.verdict;
+
+  const purchase = await prisma.computePurchase.findUnique({ where: { purchaseId } });
+  if (!purchase) return { ok: false, code: "purchase_not_found", error: "Purchase not found" };
+  if (purchase.status !== "DELIVERED") {
+    return { ok: false, code: "invalid_state", error: `Purchase is ${purchase.status}` };
+  }
+  if (!purchase.deliverableDigest) {
+    return { ok: false, code: "no_deliverable", error: "Purchase has no deliverable digest" };
+  }
+  if (verifier === purchase.buyerCommitment || verifier === purchase.providerCommitment) {
+    return { ok: false, code: "not_independent", error: "Verifier must not be a party to the purchase" };
+  }
+
+  // Verifier must have skin in the game (staked ANGEL).
+  const wallet = await prisma.agentWallet.findUnique({ where: { subjectCommitment: verifier } });
+  if (!wallet || wallet.staked <= 0) {
+    return { ok: false, code: "not_staked", error: "Verifier must be a staked agent" };
+  }
+
+  const enrollment = await prisma.agentEnrollment.findUnique({
+    where: { subjectCommitment: verifier },
+    select: { publicKey: true, status: true },
+  });
+  if (!enrollment || enrollment.status !== "ISSUED") {
+    return { ok: false, code: "not_enrolled", error: "Verifier is not enrolled" };
+  }
+  if (!/^[0-9a-f]{128}$/i.test(input.signature)) {
+    return { ok: false, code: "invalid_signature", error: "signature must be 128-hex" };
+  }
+  let valid = false;
+  try {
+    valid = await verify(
+      hexToBytes(input.signature),
+      utf8ToBytes(canonicalDeliveryVerdict({ purchaseId, deliverableDigest: purchase.deliverableDigest, verdict })),
+      hexToBytes(enrollment.publicKey)
+    );
+  } catch {
+    valid = false;
+  }
+  if (!valid) return { ok: false, code: "invalid_signature", error: "verdict signature verification failed" };
+
+  const upd = await prisma.computePurchase.updateMany({
+    where: { purchaseId, status: "DELIVERED" },
+    data: { verifierCommitment: verifier, verificationVerdict: verdict },
+  });
+  if (upd.count !== 1) return { ok: false, code: "invalid_state", error: "Purchase state changed" };
+  return { ok: true, purchaseId, status: verdict };
 }
 
 /** Buyer (or ISSUER) releases a DELIVERED purchase, paying the provider. */
@@ -284,12 +363,20 @@ export async function releaseCompute(input: {
   purchaseId: string;
   actorCommitment: string;
   isIssuer: boolean;
+  force?: boolean;
 }): Promise<LifecycleResult> {
   const purchaseId = input.purchaseId.trim();
   const purchase = await prisma.computePurchase.findUnique({ where: { purchaseId } });
   if (!purchase) return { ok: false, code: "purchase_not_found", error: "Purchase not found" };
   if (!input.isIssuer && purchase.buyerCommitment !== input.actorCommitment.toLowerCase()) {
     return { ok: false, code: "not_party", error: "Only the buyer may release this purchase" };
+  }
+  if (!input.force && purchase.verificationVerdict === "REJECT") {
+    return {
+      ok: false,
+      code: "verification_rejected",
+      error: "Delivery was rejected by the verifier — refund, or open a dispute to override",
+    };
   }
   try {
     await prisma.$transaction(async (tx) => {
@@ -328,12 +415,20 @@ export async function refundCompute(input: {
   purchaseId: string;
   actorCommitment: string;
   isIssuer: boolean;
+  force?: boolean;
 }): Promise<LifecycleResult> {
   const purchaseId = input.purchaseId.trim();
   const purchase = await prisma.computePurchase.findUnique({ where: { purchaseId } });
   if (!purchase) return { ok: false, code: "purchase_not_found", error: "Purchase not found" };
   if (!input.isIssuer && purchase.buyerCommitment !== input.actorCommitment.toLowerCase()) {
     return { ok: false, code: "not_party", error: "Only the buyer may refund this purchase" };
+  }
+  if (!input.force && purchase.verificationVerdict === "APPROVE") {
+    return {
+      ok: false,
+      code: "verification_approved",
+      error: "Delivery was approved by the verifier — release, or open a dispute to override",
+    };
   }
   try {
     await prisma.$transaction(async (tx) => {

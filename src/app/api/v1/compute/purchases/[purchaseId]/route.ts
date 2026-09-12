@@ -6,6 +6,7 @@ import {
   deliverCompute,
   releaseCompute,
   refundCompute,
+  verifyDelivery,
   type LifecycleResult,
 } from "@/lib/agent-economy/compute-marketplace";
 
@@ -16,6 +17,13 @@ const STATUS_BY_CODE: Record<string, number> = {
   purchase_not_found: 404,
   not_provider: 403,
   not_party: 403,
+  not_independent: 403,
+  not_staked: 403,
+  not_enrolled: 403,
+  invalid_signature: 403,
+  verification_rejected: 409,
+  verification_approved: 409,
+  no_deliverable: 409,
   invalid_state: 409,
   internal_error: 500,
 };
@@ -77,8 +85,28 @@ export async function POST(
     return respond(result, NO_STORE);
   }
 
+  if (action === "verify") {
+    // A staked, independent third-party verifier signs off on the deliverable.
+    const verdict = String(body.verdict ?? "").toUpperCase();
+    if (verdict !== "APPROVE" && verdict !== "REJECT") {
+      return NextResponse.json({ error: "verdict must be APPROVE or REJECT" }, { status: 400, headers: NO_STORE });
+    }
+    const verifierCommitment = String(body.verifier_commitment ?? body.verifierCommitment ?? "");
+    const auth = await authorizeResource(request, { kind: "agent", id: verifierCommitment });
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status, headers: NO_STORE });
+    }
+    const result = await verifyDelivery({
+      purchaseId,
+      verifierCommitment,
+      verdict,
+      signature: String(body.signature ?? ""),
+    });
+    return respond(result, NO_STORE);
+  }
+
   return NextResponse.json(
-    { error: "Unknown action. Use 'deliver', 'release', or 'refund'." },
+    { error: "Unknown action. Use 'deliver', 'release', 'refund', or 'verify'." },
     { status: 400, headers: NO_STORE }
   );
 }

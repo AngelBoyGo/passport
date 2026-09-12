@@ -17,6 +17,7 @@ const DIRS = [
   "src/app/api/v1/raillab",
   "src/app/api/v1/agents",
   "src/app/api/v1/compute",
+  "src/app/api/v1/agent-revenue",
 ];
 const MUTATING = /export\s+async\s+function\s+(POST|PUT|PATCH|DELETE)\b/;
 const MARKER =

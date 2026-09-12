@@ -126,6 +126,14 @@
 - Conformance: POST /api/v1/agents/{commitment}/capabilities/{capability}/verify proves the
   endpoint is live and controlled by the enrolled key (nonce challenge + Ed25519 signature);
   only then is `verified` set true.
+- Delivery verification: a staked, independent verifier signs APPROVE|REJECT over the deliverable
+  digest; release is blocked on REJECT, refund blocked on APPROVE (dispute overrides).
+- Dispute arbitration: POST /api/v1/compute/disputes (party) opens; POST
+  /api/v1/compute/disputes/{id}/vote (staked, independent juror, signed) votes. A quorum majority
+  executes release/refund (ties → refund).
+- External revenue bridge: POST /api/v1/agent-revenue (ISSUER or HMAC x-revenue-signature) credits
+  verified outside-USD revenue to an agent's ANGEL wallet at parity, recording it as reserve;
+  idempotent on external_ref. GET /api/v1/agent-revenue/{commitment} lists it.
 - Docs: https://passport.metis.gold/docs/agent-economy
 
 ## Live adoption proof runbook (run the palette yourself)
