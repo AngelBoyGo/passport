@@ -6,6 +6,11 @@ import { POST as postArrive } from "../transit/arrive/route";
 import { GET as getCorridors } from "../transit/corridors/route";
 import * as transit from "@/lib/reserves/bonded-transit";
 
+// Dispatch now requires an ISSUER key (moves a vaulted batch + locks a carrier bond).
+vi.mock("@/lib/auth/authorize", () => ({
+  requireIssuer: vi.fn(async () => ({ ok: true, operatorId: "op_issuer" })),
+}));
+
 describe("Bonded Transit & Coastal Corridors API Endpoints", () => {
   beforeEach(() => {
     vi.restoreAllMocks();

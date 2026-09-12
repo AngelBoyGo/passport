@@ -5,6 +5,11 @@ import { POST as postMilestones } from "../fund/milestones/route";
 import * as fund from "@/lib/reserves/industrialization-fund";
 import type { StabilizationDisbursement, SovereignIndustrialProject } from "@prisma/client";
 
+// Project registration now requires an ISSUER key (allocates stabilization ANGEL).
+vi.mock("@/lib/auth/authorize", () => ({
+  requireIssuer: vi.fn(async () => ({ ok: true, operatorId: "op_issuer" })),
+}));
+
 describe("Sovereign Industrialization Fund API Endpoints", () => {
   beforeEach(() => {
     vi.restoreAllMocks();

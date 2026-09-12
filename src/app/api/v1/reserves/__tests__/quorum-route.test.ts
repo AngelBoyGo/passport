@@ -5,6 +5,11 @@ import { POST as postSign } from "../quorum/sign/route";
 import { GET as getProposals } from "../quorum/proposals/route";
 import * as quorum from "@/lib/reserves/threshold-quorum";
 
+// Proposal creation now requires an authenticated key.
+vi.mock("@/lib/operator", () => ({
+  authenticateApiKey: vi.fn(async () => ({ id: "op_1", apiKeyRole: "ISSUER" })),
+}));
+
 describe("Sovereign Quorum API Endpoints", () => {
   beforeEach(() => {
     vi.restoreAllMocks();

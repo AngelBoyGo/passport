@@ -95,6 +95,15 @@
   then ed25519).
 - Docs: https://passport.metis.gold/docs/posture
 
+## Authorization & signed agent intents
+- Value-moving routes authorize the RESOURCE, not just the caller: an ISSUER key acts on any
+  resource; a HOLDER key acts only on agents it owns / escrows it is party to / rails it
+  authorized. Agent-initiated value routes (AMM swap/fractionalize, escrow release) require a
+  HOLDER to attach an Ed25519 `intent` over the canonical operation (action, resource, params,
+  nonce, expires_at) verified against the agent's registered enrollment key; nonces are
+  single-use. ISSUER keys may act on behalf (no intent).
+- Docs: https://passport.metis.gold/docs/authorization
+
 ## Live adoption proof runbook (run the palette yourself)
 - Runbook: /scripts/adoption-loop (npm run smoke:adoption) — enrolls an agent, posts signed
   evidence, issues+finalizes a receipt, provisions a dry-run-safe canary rail and settles it via

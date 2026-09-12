@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit, clientIpFromRequest, rateLimitResponse } from "@/lib/rateLimit";
+import { requireIssuer } from "@/lib/auth/authorize";
 import { bridgeIndustrialDoréToRefinery } from "@/lib/reserves/industrial-mining";
 
 export const dynamic = "force-dynamic";
 
 /**
- * POST /api/v1/reserves/industrial/bridge — Bridges industrial doré smelting runs into an investment-grade VaultBatch.
+ * POST /api/v1/reserves/industrial/bridge - Bridges industrial doré smelting runs into an investment-grade VaultBatch.
+ * AUTHORIZATION: ISSUER key required (creates investment-grade reserve records).
  */
 export async function POST(request: NextRequest) {
   const ip = clientIpFromRequest(request.headers);
@@ -13,6 +15,12 @@ export async function POST(request: NextRequest) {
   if (!rate.allowed) {
     return NextResponse.json({ error: "Rate limit exceeded" }, rateLimitResponse(rate, 30));
   }
+
+  const auth = await requireIssuer(request);
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
 
   let body: Record<string, unknown>;
   try {

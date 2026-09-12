@@ -5,6 +5,11 @@ import { GET as getStations } from "../artisanal/stations/route";
 import { POST as postBridge } from "../artisanal/bridge/route";
 import * as artisanalSourcing from "@/lib/reserves/artisanal-sourcing";
 
+// Bridge now requires an ISSUER key (creates investment-grade reserve records).
+vi.mock("@/lib/auth/authorize", () => ({
+  requireIssuer: vi.fn(async () => ({ ok: true, operatorId: "op_issuer" })),
+}));
+
 describe("Artisanal Sourcing API Endpoints", () => {
   beforeEach(() => {
     vi.restoreAllMocks();

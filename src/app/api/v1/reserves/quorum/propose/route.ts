@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit, clientIpFromRequest, rateLimitResponse } from "@/lib/rateLimit";
+import { authenticateApiKey } from "@/lib/operator";
 import { createQuorumProposal } from "@/lib/reserves/threshold-quorum";
 
 export const dynamic = "force-dynamic";
 
 /**
  * POST /api/v1/reserves/quorum/propose — Propose a Trilateral Sovereign Governance Action (AES 2-of-3).
+ *
+ * AUTHORIZATION: an authenticated key is required (the proposal is inert until distinct
+ * threshold signatures are collected via /quorum/sign).
  *
  * Body:
  *   proposal_id?: string
@@ -20,6 +24,11 @@ export async function POST(request: NextRequest) {
   const rate = await checkRateLimit(`reserves:quorum:propose:${ip}`, 30, 60_000);
   if (!rate.allowed) {
     return NextResponse.json({ error: "Rate limit exceeded" }, rateLimitResponse(rate, 30));
+  }
+
+  const operator = await authenticateApiKey(request.headers.get("authorization"));
+  if (!operator) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   let body: Record<string, unknown>;

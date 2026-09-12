@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit, clientIpFromRequest, rateLimitResponse } from "@/lib/rateLimit";
-import { authorizeAgentCommitment } from "@/lib/auth/agent-ownership";
+import { authorizeResource, verifyAgentIntent } from "@/lib/auth/authorize";
 import { fractionalizeVaultBatch } from "@/lib/reserves/fractional-amm";
 
 export const dynamic = "force-dynamic";
@@ -11,8 +11,8 @@ const NO_STORE = { "Cache-Control": "no-store, max-age=0" };
  * Locks an AUDITED unencumbered VaultBatch and mints exact integer milli-unit fractional
  * commodity tokens directly into the depositor's deterministic 64-hex wallet.
  *
- * AUTHORIZATION: fractionalization locks a real vault batch and mints tokens to the named
- * depositor, so the caller must own that commitment (HOLDER) or hold an ISSUER key.
+ * AUTHORIZATION: an ISSUER key may act on any depositor; a HOLDER key must own the depositor
+ * AND present a signed intent over the batch + depositor.
  */
 export async function POST(request: NextRequest) {
   const ip = clientIpFromRequest(request.headers);
@@ -40,9 +40,23 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const auth = await authorizeAgentCommitment(request, depositorCommitment);
+  const auth = await authorizeResource(request, { kind: "agent", id: depositorCommitment });
   if (!auth.ok) {
     return NextResponse.json({ error: auth.error }, { status: auth.status, headers: NO_STORE });
+  }
+  if (auth.role === "HOLDER") {
+    const intent = await verifyAgentIntent({
+      intent: body.intent,
+      expectAction: "amm.fractionalize",
+      expectResource: { kind: "agent", id: depositorCommitment },
+      expectParams: {
+        batch_number: batchNumber,
+        depositor_commitment: depositorCommitment,
+      },
+    });
+    if (!intent.ok) {
+      return NextResponse.json({ error: intent.error }, { status: intent.status, headers: NO_STORE });
+    }
   }
 
   try {

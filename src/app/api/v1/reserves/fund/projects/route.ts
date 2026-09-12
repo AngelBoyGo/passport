@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit, clientIpFromRequest, rateLimitResponse } from "@/lib/rateLimit";
+import { requireIssuer } from "@/lib/auth/authorize";
 import {
   registerIndustrialProject,
   listFundProjects,
@@ -66,6 +67,12 @@ export async function POST(request: NextRequest) {
   const rate = await checkRateLimit(`reserves:fund:projects:post:${ip}`, 30, 60_000);
   if (!rate.allowed) {
     return NextResponse.json({ error: "Rate limit exceeded" }, rateLimitResponse(rate, 30));
+  }
+
+  // Registering an industrialization project allocates sovereign stabilization ANGEL.
+  const auth = await requireIssuer(request);
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
   let body: Record<string, unknown>;

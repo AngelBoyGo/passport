@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit, clientIpFromRequest, rateLimitResponse } from "@/lib/rateLimit";
-import { authenticateApiKey } from "@/lib/operator";
-import { prisma } from "@/lib/db";
+import { authorizeResource, verifyAgentIntent } from "@/lib/auth/authorize";
 import {
   createCommodityEscrow,
   releaseEscrowOnAssay,
@@ -15,14 +14,15 @@ const NO_STORE = { "Cache-Control": "no-store, max-age=0" };
 /**
  * POST /api/v1/reserves/escrow — create, release, or refund a bilateral RWA escrow.
  *
- * AUTHORIZATION: an escrow moves the buyer's locked ANGEL, so a HOLDER key may only create an
- * escrow it funds, and may only release/refund an escrow it is a party to. An ISSUER key may
- * act on any escrow (delegated/arbitration).
+ * AUTHORIZATION (object-level): an escrow moves the buyer's locked ANGEL, so a HOLDER key may
+ * only create an escrow it funds, and may only release/refund an escrow it is a party to. A
+ * HOLDER release also requires a signed agent intent bound to the escrow + assay certificate.
+ * An ISSUER key may act on any escrow (delegated/arbitration).
  *
  * Body actions:
  *   { action: "create", escrow_id, buyer_commitment, seller_commitment, batch_number,
  *     fine_grams, unit_price_usd, locked_angel, commodity_type?, timeout_hours? }
- *   { action: "release", escrow_id, assay_certification_number, release_signature }
+ *   { action: "release", escrow_id, assay_certification_number, release_signature, intent? }
  *   { action: "refund", escrow_id }
  */
 export async function POST(request: NextRequest) {
@@ -30,11 +30,6 @@ export async function POST(request: NextRequest) {
   const rate = await checkRateLimit(`reserves:escrow:post:${ip}`, 30, 60_000);
   if (!rate.allowed) {
     return NextResponse.json({ error: "Rate limit exceeded" }, rateLimitResponse(rate, 30));
-  }
-
-  const operator = await authenticateApiKey(request.headers.get("authorization"));
-  if (!operator) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   let body: Record<string, unknown>;
@@ -46,24 +41,13 @@ export async function POST(request: NextRequest) {
 
   const action = String(body.action || "");
   const escrowId = String(body.escrow_id || body.escrowId || "");
-  const isIssuer = operator.apiKeyRole !== "HOLDER";
-  const ownsCommitment = async (commitment: string): Promise<boolean> => {
-    if (!commitment) return false;
-    const owned = await prisma.agent.findFirst({
-      where: { operatorId: operator.id, agentId: commitment },
-      select: { id: true },
-    });
-    return Boolean(owned);
-  };
 
   try {
     if (action === "create") {
       const buyerCommitment = String(body.buyer_commitment || body.buyerCommitment || "");
-      if (!isIssuer && !(await ownsCommitment(buyerCommitment))) {
-        return NextResponse.json(
-          { error: "The authenticated operator does not own the buyer commitment" },
-          { status: 403, headers: NO_STORE }
-        );
+      const auth = await authorizeResource(request, { kind: "agent", id: buyerCommitment });
+      if (!auth.ok) {
+        return NextResponse.json({ error: auth.error }, { status: auth.status, headers: NO_STORE });
       }
       const escrow = await createCommodityEscrow({
         escrowId,
@@ -80,18 +64,37 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === "release" || action === "refund") {
-      // Caller must be a party to the escrow (buyer or seller) unless ISSUER.
-      if (!isIssuer) {
-        const existing = await getEscrow(escrowId);
-        if (!existing) {
-          return NextResponse.json({ error: "Escrow not found" }, { status: 404, headers: NO_STORE });
+      const auth = await authorizeResource(request, { kind: "escrow", id: escrowId });
+      if (!auth.ok) {
+        return NextResponse.json({ error: auth.error }, { status: auth.status, headers: NO_STORE });
+      }
+
+      const assayCertificationNumber = String(
+        body.assay_certification_number || body.assayCertificationNumber || ""
+      );
+
+      if (action === "release" && auth.role === "HOLDER") {
+        const intent = await verifyAgentIntent({
+          intent: body.intent,
+          expectAction: "escrow.release",
+          expectResource: { kind: "escrow", id: escrowId },
+          expectParams: {
+            escrow_id: escrowId,
+            assay_certification_number: assayCertificationNumber,
+          },
+        });
+        if (!intent.ok) {
+          return NextResponse.json({ error: intent.error }, { status: intent.status, headers: NO_STORE });
         }
-        const party =
-          (await ownsCommitment(existing.buyerCommitment)) ||
-          (await ownsCommitment(existing.sellerCommitment));
-        if (!party) {
+        // The signing agent must be a party to the escrow.
+        const escrow = await getEscrow(escrowId);
+        const signer = intent.agentCommitment;
+        if (
+          !escrow ||
+          (escrow.buyerCommitment !== signer && escrow.sellerCommitment !== signer)
+        ) {
           return NextResponse.json(
-            { error: "The authenticated operator is not a party to this escrow" },
+            { error: "intent signer is not a party to this escrow" },
             { status: 403, headers: NO_STORE }
           );
         }
@@ -100,9 +103,7 @@ export async function POST(request: NextRequest) {
       if (action === "release") {
         const escrow = await releaseEscrowOnAssay({
           escrowId,
-          assayCertificationNumber: String(
-            body.assay_certification_number || body.assayCertificationNumber || ""
-          ),
+          assayCertificationNumber,
           releaseSignature: String(body.release_signature || body.releaseSignature || ""),
         });
         return NextResponse.json({ success: true, escrow }, { status: 200 });

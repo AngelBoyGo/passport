@@ -6,6 +6,11 @@ import { GET as getConcessions } from "../industrial/concessions/route";
 import * as industrial from "@/lib/reserves/industrial-mining";
 import type { SmeltingRunTelemetry, VaultBatch } from "@prisma/client";
 
+// Bridge now requires an ISSUER key (creates investment-grade reserve records).
+vi.mock("@/lib/auth/authorize", () => ({
+  requireIssuer: vi.fn(async () => ({ ok: true, operatorId: "op_issuer" })),
+}));
+
 describe("Industrial Mining API Endpoints", () => {
   beforeEach(() => {
     vi.restoreAllMocks();

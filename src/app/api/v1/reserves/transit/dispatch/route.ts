@@ -1,17 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit, clientIpFromRequest, rateLimitResponse } from "@/lib/rateLimit";
+import { requireIssuer } from "@/lib/auth/authorize";
 import { dispatchDiplomaticTransit } from "@/lib/reserves/bonded-transit";
 
 export const dynamic = "force-dynamic";
 
 /**
  * POST /api/v1/reserves/transit/dispatch — Dispatch bullion convoy under diplomatic bonded seal.
+ * AUTHORIZATION: ISSUER key required (moves a vaulted batch and locks a carrier bond).
  */
 export async function POST(request: NextRequest) {
   const ip = clientIpFromRequest(request.headers);
   const rate = await checkRateLimit(`reserves:transit:dispatch:${ip}`, 30, 60_000);
   if (!rate.allowed) {
     return NextResponse.json({ error: "Rate limit exceeded" }, rateLimitResponse(rate, 30));
+  }
+
+  const auth = await requireIssuer(request);
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
   let body: Record<string, unknown>;

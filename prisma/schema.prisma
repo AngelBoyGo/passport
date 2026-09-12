@@ -330,6 +330,20 @@ model AgentEnrollment {
   @@index([status])
 }
 
+/// Signed agent intent nonce (Phase 31): a DB-unique replay guard for agent-signed value
+/// operations (AMM swap/fractionalize, escrow release). A nonce may be consumed at most once.
+model AgentIntentNonce {
+  id              String   @id @default(cuid())
+  nonce           String   @unique
+  agentCommitment String
+  action          String
+  expiresAt       DateTime
+  createdAt       DateTime @default(now())
+
+  @@index([agentCommitment])
+  @@index([expiresAt])
+}
+
 /// Marketplace hire → hold → deliver → accept loop keyed by external task id.
 model Engagement {
   id                   String           @id @default(cuid())
