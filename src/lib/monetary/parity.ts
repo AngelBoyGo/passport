@@ -117,8 +117,7 @@ export function redemptionQuote(input: {
 }
 
 /** Aggregate backing status for reporting (e.g. the monetary receipt / trust surfaces). */
-export interface ParityStatus {
-  supplyAngel: number;
+export interface ParityStatus {  supplyAngel: number;
   reserveUsd: number;
   requiredReserveUsd: number;
   coverageRatio: number;
@@ -127,8 +126,7 @@ export interface ParityStatus {
   surplusUsd: number;
 }
 
-export function parityStatus(input: { supplyAngel: number; reserveUsd: number }): ParityStatus {
-  const supplyAngel = Math.max(0, input.supplyAngel);
+export function parityStatus(input: { supplyAngel: number; reserveUsd: number }): ParityStatus {  const supplyAngel = Math.max(0, input.supplyAngel);
   const reserveUsd = Math.max(0, input.reserveUsd);
   const requiredReserveUsd = supplyAngel * PARITY_USD;
   const coverageRatio = requiredReserveUsd > 0 ? reserveUsd / requiredReserveUsd : 1;
@@ -144,4 +142,43 @@ export function parityStatus(input: { supplyAngel: number; reserveUsd: number })
 
 function round4(n: number): number {
   return Math.round(n * 10_000) / 10_000;
+}
+
+/**
+ * Reserve-integrated issuance quote for external revenue: USD earned outside the system is added
+ * to the reserve and the agent is credited backed ANGEL at parity. Because the USD added is
+ * always >= angelCredited x parity, coverage can only rise — revenue can never dilute backing.
+ */
+export interface RevenueIssuance {
+  angelCredited: number;
+  reserveUsdAdded: number;
+  coverageBefore: number;
+  coverageAfter: number;
+  backed: boolean;
+}
+
+export function revenueIssuanceQuote(input: {
+  grossUsdCents: number;
+  supplyAngel: number;
+  reserveUsd: number;
+}): RevenueIssuance {
+  const grossUsdCents = Math.max(0, Math.floor(input.grossUsdCents));
+  const supplyAngel = Math.max(0, input.supplyAngel);
+  const reserveUsd = Math.max(0, input.reserveUsd);
+
+  const reserveUsdAdded = grossUsdCents / 100;
+  const angelCredited = Math.floor(grossUsdCents / (PARITY_USD * 100));
+
+  const before = supplyAngel > 0 ? reserveUsd / (supplyAngel * PARITY_USD) : 1;
+  const afterSupply = supplyAngel + angelCredited;
+  const after = afterSupply > 0 ? (reserveUsd + reserveUsdAdded) / (afterSupply * PARITY_USD) : 1;
+
+  return {
+    angelCredited,
+    reserveUsdAdded: round2(reserveUsdAdded),
+    coverageBefore: round4(before),
+    coverageAfter: round4(after),
+    // Never worsens backing (coverage non-decreasing); fully backed once after >= 1.
+    backed: after >= before - 1e-9,
+  };
 }

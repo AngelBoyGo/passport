@@ -67,6 +67,7 @@ export async function POST(request: NextRequest) {
       external_ref: result.externalRef,
       gross_usd_cents: result.grossUsdCents,
       angel_credited: result.angelCredited,
+      reserve_usd_added: result.reserveUsdAdded,
       deduped: result.deduped,
     },
     { status: result.deduped ? 200 : 201, headers: NO_STORE }

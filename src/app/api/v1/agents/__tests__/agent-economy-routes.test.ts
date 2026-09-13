@@ -4,6 +4,7 @@ import { NextRequest } from "next/server";
 const { mocks } = vi.hoisted(() => ({
   mocks: {
     authorizeResource: vi.fn(),
+    verifyAgentIntent: vi.fn(),
     declareCapability: vi.fn(),
     listAgentCapabilities: vi.fn(),
     discoverCapabilities: vi.fn(),
@@ -19,7 +20,10 @@ vi.mock("@/lib/rateLimit", () => ({
   clientIpFromRequest: () => "127.0.0.1",
   rateLimitResponse: () => ({}),
 }));
-vi.mock("@/lib/auth/authorize", () => ({ authorizeResource: mocks.authorizeResource }));
+vi.mock("@/lib/auth/authorize", () => ({
+  authorizeResource: mocks.authorizeResource,
+  verifyAgentIntent: mocks.verifyAgentIntent,
+}));
 vi.mock("@/lib/agent-economy/capability-registry", () => ({
   declareCapability: mocks.declareCapability,
   listAgentCapabilities: mocks.listAgentCapabilities,
@@ -92,7 +96,7 @@ describe("agent-economy routes", () => {
     });
 
     it("purchase maps spend_policy_denied to 403", async () => {
-      mocks.authorizeResource.mockResolvedValue({ ok: true, operatorId: "op", role: "HOLDER" });
+      mocks.authorizeResource.mockResolvedValue({ ok: true, operatorId: "op", role: "ISSUER" });
       mocks.purchaseUnits.mockResolvedValue({ ok: false, code: "spend_policy_denied", error: "over cap" });
       const { POST } = await import("@/app/api/v1/compute/offers/[offerId]/purchase/route");
       const res = await POST(
@@ -102,10 +106,10 @@ describe("agent-economy routes", () => {
       expect(res.status).toBe(403);
     });
 
-    it("purchase returns 201 on success", async () => {
-      mocks.authorizeResource.mockResolvedValue({ ok: true, operatorId: "op", role: "HOLDER" });
+    it("purchase returns 201 on success (ISSUER)", async () => {
+      mocks.authorizeResource.mockResolvedValue({ ok: true, operatorId: "op", role: "ISSUER" });
       mocks.purchaseUnits.mockResolvedValue({
-        ok: true, purchaseId: "p1", units: 5, totalAngel: 50, providerCommitment: "b".repeat(64), deduped: false,
+        ok: true, purchaseId: "p1", units: 5, totalAngel: 50, providerCommitment: "b".repeat(64), status: "HELD", deduped: false,
       });
       const { POST } = await import("@/app/api/v1/compute/offers/[offerId]/purchase/route");
       const res = await POST(
@@ -115,6 +119,18 @@ describe("agent-economy routes", () => {
       expect(res.status).toBe(201);
       const body = await res.json();
       expect(body.total_angel).toBe(50);
+    });
+
+    it("HOLDER purchase requires a signed intent", async () => {
+      mocks.authorizeResource.mockResolvedValue({ ok: true, operatorId: "op", role: "HOLDER" });
+      mocks.verifyAgentIntent.mockResolvedValue({ ok: false, status: 400, error: "signed intent is required" });
+      const { POST } = await import("@/app/api/v1/compute/offers/[offerId]/purchase/route");
+      const res = await POST(
+        req("POST", { buyer_commitment: AGENT, units: 5 }),
+        { params: Promise.resolve({ offerId: "gpu-hours" }) }
+      );
+      expect(res.status).toBe(400);
+      expect(mocks.purchaseUnits).not.toHaveBeenCalled();
     });
   });
 });

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { checkRateLimit, clientIpFromRequest, rateLimitResponse } from "@/lib/rateLimit";
-import { authorizeResource } from "@/lib/auth/authorize";
+import { authorizeResource, verifyAgentIntent } from "@/lib/auth/authorize";
 import { purchaseUnits } from "@/lib/agent-economy/compute-marketplace";
 
 export const dynamic = "force-dynamic";
@@ -46,6 +46,21 @@ export async function POST(
   }
 
   const { offerId } = await params;
+
+  // A HOLDER key must also prove the AGENT authorised this exact purchase (signed intent) —
+  // so a leaked operator key alone cannot spend the agent's ANGEL.
+  if (auth.role === "HOLDER") {
+    const intent = await verifyAgentIntent({
+      intent: body.intent,
+      expectAction: "compute.purchase",
+      expectResource: { kind: "agent", id: buyerCommitment },
+      expectParams: { offer_id: offerId, units: Number(body.units) },
+    });
+    if (!intent.ok) {
+      return NextResponse.json({ error: intent.error }, { status: intent.status, headers: NO_STORE });
+    }
+  }
+
   const purchaseId =
     (body.purchase_id ? String(body.purchase_id) : "") || `cp_${bytesToHex(crypto.getRandomValues(new Uint8Array(8)))}`;
 

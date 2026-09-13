@@ -11,7 +11,7 @@ import { timingSafeEqual } from "node:crypto";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 import { prisma } from "@/lib/db";
-import { PARITY_USD } from "@/lib/monetary/parity";
+import { PARITY_USD, revenueIssuanceQuote } from "@/lib/monetary/parity";
 import { markJobSold } from "./pipeline";
 
 /** USD cents → whole ANGEL at the current parity anchor. */
@@ -53,6 +53,7 @@ export type RevenueResult =
       externalRef: string;
       grossUsdCents: number;
       angelCredited: number;
+      reserveUsdAdded: number;
       deduped: boolean;
     }
   | { ok: false; code: string; error: string };
@@ -88,7 +89,8 @@ export async function creditExternalRevenue(
     }
   }
 
-  const angelCredited = usdCentsToAngel(grossUsdCents);
+  const quote = revenueIssuanceQuote({ grossUsdCents, supplyAngel: 0, reserveUsd: 0 });
+  const angelCredited = quote.angelCredited;
   if (angelCredited < 1) {
     return { ok: false, code: "below_floor", error: "Revenue is below the 1 ANGEL crediting floor" };
   }
@@ -146,6 +148,7 @@ export async function creditExternalRevenue(
       externalRef,
       grossUsdCents,
       angelCredited,
+      reserveUsdAdded: quote.reserveUsdAdded,
       deduped: false,
     };
   } catch (err) {
@@ -158,6 +161,7 @@ export async function creditExternalRevenue(
           externalRef,
           grossUsdCents: existing.grossUsdCents,
           angelCredited: existing.angelCredited,
+          reserveUsdAdded: existing.grossUsdCents / 100,
           deduped: true,
         };
       }

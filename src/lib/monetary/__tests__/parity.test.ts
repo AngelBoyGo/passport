@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   redemptionQuote,
   parityStatus,
+  revenueIssuanceQuote,
   PARITY_USD,
   PARITY_REDEMPTION_FEE_BPS,
   STABILITY_CONTRACT,
@@ -71,5 +72,13 @@ describe("ANGEL parity redemption (stability contract)", () => {
     // no reserve to pay from
     expect(q.redeemable).toBe(false);
     expect(q.maxRedeemableAngel).toBe(0);
+  });
+
+  it("revenue issuance never dilutes backing (coverage non-decreasing)", () => {
+    const q = revenueIssuanceQuote({ grossUsdCents: 600, supplyAngel: 100, reserveUsd: 520 });
+    expect(q.angelCredited).toBe(1);
+    expect(q.reserveUsdAdded).toBe(6);
+    expect(q.coverageAfter).toBeGreaterThanOrEqual(q.coverageBefore);
+    expect(q.backed).toBe(true);
   });
 });

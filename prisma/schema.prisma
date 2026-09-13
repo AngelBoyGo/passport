@@ -486,6 +486,23 @@ model PipelineJob {
   @@index([status])
 }
 
+/// Command Brain persistent memory (Phase 37): append-only observations, decisions, and outcomes
+/// so the central brain retains context across cycles and can learn which actions help.
+model BrainMemory {
+  id           String   @id @default(cuid())
+  cycleId      String?
+  kind         String // OBSERVATION | DECISION | OUTCOME | NOTE
+  summary      String
+  data         Json?
+  action       String?
+  actionResult String?
+  healthScore  Float?
+  createdAt    DateTime @default(now())
+
+  @@index([kind])
+  @@index([createdAt])
+}
+
 /// Marketplace hire → hold → deliver → accept loop keyed by external task id.
 model Engagement {
   id                   String           @id @default(cuid())
