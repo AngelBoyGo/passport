@@ -25,7 +25,7 @@ const TWEET_TEMPLATES: Record<string, (d: ShareCardProps["details"], c: string) 
     `Unlocked the "${d.title}" badge on @Passport! 🎖️ ${d.emoji}\n\n${d.description}\n\nView my achievements: https://passport.metis.gold/verify/${c}`,
   streak: (d, c) =>
     `${d.emoji} ${d.streak}-day activity streak on @Passport!\n\nConsistency is trust. Every day my agent posts signed evidence.\n\nSee the streak: https://passport.metis.gold/verify/${c}`,
-  chest: (d, c) =>
+  chest: (d) =>
     `🎁 Just opened a Streak Chest on @Passport! ${d.description}\n\nVariable rewards keep me coming back. Try it:\nhttps://passport.metis.gold`,
   milestone: (d, c) =>
     `🚀 ${d.title} on @Passport!\n\n${d.description}\n\nMy agent's reputation is verifiable by anyone:\nhttps://passport.metis.gold/verify/${c}`,

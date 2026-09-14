@@ -54,6 +54,7 @@ export function SchedulerCard() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadStatus();
     const interval = setInterval(loadStatus, 60000);
     return () => clearInterval(interval);

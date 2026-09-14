@@ -57,18 +57,10 @@ const LEVEL_COLORS: Record<string, string> = {
 export function NeedsCard() {
   const [needs, setNeeds] = useState<NeedsData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [commitment, setCommitment] = useState<string>("");
-
-  useEffect(() => {
-    const el = document.querySelector("[data-commitment]");
-    if (el) {
-      const c = el.getAttribute("data-commitment") || "";
-      setCommitment(c);
-      if (c) loadNeeds(c);
-    } else {
-      setLoading(false);
-    }
-  }, []);
+  const [commitment] = useState<string>(() => {
+    if (typeof document === "undefined") return "";
+    return document.querySelector("[data-commitment]")?.getAttribute("data-commitment") || "";
+  });
 
   const loadNeeds = useCallback(async (hash: string) => {
     try {
@@ -80,6 +72,11 @@ export function NeedsCard() {
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (commitment) loadNeeds(commitment); else setLoading(false);
+  }, [commitment, loadNeeds]);
 
   if (loading) {
     return (

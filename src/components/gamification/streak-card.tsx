@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { ShareCard } from "./share-card";
 
 interface StreakData {
   currentStreak: number;
@@ -25,8 +24,6 @@ export function StreakCard() {
   const [streak, setStreak] = useState<StreakData | null>(null);
   const [loading, setLoading] = useState(true);
   const [showChest, setShowChest] = useState(false);
-  const [shareEvent, setShareEvent] = useState<{ type: "streak" | "chest"; details: { title: string; description: string; emoji: string; streak?: number } } | null>(null);
-  const [shareCommitment, setShareCommitment] = useState<string>("");
 
   const loadStreak = useCallback(async () => {
     try {
@@ -44,7 +41,8 @@ export function StreakCard() {
     }
   }, []);
 
-  useEffect(() => { loadStreak(); }, [loadStreak]);
+  useEffect(() => { // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadStreak(); }, [loadStreak]);
 
   if (loading || !streak) {
     return (

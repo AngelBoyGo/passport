@@ -44,6 +44,7 @@ export function ThinkTankCard() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadThinkTank();
     const interval = setInterval(loadThinkTank, 60000);
     return () => clearInterval(interval);

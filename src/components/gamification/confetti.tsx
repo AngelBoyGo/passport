@@ -14,7 +14,10 @@ interface ConfettiProps {
  * Colors: gold (achievement), purple (rare), green (success).
  */
 export function ConfettiEffect({ trigger, type = "celebration", onComplete }: ConfettiProps) {
-  const [particles, setParticles] = useState<Array<{ id: number; x: number; color: string; delay: number; size: number }>>([]);
+  const [particles, setParticles] = useState<Array<{
+    id: number; x: number; color: string; delay: number; size: number;
+    round: boolean; duration: number;
+  }>>([]);
 
   useEffect(() => {
     if (!trigger) return;
@@ -31,8 +34,11 @@ export function ConfettiEffect({ trigger, type = "celebration", onComplete }: Co
       color: colors[Math.floor(Math.random() * colors.length)],
       delay: Math.random() * 0.3,
       size: 4 + Math.random() * 8,
+      round: Math.random() > 0.5,
+      duration: 1.5 + Math.random(),
     }));
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setParticles(newParticles);
 
     const timer = setTimeout(() => {
@@ -57,9 +63,9 @@ export function ConfettiEffect({ trigger, type = "celebration", onComplete }: Co
             width: `${p.size}px`,
             height: `${p.size}px`,
             backgroundColor: p.color,
-            borderRadius: Math.random() > 0.5 ? "50%" : "2px",
+            borderRadius: p.round ? "50%" : "2px",
             animationDelay: `${p.delay}s`,
-            animationDuration: `${1.5 + Math.random()}s`,
+            animationDuration: `${p.duration}s`,
             opacity: 0.9,
           }}
         />

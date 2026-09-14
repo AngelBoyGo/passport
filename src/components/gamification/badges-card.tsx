@@ -23,14 +23,11 @@ export function BadgesCard() {
   const [badges, setBadges] = useState<AchievementBadgeData[]>([]);
   const [loading, setLoading] = useState(true);
   const [newBadgeId, setNewBadgeId] = useState<string | null>(null);
-  const [commitment, setCommitment] = useState<string>("");
-
-  useEffect(() => {
-    loadBadges();
-    // Try to get the commitment from the URL or a data attribute
+  const [commitment] = useState<string>(() => {
+    if (typeof document === "undefined") return "";
     const el = document.querySelector("[data-commitment]");
-    if (el) setCommitment(el.getAttribute("data-commitment") || "");
-  }, []);
+    return el?.getAttribute("data-commitment") || "";
+  });
 
   const loadBadges = useCallback(async () => {
     try {
@@ -48,6 +45,11 @@ export function BadgesCard() {
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadBadges();
+  }, [loadBadges]);
 
   if (loading) {
     return (
