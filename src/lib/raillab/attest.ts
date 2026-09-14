@@ -18,8 +18,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { prisma } from "@/lib/db";
 import { canonicalJson, sha256Hex } from "@/lib/receipt/canonical";
-import { getPublicKey, sign, verify } from "@noble/ed25519";
+import { getPublicKey, sign } from "@noble/ed25519";
 import { bytesToHex, hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
+import { verifyPinnedSignature } from "@/lib/auth/verifyPinnedSignature";
 import { runIntegrityCheck, type IntegrityStatus } from "./integrity";
 
 export const ATTESTATION_QUIET_PERIOD_MS = 5 * 60 * 1000; // 5 min
@@ -306,12 +307,13 @@ export async function verifyIntegrityAttestation(
     return { valid: false, reason: "missing signature or public key" };
   }
   try {
-    const ok = await verify(
-      hexToBytes(attestation.signature),
-      utf8ToBytes(attestation.attestationHash),
-      hexToBytes(attestation.publicKey)
-    );
-    return ok ? { valid: true } : { valid: false, reason: "signature mismatch" };
+    const check = await verifyPinnedSignature({
+      pinnedKey: attestation.publicKey,
+      signatureHex: attestation.signature,
+      signPayload: attestation.attestationHash,
+      context: "raillab.attest.verify",
+    });
+    return check.valid ? { valid: true } : { valid: false, reason: "signature mismatch" };
   } catch (err) {
     return { valid: false, reason: err instanceof Error ? err.message : "verify error" };
   }

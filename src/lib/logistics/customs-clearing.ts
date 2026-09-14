@@ -14,9 +14,8 @@
 
 import { prisma } from "@/lib/db";
 import { canonicalJson, sha256Hex } from "@/lib/receipt/canonical";
+import { verifyPinnedSignature } from "@/lib/auth/verifyPinnedSignature";
 import { getCommoditySpotPrices, computeLotValueUsd } from "@/lib/reserves/commodity-oracle";
-import { verify } from "@noble/ed25519";
-import { hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
 
 const COMMITMENT_RE = /^[0-9a-f]{64}$/i;
 const SEAL_DIGEST_RE = /^[0-9a-f]{64}$/i;
@@ -226,11 +225,13 @@ export async function verifyCheckpointPassage(input: VerifyCheckpointInput) {
 
   const verifySignature = async (signatureHex: string, publicKeyHex: string): Promise<boolean> => {
     try {
-      return await verify(
-        hexToBytes(signatureHex),
-        utf8ToBytes(trustPayload),
-        hexToBytes(publicKeyHex)
-      );
+      const check = await verifyPinnedSignature({
+        pinnedKey: publicKeyHex,
+        signatureHex,
+        signPayload: trustPayload,
+        context: "logistics.customs.verify",
+      });
+      return check.valid;
     } catch {
       return false;
     }

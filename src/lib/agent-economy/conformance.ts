@@ -8,8 +8,8 @@
  * capability, the same way an ACME challenge proves control of a domain.
  */
 
-import { verify } from "@noble/ed25519";
-import { bytesToHex, hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
+import { bytesToHex } from "@noble/hashes/utils.js";
+import { verifyPinnedSignature } from "@/lib/auth/verifyPinnedSignature";
 import "@/lib/receipt/crypto";
 import { prisma } from "@/lib/db";
 import { canonicalJson } from "@/lib/receipt/canonical";
@@ -115,12 +115,14 @@ export async function runConformanceCheck(input: {
   }
 
   try {
-    const ok = await verify(
-      hexToBytes(signature),
-      utf8ToBytes(canonicalChallenge(challenge)),
-      hexToBytes(enrollment.publicKey)
-    );
-    return ok ? { ok: true } : { ok: false, reason: "signature verification failed" };
+    const check = await verifyPinnedSignature({
+      pinnedKey: enrollment.publicKey,
+      signatureHex: signature,
+      signPayload: canonicalChallenge(challenge),
+      context: "agent-economy.conformance.verify",
+      commitment: challenge.agent_commitment,
+    });
+    return check.valid ? { ok: true } : { ok: false, reason: "signature verification failed" };
   } catch (err) {
     return { ok: false, reason: err instanceof Error ? err.message : "signature verification error" };
   }

@@ -27,31 +27,19 @@ const HELPER = "src/lib/auth/verifyPinnedSignature.ts";
  * entry here with a reason.
  */
 const APPROVED_VERIFY_CALL_SITES: Record<string, string> = {
-  "src/lib/agent-economy/dispute.ts": "juror verdict signed over a job the juror is assigned to; key from juror enrollment",
-  "src/lib/agent-economy/conformance.ts": "remote endpoint self-signs a challenge; used as liveness proof, not authorization",
-  "src/lib/agent-economy/compute-marketplace.ts": "verifier verdict signature; key resolved from verifier commitment registry",
-  "src/lib/agent-pay/agent-payment-service.ts": "agent payment authorisation; key is the paying agent's enrolled key",
-  "src/lib/auth/authorize.ts": "verifyAgentIntent — signed agent intents; key is the caller's enrolled key by design",
-  "src/lib/auth/autonomous-provision.ts": "PoW/signature provisioning; key is the new agent's own freshly-derived key",
-  "src/lib/bill-of-rights/rights.ts": "rights manifest signature; signed by the issuing authority key",
-  "src/lib/bill-of-rights/violations.ts": "violation report signature; reporter key",
+  "src/lib/bill-of-rights/rights.ts": "rights manifest signature; signed by the issuing authority key; key embedded in manifest",
+  "src/lib/bill-of-rights/violations.ts": "violation report signature; reporter key; key embedded in violation record",
   "src/lib/compliance/package-builder.ts": "compliance package receipt signature; operator signing key",
   "src/lib/credentials/portable-reputation.ts": "W3C VC signature; issuer key",
-  "src/lib/datacenter/datacenter-service.ts": "datacenter attestation signature; registered signer key",
-  "src/lib/enrollment/proof.ts": "enrollment challenge signature; verified against the enrolled public key",
-  "src/lib/logistics/customs-clearing.ts": "customs inspector signature; inspector registry key",
+  "src/lib/enrollment/proof.ts": "enrollment challenge signature; low-level fn, verify is the final step in a PoW chain",
   "src/lib/notary/notary-anchor.ts": "external notary anchor signature",
-  "src/lib/raillab/attest.ts": "attestation signer key persisted per attestation (rotation-safe)",
-  "src/lib/raillab/breach-response.ts": "signed breach response; signer key pinned per rail era",
-  "src/lib/raillab/settlement.ts": "signature-gated settlement; verifies against the rail's registered signer key",
-  "src/lib/receipt/merkle-checkpoint.ts": "Merkle checkpoint signature; signer key pinned by era",
   "src/lib/receipt/verify.ts": "public offline receipt verification; key embedded in the signed receipt",
-  "src/lib/reserves/artisanal-sourcing.ts": "spectrometer signature; pinned to ArtisanalBuyingStation.stationPublicKey",
   "src/lib/reserves/por-service.ts": "PoR attestation self-verification; public_key carried in the signed attestation",
   "src/lib/transparency/key-log.ts": "key-transparency log entry signature; key from the log",
-  "src/app/api/v1/a2a/hire/route.ts": "A2A hire signature; key is the hiring agent's enrolled key",
-  "src/app/api/v1/delegation/route.ts": "delegation grant signature; key is the delegating agent's enrolled key",
-  "src/app/api/v1/messages/route.ts": "agent message signature; pinned to enrollment.publicKey",
+  "src/lib/auth/autonomous-provision.ts": "PoW/signature provisioning; raw SHA-256 hash signing, not compatible with helper's utf-8 signPayload",
+  "src/app/api/v1/a2a/hire/route.ts": "A2A hire signature; raw bytes signing over hash digest, not compatible with helper's utf-8 mode",
+  "src/app/api/v1/delegation/route.ts": "delegation grant signature; raw message bytes, helper uses utf-8",
+  "src/app/api/v1/messages/route.ts": "agent message signature; signed over hex-to-bytes digest, incompatible with utf-8 helper",
 };
 
 function findTsFiles(dir: string, out: string[] = []): string[] {
@@ -98,13 +86,25 @@ describe("Signer provenance inventory (non-regressable)", () => {
     expect(stale, `Stale APPROVED_VERIFY_CALL_SITES entries: ${stale.join(", ")}`).toEqual([]);
   });
 
-  it("the audit's self-asserted signer paths now delegate to verifyPinnedSignature", () => {
+  it("the audit's self-asserted signer paths and refactored call sites now delegate to verifyPinnedSignature", () => {
     const hardened = [
       "src/lib/reserves/threshold-quorum.ts",
       "src/lib/reserves/industrial-mining.ts",
       "src/lib/reserves/bonded-transit.ts",
       "src/lib/reserves/industrialization-fund.ts",
       "src/lib/swarm/swarm-service.ts",
+      "src/lib/agent-economy/dispute.ts",
+      "src/lib/agent-economy/conformance.ts",
+      "src/lib/agent-economy/compute-marketplace.ts",
+      "src/lib/agent-pay/agent-payment-service.ts",
+      "src/lib/auth/authorize.ts",
+      "src/lib/datacenter/datacenter-service.ts",
+      "src/lib/logistics/customs-clearing.ts",
+      "src/lib/raillab/attest.ts",
+      "src/lib/raillab/breach-response.ts",
+      "src/lib/raillab/settlement.ts",
+      "src/lib/receipt/merkle-checkpoint.ts",
+      "src/lib/reserves/artisanal-sourcing.ts",
     ];
     for (const r of hardened) {
       const src = readFileSync(join(ROOT, r), "utf8");

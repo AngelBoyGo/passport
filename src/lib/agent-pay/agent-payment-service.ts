@@ -1,6 +1,6 @@
-import { verify } from "@noble/ed25519";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
+import { verifyPinnedSignature } from "@/lib/auth/verifyPinnedSignature";
 import { timingSafeEqual } from "node:crypto";
 import { prisma } from "@/lib/db";
 import { recordCapabilityEvent } from "@/lib/operator";
@@ -114,7 +114,13 @@ export async function authorizeAgentSpend(opts: {
     const digest = computeSpendScopeDigest(scope);
     let ok = false;
     try {
-      ok = await verify(hexToBytes(agentSignatureHex), utf8ToBytes(digest), hexToBytes(agentPublicKeyHex));
+      const check = await verifyPinnedSignature({
+        pinnedKey: agentPublicKeyHex,
+        signatureHex: agentSignatureHex,
+        signPayload: digest,
+        context: "agent-pay.spend.authorize",
+      });
+      ok = check.valid;
     } catch {
       ok = false;
     }

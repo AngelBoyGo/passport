@@ -6,8 +6,7 @@
  * under the buyer's spend policy, and every purchase is idempotent. No external platform needed.
  */
 
-import { verify } from "@noble/ed25519";
-import { hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
+import { verifyPinnedSignature } from "@/lib/auth/verifyPinnedSignature";
 import "@/lib/receipt/crypto";
 import { prisma } from "@/lib/db";
 import { canonicalJson } from "@/lib/receipt/canonical";
@@ -373,11 +372,13 @@ export async function verifyDelivery(input: {
   }
   let valid = false;
   try {
-    valid = await verify(
-      hexToBytes(input.signature),
-      utf8ToBytes(canonicalDeliveryVerdict({ purchaseId, deliverableDigest: purchase.deliverableDigest, verdict })),
-      hexToBytes(enrollment.publicKey)
-    );
+    const result = await verifyPinnedSignature({
+      pinnedKey: enrollment.publicKey,
+      signatureHex: input.signature,
+      signPayload: canonicalDeliveryVerdict({ purchaseId, deliverableDigest: purchase.deliverableDigest, verdict }),
+      context: "agent-economy.compute.verdict",
+    });
+    valid = result.valid;
   } catch {
     valid = false;
   }

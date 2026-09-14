@@ -9,12 +9,11 @@
  */
 
 import { NextRequest } from "next/server";
-import { verify } from "@noble/ed25519";
-import { hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
+import { verifyPinnedSignature } from "@/lib/auth/verifyPinnedSignature";
 import "@/lib/receipt/crypto";
+import { canonicalJson } from "@/lib/receipt/canonical";
 import { prisma } from "@/lib/db";
 import { authenticateApiKey } from "@/lib/operator";
-import { canonicalJson } from "@/lib/receipt/canonical";
 
 /** Maximum accepted lifetime of an agent intent (now → expires_at). */
 export const AGENT_INTENT_MAX_TTL_MS = 5 * 60_000;
@@ -214,13 +213,15 @@ export async function verifyAgentIntent(input: VerifyIntentInput): Promise<Verif
   let valid = false;
   try {
     const { signature, ...payload } = intent;
-    void signature;
     const canonical = canonicalIntentPayload(payload);
-    valid = await verify(
-      hexToBytes(intent.signature),
-      utf8ToBytes(canonical),
-      hexToBytes(enrollment.publicKey)
-    );
+    const check = await verifyPinnedSignature({
+      pinnedKey: enrollment.publicKey,
+      signatureHex: signature,
+      signPayload: canonical,
+      context: "auth.verify-agent-intent",
+      commitment: intent.agent_commitment,
+    });
+    valid = check.valid;
   } catch {
     valid = false;
   }

@@ -17,8 +17,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { prisma } from "@/lib/db";
 import { canonicalJson } from "@/lib/receipt/canonical";
-import { verify } from "@noble/ed25519";
-import { hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
+import { verifyPinnedSignature } from "@/lib/auth/verifyPinnedSignature";
 import { executeRailSettlement } from "./executor";
 import { recordSettlement, getRailTelemetry } from "./telemetry";
 
@@ -74,12 +73,14 @@ export async function verifySettlementSignature(
 
   try {
     const canonical = canonicalJson(payload);
-    const ok = await verify(
-      hexToBytes(signatureHex),
-      utf8ToBytes(canonical),
-      hexToBytes(publicKey)
-    );
-    return ok ? { valid: true, publicKey } : { valid: false, reason: "signature mismatch" };
+    const check = await verifyPinnedSignature({
+      pinnedKey: publicKey,
+      signatureHex,
+      signPayload: canonical,
+      context: "raillab.settlement.verify",
+      commitment: signerCommitment,
+    });
+    return check.valid ? { valid: true, publicKey } : { valid: false, reason: "signature mismatch" };
   } catch (err) {
     return { valid: false, reason: err instanceof Error ? err.message : "verification error" };
   }

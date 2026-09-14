@@ -23,6 +23,7 @@ import * as porService from "../por-service";
 import type { SovereignStateHeartbeat } from "@prisma/client";
 import { sign, getPublicKey } from "@noble/ed25519";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
+import { canonicalJson } from "@/lib/receipt/canonical";
 
 describe("Trilateral Multi-State Threshold Quorum & Governance", () => {
   // Deterministic mock test keypair for Mali (ML)
@@ -305,13 +306,21 @@ describe("Trilateral Multi-State Threshold Quorum & Governance", () => {
     });
 
     it("registers authenticated state heartbeat", async () => {
+      const heartbeatPayload = {
+        country_code: "ML",
+        node_endpoint: "https://ml.sentry.metis.gold",
+        nonce: "nonce_123",
+      };
+      const canonical = canonicalJson(heartbeatPayload);
+      const hbSig = bytesToHex(sign(utf8ToBytes(canonical), hexToBytes(mlPrivateKey)));
+
       prismaMock.sovereignStateHeartbeat.upsert.mockResolvedValue({
         id: "hb_ml",
         countryCode: "ML",
         nodeEndpoint: "https://ml.sentry.metis.gold",
         lastSeenAt: new Date(),
         heartbeatNonce: "nonce_123",
-        signature: "sig_mock",
+        signature: hbSig,
         status: "ONLINE",
         updatedAt: new Date(),
       } as unknown as SovereignStateHeartbeat);
@@ -320,7 +329,7 @@ describe("Trilateral Multi-State Threshold Quorum & Governance", () => {
         countryCode: "ML",
         nodeEndpoint: "https://ml.sentry.metis.gold",
         heartbeatNonce: "nonce_123",
-        signature: "sig_mock",
+        signature: hbSig,
       });
 
       expect(hb.status).toBe("ONLINE");

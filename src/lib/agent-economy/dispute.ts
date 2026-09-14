@@ -7,11 +7,10 @@
  * Ties resolve to REFUND (buyer-protective). Staking is the Sybil/collusion cost.
  */
 
-import { verify } from "@noble/ed25519";
-import { hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
+import { verifyPinnedSignature } from "@/lib/auth/verifyPinnedSignature";
 import "@/lib/receipt/crypto";
-import { prisma } from "@/lib/db";
 import { canonicalJson } from "@/lib/receipt/canonical";
+import { prisma } from "@/lib/db";
 import { releaseCompute, refundCompute } from "./compute-marketplace";
 
 export const DISPUTE_QUORUM = 3;
@@ -108,17 +107,14 @@ export async function castDisputeVote(input: {
     return { ok: false, code: "invalid_signature", error: "signature must be 128-hex" };
   }
 
-  let valid = false;
-  try {
-    valid = await verify(
-      hexToBytes(input.signature),
-      utf8ToBytes(canonicalVote({ disputeId, vote })),
-      hexToBytes(enrollment.publicKey)
-    );
-  } catch {
-    valid = false;
-  }
-  if (!valid) return { ok: false, code: "invalid_signature", error: "vote signature verification failed" };
+  const check = await verifyPinnedSignature({
+    pinnedKey: enrollment.publicKey,
+    signatureHex: input.signature,
+    signPayload: canonicalVote({ disputeId, vote }),
+    context: "agent-economy.dispute.vote",
+    commitment: juror,
+  });
+  if (!check.valid) return { ok: false, code: "invalid_signature", error: "vote signature verification failed" };
 
   // One vote per juror (unique). A duplicate is idempotent.
   try {

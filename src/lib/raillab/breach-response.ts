@@ -13,8 +13,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { prisma } from "@/lib/db";
 import { canonicalJson, sha256Hex } from "@/lib/receipt/canonical";
-import { getPublicKey, sign, verify } from "@noble/ed25519";
+import { getPublicKey, sign } from "@noble/ed25519";
 import { bytesToHex, hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
+import { verifyPinnedSignature } from "@/lib/auth/verifyPinnedSignature";
 import type { IntegrityStatus } from "./integrity";
 import { transitionRailState } from "./state-machine";
 
@@ -279,12 +280,13 @@ export async function verifyBreachResponse(
     return { valid: false, reason: "missing signature or public key" };
   }
   try {
-    const ok = await verify(
-      hexToBytes(response.signature),
-      utf8ToBytes(response.attestationHash),
-      hexToBytes(response.publicKey)
-    );
-    return ok ? { valid: true } : { valid: false, reason: "signature mismatch" };
+    const check = await verifyPinnedSignature({
+      pinnedKey: response.publicKey,
+      signatureHex: response.signature,
+      signPayload: response.attestationHash,
+      context: "raillab.breach-response.verify",
+    });
+    return check.valid ? { valid: true } : { valid: false, reason: "signature mismatch" };
   } catch (err) {
     return { valid: false, reason: err instanceof Error ? err.message : "verify error" };
   }

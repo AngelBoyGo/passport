@@ -1,5 +1,6 @@
-import { sign, verify, getPublicKey } from "@noble/ed25519";
+import { sign, getPublicKey } from "@noble/ed25519";
 import { bytesToHex, hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
+import { verifyPinnedSignature } from "@/lib/auth/verifyPinnedSignature";
 import "@/lib/receipt/crypto";
 import { canonicalJson, sha256Hex } from "@/lib/receipt/canonical";
 import { signReceipt, getPublicKeyHex } from "@/lib/receipt/signer";
@@ -660,12 +661,13 @@ export async function verifyDataCenterSustainabilityVC(
   }
 
   try {
-    const isValid = await verify(
-      hexToBytes(proof.proofValue),
-      utf8ToBytes(canonicalHash),
-      hexToBytes(issuerPubKeyHex)
-    );
-    return { valid: isValid, error: isValid ? undefined : "Cryptographic signature mismatch" };
+    const check = await verifyPinnedSignature({
+      pinnedKey: issuerPubKeyHex,
+      signatureHex: proof.proofValue,
+      signPayload: canonicalHash,
+      context: "datacenter.credential.verify",
+    });
+    return { valid: check.valid, error: check.valid ? undefined : "Cryptographic signature mismatch" };
   } catch (e) {
     return { valid: false, error: String(e) };
   }

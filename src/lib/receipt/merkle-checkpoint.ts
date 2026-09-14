@@ -1,6 +1,7 @@
-import { sign, verify } from "@noble/ed25519";
+import { sign } from "@noble/ed25519";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
+import { verifyPinnedSignature } from "@/lib/auth/verifyPinnedSignature";
 import "@/lib/receipt/crypto";
 import { canonicalJson, sha256Hex } from "@/lib/receipt/canonical";
 import { getPublicKeyHex } from "@/lib/receipt/signer";
@@ -180,11 +181,13 @@ export async function verifyReceiptCheckpoint(
 
   try {
     if (!verifyKey) return false;
-    return await verify(
-      hexToBytes(checkpoint.signature),
-      utf8ToBytes(checkpoint.content_hash),
-      hexToBytes(verifyKey)
-    );
+    const check = await verifyPinnedSignature({
+      pinnedKey: verifyKey,
+      signatureHex: checkpoint.signature,
+      signPayload: checkpoint.content_hash,
+      context: "receipt.merkle-checkpoint.verify",
+    });
+    return check.valid;
   } catch {
     return false;
   }

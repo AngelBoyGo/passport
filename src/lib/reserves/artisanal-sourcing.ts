@@ -13,9 +13,7 @@
 import { prisma } from "@/lib/db";
 import { getCommoditySpotPrices } from "./commodity-oracle";
 import { generateLivePoR } from "./por-service";
-import { canonicalJson } from "@/lib/receipt/canonical";
-import { verify } from "@noble/ed25519";
-import { hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
+import { verifyPinnedSignature } from "@/lib/auth/verifyPinnedSignature";
 
 const COMMITMENT_RE = /^[0-9a-f]{64}$/i;
 const MIN_REFINED_FINENESS = 0.9950; // London Good Delivery minimum purity (99.50%)
@@ -96,12 +94,13 @@ export async function verifySpectrometerSignature(
 ): Promise<boolean> {
   if (!publicKeyHex || !signatureHex) return false;
   try {
-    const canonical = canonicalJson(payload);
-    return await verify(
-      hexToBytes(signatureHex),
-      utf8ToBytes(canonical),
-      hexToBytes(publicKeyHex)
-    );
+    const check = await verifyPinnedSignature({
+      pinnedKey: publicKeyHex,
+      signatureHex,
+      signPayload: payload,
+      context: "reserves.artisanal.spectrometer",
+    });
+    return check.valid;
   } catch {
     return false;
   }
