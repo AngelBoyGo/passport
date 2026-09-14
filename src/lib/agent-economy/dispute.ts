@@ -188,3 +188,85 @@ export async function getDispute(disputeId: string) {
   });
   return { ...dispute, votes };
 }
+
+/**
+ * Aggregated verifier reward pool accounting — juror lifetime stats computed
+ * from existing vote data. No separate table; pure aggregation.
+ */
+export async function getJurorRewardStats(
+  jurorCommitment: string
+): Promise<{
+  totalDisputesServed: number;
+  majorityVotes: number;
+  minorityVotes: number;
+  totalRewardsEarned: number;
+  totalSlashApplied: number;
+  netEarnings: number;
+  alignmentRatio: number;
+}> {
+  const juror = jurorCommitment.toLowerCase();
+
+  const allVotes = await prisma.computeDisputeVote.findMany({
+    where: { jurorCommitment: juror },
+  });
+
+  const resolvedDisputeIds = allVotes.map((v) => v.disputeId);
+  const resolved = new Set<string>();
+  const resolutionByDispute = new Map<string, string>();
+
+  if (resolvedDisputeIds.length > 0) {
+    const disputes = await prisma.computeDispute.findMany({
+      where: { disputeId: { in: resolvedDisputeIds }, status: "RESOLVED", resolution: { not: null } },
+    });
+    for (const d of disputes) {
+      resolved.add(d.disputeId);
+      resolutionByDispute.set(d.disputeId, d.resolution!);
+    }
+  }
+
+  let majorityVotes = 0;
+  let minorityVotes = 0;
+
+  for (const v of allVotes) {
+    const resolution = resolutionByDispute.get(v.disputeId);
+    if (!resolution) continue;
+    if (v.vote === resolution) majorityVotes++;
+    else minorityVotes++;
+  }
+
+  const total = majorityVotes + minorityVotes;
+  const rewards = majorityVotes * JUROR_FEE_ANGEL;
+  const slashes = minorityVotes * JUROR_SLASH_ANGEL;
+
+  return {
+    totalDisputesServed: allVotes.length,
+    majorityVotes,
+    minorityVotes,
+    totalRewardsEarned: rewards,
+    totalSlashApplied: slashes,
+    netEarnings: rewards - slashes,
+    alignmentRatio: total > 0 ? Math.round((majorityVotes / total) * 1000) / 1000 : 0,
+  };
+}
+
+export async function listJurorRewardPool(
+  limit = 20
+): Promise<Array<{ jurorCommitment: string; disputesServed: number; netEarnings: number }>> {
+  const groups = await prisma.computeDisputeVote.groupBy({
+    by: ["jurorCommitment"],
+    _count: { jurorCommitment: true },
+    orderBy: { _count: { jurorCommitment: "desc" } },
+    take: Math.min(Math.max(limit, 1), 100),
+  });
+
+  return Promise.all(
+    groups.map(async (g) => {
+      const stats = await getJurorRewardStats(g.jurorCommitment);
+      return {
+        jurorCommitment: g.jurorCommitment,
+        disputesServed: stats.totalDisputesServed,
+        netEarnings: stats.netEarnings,
+      };
+    })
+  );
+}

@@ -20,6 +20,8 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
           <DocLink href="/docs/authorization">Authorization</DocLink>
           <DocLink href="/docs/spend-policy">Spend Policy</DocLink>
           <DocLink href="/docs/agent-economy">Agent Economy</DocLink>
+          <DocLink href="/docs/economy-health">Economy Health</DocLink>
+          <DocLink href="/docs/command-brain">Command Brain</DocLink>
         </nav>
       </aside>
       <article className="min-w-0 flex-1 md:pl-12">{children}</article>

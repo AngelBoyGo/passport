@@ -3,7 +3,7 @@
  * Replaces Vercel Cron Jobs. Starts when the Next.js server boots.
  */
 
-import cron from "node-cron";
+import cron, { ScheduledTask } from "node-cron";
 import { prisma } from "@/lib/db";
 import { runTick, type SchedulerDeps } from "@/lib/scheduler/scheduler-service";
 

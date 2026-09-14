@@ -7,5 +7,9 @@ export async function register() {
     // Dynamic import to avoid pulling node-cron into edge runtime
     const { startScheduler } = await import("@/lib/scheduler/node-cron");
     startScheduler();
+    const { startBrainScheduler } = await import("@/lib/scheduler/brain-scheduler");
+    startBrainScheduler();
+    const { startRevenueRunner } = await import("@/lib/scheduler/revenue-runner");
+    startRevenueRunner();
   }
 }
