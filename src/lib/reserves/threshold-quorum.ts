@@ -260,6 +260,7 @@ export async function submitQuorumSignature(input: SubmitSignatureInput) {
 
 /**
  * Registers an authenticated node heartbeat from a sovereign state capital.
+ * Verifies the Ed25519 signature against the registered sovereign key for the state.
  */
 export async function registerStateHeartbeat(params: {
   countryCode: string;
@@ -270,6 +271,27 @@ export async function registerStateHeartbeat(params: {
   const countryCode = params.countryCode.toUpperCase() as SovereignCountryCode;
   if (!SOVEREIGN_STATES.includes(countryCode)) {
     throw new Error(`Invalid state code '${params.countryCode}'`);
+  }
+
+  // Verify Ed25519 signature over canonical heartbeat payload against the state's key.
+  const stateKey = getSovereignStateKey(countryCode);
+  if (!stateKey) {
+    throw new Error(`No registered sovereign key for state ${countryCode}; heartbeat refused`);
+  }
+  const heartbeatPayload = {
+    country_code: countryCode,
+    node_endpoint: params.nodeEndpoint,
+    nonce: params.heartbeatNonce,
+  };
+  const hive = await verifyPinnedSignature({
+    pinnedKey: stateKey,
+    signatureHex: params.signature,
+    signPayload: heartbeatPayload,
+    context: "reserves.quorum.heartbeat",
+    commitment: countryCode,
+  });
+  if (!hive.valid) {
+    throw new Error(`Invalid heartbeat signature for sovereign state ${countryCode}`);
   }
 
   return prisma.sovereignStateHeartbeat.upsert({
