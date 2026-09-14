@@ -243,7 +243,7 @@ export async function runExecutionTick(): Promise<ExecutionTickResult> {
 
     const latencyMs = Date.now() - startedAt;
     if (result.ok) {
-      result.live ? executed++ : dryRun++;
+      if (result.live) executed++; else dryRun++;
     } else {
       failed++;
     }
