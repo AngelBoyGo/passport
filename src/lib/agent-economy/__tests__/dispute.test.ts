@@ -5,7 +5,7 @@ import { canonicalVote } from "../dispute";
 
 const { prismaMock, marketMock } = vi.hoisted(() => ({
   prismaMock: {
-    computeDispute: { findUnique: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
+    computeDispute: { findUnique: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), findMany: vi.fn() },
     computeDisputeVote: { create: vi.fn(), count: vi.fn(), findMany: vi.fn() },
     computePurchase: { findUnique: vi.fn() },
     agentWallet: { findUnique: vi.fn() },
@@ -17,7 +17,7 @@ const { prismaMock, marketMock } = vi.hoisted(() => ({
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 vi.mock("../compute-marketplace", () => marketMock);
 
-import { openDispute, castDisputeVote } from "../dispute";
+import { openDispute, castDisputeVote, getJurorRewardStats } from "../dispute";
 
 const kp = keygen();
 const BUYER = "a".repeat(64);
@@ -111,6 +111,36 @@ describe("compute dispute arbitration", () => {
       const r = await castDisputeVote({ disputeId: DISPUTE, jurorCommitment: JUROR, vote: "RELEASE", signature: voteSig("RELEASE") });
       expect(r).toMatchObject({ ok: true, status: "OPEN", votes: 2 });
       expect(marketMock.releaseCompute).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("juror reward pool", () => {
+    it("getJurorRewardStats returns zeros for a juror with no votes", async () => {
+      prismaMock.computeDisputeVote.findMany.mockResolvedValue([]);
+      const stats = await getJurorRewardStats(JUROR);
+      expect(stats.totalDisputesServed).toBe(0);
+      expect(stats.netEarnings).toBe(0);
+      expect(stats.alignmentRatio).toBe(0);
+    });
+
+    it("getJurorRewardStats computes net earnings for resolved disputes", async () => {
+      prismaMock.computeDisputeVote.findMany.mockResolvedValue([
+        { disputeId: "d1", jurorCommitment: JUROR, vote: "RELEASE" },
+        { disputeId: "d2", jurorCommitment: JUROR, vote: "REFUND" },
+      ]);
+      prismaMock.computeDispute.findMany.mockResolvedValue([
+        { disputeId: "d1", status: "RESOLVED", resolution: "RELEASE" },
+        { disputeId: "d2", status: "RESOLVED", resolution: "RELEASE" },
+      ]);
+
+      const stats = await getJurorRewardStats(JUROR);
+      expect(stats.totalDisputesServed).toBe(2);
+      expect(stats.majorityVotes).toBe(1); // d1 majority, d2 minority
+      expect(stats.minorityVotes).toBe(1);
+      expect(stats.totalRewardsEarned).toBe(1); // 1 * JUROR_FEE_ANGEL
+      expect(stats.totalSlashApplied).toBe(1); // 1 * JUROR_SLASH_ANGEL
+      expect(stats.netEarnings).toBe(0);
+      expect(stats.alignmentRatio).toBeCloseTo(0.5);
     });
   });
 });
