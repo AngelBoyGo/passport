@@ -13,9 +13,8 @@
 import { prisma } from "@/lib/db";
 import { Prisma } from "@prisma/client";
 import { canonicalJson, sha256Hex } from "@/lib/receipt/canonical";
+import { verifyPinnedSignature } from "@/lib/auth/verifyPinnedSignature";
 import { generateLivePoR } from "./por-service";
-import { verify } from "@noble/ed25519";
-import { hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
 
 export const SOVEREIGN_STATES = ["ML", "BF", "NE"] as const;
 export type SovereignCountryCode = typeof SOVEREIGN_STATES[number];
@@ -41,10 +40,13 @@ export const SOVEREIGN_STATE_BENCHMARK_KEYS: Record<SovereignCountryCode, string
  */
 export function getSovereignStateKey(countryCode: string): string {
   const code = countryCode.toUpperCase() as SovereignCountryCode;
+  if (!SOVEREIGN_STATES.includes(code)) return "";
   const envKey = process.env[`SOVEREIGN_KEY_${code}`]?.trim();
   if (envKey && /^[0-9a-f]{64}$/i.test(envKey)) {
     return envKey.toLowerCase();
   }
+  // Fail closed in production: never fall back to the public benchmark keys there.
+  if (process.env.NODE_ENV === "production") return "";
   return SOVEREIGN_STATE_BENCHMARK_KEYS[code] || "";
 }
 
@@ -174,24 +176,26 @@ export async function submitQuorumSignature(input: SubmitSignatureInput) {
     throw new Error(`Sovereign state '${signerState}' has already signed proposal '${input.proposalId}'`);
   }
 
-  // 1. Verify Ed25519 Cryptographic Signature
+  // 1. Verify Ed25519 Cryptographic Signature against the REGISTERED sovereign key.
+  //    A caller-supplied signerPublicKey must never override the registered key, otherwise
+  //    any caller could self-assert a keypair and forge a 2-of-3 quorum that executes
+  //    reserve actions (ADD_VAULT / QUARANTINE_VAULT / EMERGENCY_FREEZE / ...).
   const expectedKey = getSovereignStateKey(signerState);
-  const keyToVerify = input.signerPublicKey || expectedKey;
-
-  let isValidSignature = false;
-  try {
-    isValidSignature = await verify(
-      hexToBytes(input.signature),
-      utf8ToBytes(proposal.payloadDigest),
-      hexToBytes(keyToVerify)
-    );
-  } catch {
-    isValidSignature = false;
+  if (!expectedKey) {
+    throw new Error(`No registered sovereign key for state ${signerState}`);
   }
-
-  if (!isValidSignature) {
+  const provenance = await verifyPinnedSignature({
+    pinnedKey: expectedKey,
+    providedKey: input.signerPublicKey,
+    signatureHex: input.signature,
+    signPayload: proposal.payloadDigest,
+    context: "reserves.quorum.sign",
+    commitment: signerState,
+  });
+  if (!provenance.valid) {
     throw new Error(`Invalid Ed25519 signature for sovereign state ${signerState}`);
   }
+  const keyToVerify = expectedKey;
 
   // 2. Execute Atomic Quorum Evaluation & Action Trigger
   const result = await prisma.$transaction(async (tx) => {

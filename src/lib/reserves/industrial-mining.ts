@@ -12,9 +12,7 @@
 import { prisma } from "@/lib/db";
 import { getCommoditySpotPrices } from "./commodity-oracle";
 import { generateLivePoR } from "./por-service";
-import { canonicalJson } from "@/lib/receipt/canonical";
-import { verify } from "@noble/ed25519";
-import { hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
+import { verifyPinnedSignature, signaturesEnforced } from "@/lib/auth/verifyPinnedSignature";
 
 export const MIN_DORE_DENSITY = 15.0; // Specific gravity of gold doré
 export const MAX_GOLD_DENSITY = 19.32; // Theoretical density of pure element Au
@@ -157,8 +155,12 @@ export async function recordSmeltingRun(input: RecordSmeltInput) {
     stateParticipationPercent: concession.stateParticipationPercent,
   });
 
-  // 4. Verify Edge HSM Controller Signature
-  const hsmKey = input.hsmPublicKey || concession.smelterHsmPublicKey;
+  // 4. Verify Edge HSM Controller Signature against the concession's REGISTERED key.
+  //    A caller-supplied hsmPublicKey must never override it (self-asserted signer bypass).
+  const hsmKey = concession.smelterHsmPublicKey;
+  if (!hsmKey) {
+    throw new Error(`Concession '${input.concessionCode}' has no registered HSM key`);
+  }
   const pourPayload = {
     concession_code: input.concessionCode,
     density_grams_per_cc: calculation.densityGramsPerCc,
@@ -167,20 +169,18 @@ export async function recordSmeltingRun(input: RecordSmeltInput) {
     run_number: input.runNumber,
   };
 
-  let isSigValid = false;
-  try {
-    const canonical = canonicalJson(pourPayload);
-    isSigValid = await verify(
-      hexToBytes(input.hsmSignature),
-      utf8ToBytes(canonical),
-      hexToBytes(hsmKey)
-    );
-  } catch {
-    isSigValid = false;
-  }
-
-  if (process.env.NODE_ENV === "production" && !isSigValid) {
-    throw new Error("Invalid furnace edge HSM controller signature");
+  if (signaturesEnforced()) {
+    const provenance = await verifyPinnedSignature({
+      pinnedKey: hsmKey,
+      providedKey: input.hsmPublicKey,
+      signatureHex: input.hsmSignature,
+      signPayload: pourPayload,
+      context: "reserves.industrial.smelt",
+      commitment: input.concessionCode,
+    });
+    if (!provenance.valid) {
+      throw new Error("Invalid furnace edge HSM controller signature");
+    }
   }
 
   // 5. Execute Atomic Smelting Telemetry Ingestion

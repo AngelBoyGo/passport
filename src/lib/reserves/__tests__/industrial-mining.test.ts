@@ -128,6 +128,38 @@ describe("Industrial Mining Telemetry & Anti-Transfer-Pricing Royalty Engine", (
       );
     });
 
+    it("ignores a caller-supplied hsmPublicKey and rejects a forged production signature", async () => {
+      vi.stubEnv("NODE_ENV", "production");
+      try {
+        vi.spyOn(oracle, "getCommoditySpotPrices").mockReturnValue({
+          Au: { symbol: "Au", priceUsd: 75.0, isStale: false },
+        } as unknown as Record<string, CommodityPrice>);
+
+        prismaMock.industrialMiningConcession.findUnique.mockResolvedValue({
+          id: "conc_1",
+          concessionCode,
+          activeStatus: "ACTIVE",
+          statutoryRoyaltyPercent: 10.0,
+          stateParticipationPercent: 20.0,
+          smelterHsmPublicKey: "bb".repeat(32),
+        });
+
+        await expect(
+          recordSmeltingRun({
+            runNumber: "SMELT-FORGED",
+            concessionCode,
+            grossPouredGrams: 5000.0,
+            densityGramsPerCc: 17.5,
+            estimatedAuFineness: 0.88,
+            hsmSignature: "00".repeat(64),
+            hsmPublicKey: "cc".repeat(32), // attacker key must be ignored
+          })
+        ).rejects.toThrow(/Invalid furnace edge HSM/);
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
     it("refuses intake if gold spot oracle is stale", async () => {
       vi.spyOn(oracle, "getCommoditySpotPrices").mockReturnValue({
         Au: { symbol: "Au", priceUsd: 75.0, isStale: true },

@@ -267,5 +267,57 @@ describe("Sovereign Industrialization & Counter-Cyclical Stabilization Fund", ()
         })
       );
     });
+
+    it("rejects a verifier key that is not in MILESTONE_VERIFIER_KEYS", async () => {
+      vi.stubEnv("ENFORCE_SIGNATURES", "1");
+      vi.stubEnv("MILESTONE_VERIFIER_KEYS", "ab".repeat(32));
+      try {
+        prismaMock.stabilizationDisbursement.findUnique.mockResolvedValue({
+          disbursementId: "DISB-PROJ-1",
+          milestoneNumber: 1,
+          status: "PENDING",
+          amountAngel: 500,
+          projectId: "proj_1",
+          project: { projectCode: "PROJ-1", countryCode: "ML", totalMilestones: 1 },
+        });
+
+        await expect(
+          verifyMilestoneCompletion({
+            disbursementId: "DISB-PROJ-1",
+            verifierSignature: "00".repeat(64),
+            verifierPublicKey: "cd".repeat(32),
+            mediaDigest,
+          })
+        ).rejects.toThrow(/not an authorized milestone verifier/);
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it("fails closed under enforcement when no verifier allowlist is configured", async () => {
+      vi.stubEnv("ENFORCE_SIGNATURES", "1");
+      delete process.env.MILESTONE_VERIFIER_KEYS;
+      try {
+        prismaMock.stabilizationDisbursement.findUnique.mockResolvedValue({
+          disbursementId: "DISB-PROJ-1",
+          milestoneNumber: 1,
+          status: "PENDING",
+          amountAngel: 500,
+          projectId: "proj_1",
+          project: { projectCode: "PROJ-1", countryCode: "ML", totalMilestones: 1 },
+        });
+
+        await expect(
+          verifyMilestoneCompletion({
+            disbursementId: "DISB-PROJ-1",
+            verifierSignature: "00".repeat(64),
+            verifierPublicKey: "cd".repeat(32),
+            mediaDigest,
+          })
+        ).rejects.toThrow(/No authorized milestone verifier keys configured/);
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
   });
 });

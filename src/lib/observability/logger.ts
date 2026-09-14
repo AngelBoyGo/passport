@@ -9,6 +9,7 @@ export type PassportLogEvent = {
     | "gate_verify"
     | "receipt_issue"
     | "credits_read"
+    | "signature_provenance_rejected"
     | "unhandled_error";
   outcome: PassportLogOutcome;
   http_status: number;

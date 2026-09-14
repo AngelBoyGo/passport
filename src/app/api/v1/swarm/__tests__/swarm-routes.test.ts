@@ -33,6 +33,7 @@ describe("Swarm API Routes", () => {
     vi.spyOn(prisma.agentWallet, "update").mockResolvedValue({ balance: 49 } as any);
     vi.spyOn(prisma.agentWallet, "upsert").mockResolvedValue({ balance: 5 } as any);
     vi.spyOn(prisma.resurrectionCapsule, "findUnique").mockResolvedValue(null);
+    vi.spyOn(prisma.agentEnrollment, "findUnique").mockResolvedValue(null);
   });
 
   describe("POST & GET /api/v1/swarm/memory", () => {

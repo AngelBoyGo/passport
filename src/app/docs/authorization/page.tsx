@@ -33,6 +33,23 @@ export default function DocsAuthorization() {
       </section>
 
       <section>
+        <h2 className="text-xl font-semibold">Signer provenance (fail closed)</h2>
+        <p className="text-sm text-slate-600 mt-2">
+          A &quot;verified&quot; signature is only meaningful if it is verified against a key the
+          platform already trusts. Every signature check resolves its key from an env-configured,
+          database-registry, or (non-production only) genesis-benchmark source via{" "}
+          <code className="font-mono text-xs">verifyPinnedSignature()</code>. A{" "}
+          <code className="font-mono text-xs">public_key</code> supplied in a request body is
+          accepted for backward compatibility but is <strong>never</strong> used as the
+          verification key; if it differs from the pinned key the request is rejected with a{" "}
+          <code className="font-mono text-xs">401</code> and a{" "}
+          <code className="font-mono text-xs">signature_provenance_rejected</code> security event.
+          When no pinned key is configured, the check fails closed in production (or whenever{" "}
+          <code className="font-mono text-xs">ENFORCE_SIGNATURES=1</code>, e.g. staging).
+        </p>
+      </section>
+
+      <section>
         <h2 className="text-xl font-semibold">Signed agent intents</h2>
         <p className="text-sm text-slate-600 mt-2">
           Agent-initiated value routes (AMM swap/fractionalize, escrow release) require a HOLDER
@@ -71,7 +88,10 @@ POST /api/v1/reserves/amm/swap
           and <code className="font-mono text-xs">raillab/</code> and fails, by name, if a route
           has no recognized authorization marker — so a new unguarded value route cannot ship
           silently. Routes authorized by a signature verified inside their service (or public by
-          design) are explicitly allowlisted.
+          design) are explicitly allowlisted. A second meta-test enumerates every direct{" "}
+          <code className="font-mono text-xs">verify(</code> call site and fails unless it delegates
+          to <code className="font-mono text-xs">verifyPinnedSignature()</code> or is approved with a
+          justification — so a self-asserted-signer bypass cannot silently return.
         </p>
         <p className="text-sm text-slate-600 mt-2">
           Related:{" "}

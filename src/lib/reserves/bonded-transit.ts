@@ -12,9 +12,7 @@
 import { prisma } from "@/lib/db";
 import { getCommoditySpotPrices } from "./commodity-oracle";
 import { generateLivePoR } from "./por-service";
-import { canonicalJson } from "@/lib/receipt/canonical";
-import { verify } from "@noble/ed25519";
-import { hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
+import { verifyPinnedSignature, signaturesEnforced } from "@/lib/auth/verifyPinnedSignature";
 
 const COMMITMENT_RE = /^[0-9a-f]{64}$/i;
 const DEFAULT_CARRIER_BOND_ANGEL = 5000;
@@ -149,27 +147,34 @@ export async function recordIntermediateCheckpoint(input: CheckpointInput) {
     throw new Error(`Checkpoint '${input.checkpointName}' was already visited for this waybill`);
   }
 
-  // 1. Verify customs inspector Ed25519 signature over canonical waypoint payload
+  // 1. Verify customs inspector Ed25519 signature over canonical waypoint payload,
+  //    against the checkpoint's REGISTERED inspector key (never a caller-supplied key).
+  const checkpoint = await prisma.customsCheckpoint.findFirst({
+    where: { checkpointName: input.checkpointName, activeStatus: "ACTIVE" },
+  });
+  if (!checkpoint) {
+    throw new Error(
+      `Customs checkpoint '${input.checkpointName}' is not registered or inactive`
+    );
+  }
   const checkpointPayload = {
     checkpoint_name: input.checkpointName,
     diplomatic_seal_digest: waybill.diplomaticSealDigest,
     waybill_number: waybill.waybillNumber,
   };
 
-  let isSigValid = false;
-  try {
-    const canonical = canonicalJson(checkpointPayload);
-    isSigValid = await verify(
-      hexToBytes(input.inspectorSignature),
-      utf8ToBytes(canonical),
-      hexToBytes(input.inspectorPublicKey)
-    );
-  } catch {
-    isSigValid = false;
-  }
-
-  if (process.env.NODE_ENV === "production" && !isSigValid) {
-    throw new Error("Invalid checkpoint inspector signature");
+  if (signaturesEnforced()) {
+    const provenance = await verifyPinnedSignature({
+      pinnedKey: checkpoint.inspectorPublicKey,
+      providedKey: input.inspectorPublicKey,
+      signatureHex: input.inspectorSignature,
+      signPayload: checkpointPayload,
+      context: "reserves.transit.checkpoint",
+      commitment: input.checkpointName,
+    });
+    if (!provenance.valid) {
+      throw new Error("Invalid checkpoint inspector signature");
+    }
   }
 
   const updatedCheckpoints = [...waybill.checkpointsVisited, input.checkpointName];
@@ -203,8 +208,12 @@ export async function recordPortArrival(input: PortArrivalInput) {
     );
   }
 
-  // 1. Verify Port Customs Authority Signature
-  const portKey = input.enclavePublicKey || waybill.enclave.enclavePublicKey;
+  // 1. Verify Port Customs Authority Signature against the enclave's REGISTERED key.
+  //    A caller-supplied enclavePublicKey must never override it (self-asserted signer bypass).
+  const portKey = waybill.enclave.enclavePublicKey;
+  if (!portKey) {
+    throw new Error(`Enclave for port '${input.portCode}' has no registered public key`);
+  }
   const arrivalPayload = {
     destination_port_code: input.portCode,
     diplomatic_seal_digest: waybill.diplomaticSealDigest,
@@ -212,20 +221,18 @@ export async function recordPortArrival(input: PortArrivalInput) {
     waybill_number: waybill.waybillNumber,
   };
 
-  let isSigValid = false;
-  try {
-    const canonical = canonicalJson(arrivalPayload);
-    isSigValid = await verify(
-      hexToBytes(input.enclaveSignature),
-      utf8ToBytes(canonical),
-      hexToBytes(portKey)
-    );
-  } catch {
-    isSigValid = false;
-  }
-
-  if (process.env.NODE_ENV === "production" && !isSigValid) {
-    throw new Error("Invalid coastal port enclave customs signature");
+  if (signaturesEnforced()) {
+    const provenance = await verifyPinnedSignature({
+      pinnedKey: portKey,
+      providedKey: input.enclavePublicKey,
+      signatureHex: input.enclaveSignature,
+      signPayload: arrivalPayload,
+      context: "reserves.transit.arrive",
+      commitment: input.waybillNumber,
+    });
+    if (!provenance.valid) {
+      throw new Error("Invalid coastal port enclave customs signature");
+    }
   }
 
   // 2. Execute Arrival Settlement Transaction

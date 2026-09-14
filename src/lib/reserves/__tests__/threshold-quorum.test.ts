@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
@@ -28,10 +28,22 @@ describe("Trilateral Multi-State Threshold Quorum & Governance", () => {
   // Deterministic mock test keypair for Mali (ML)
   const mlPrivateKey = "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20";
   const bfPrivateKey = "1112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f30";
+  const nePrivateKey = "2122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40";
 
   beforeEach(() => {
     vi.clearAllMocks();
     vi.restoreAllMocks();
+    // Register the deterministic test keypairs as the sovereign keys for ML/BF/NE so the
+    // service verifies against the pinned registry rather than a caller-supplied key.
+    process.env.SOVEREIGN_KEY_ML = bytesToHex(getPublicKey(hexToBytes(mlPrivateKey)));
+    process.env.SOVEREIGN_KEY_BF = bytesToHex(getPublicKey(hexToBytes(bfPrivateKey)));
+    process.env.SOVEREIGN_KEY_NE = bytesToHex(getPublicKey(hexToBytes(nePrivateKey)));
+  });
+
+  afterEach(() => {
+    delete process.env.SOVEREIGN_KEY_ML;
+    delete process.env.SOVEREIGN_KEY_BF;
+    delete process.env.SOVEREIGN_KEY_NE;
   });
 
   describe("createQuorumProposal", () => {
@@ -225,6 +237,36 @@ describe("Trilateral Multi-State Threshold Quorum & Governance", () => {
           signature: "dummy_sig",
         })
       ).rejects.toThrow(/already signed/);
+    });
+
+    it("rejects a forged vote whose signerPublicKey does not match the registered sovereign key", async () => {
+      const attackerPrivateKey = "aa".repeat(32);
+      const payloadDigestAttacker =
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+      const forgedSig = bytesToHex(
+        await sign(utf8ToBytes(payloadDigestAttacker), hexToBytes(attackerPrivateKey))
+      );
+      const attackerPublicKey = bytesToHex(getPublicKey(hexToBytes(attackerPrivateKey)));
+
+      prismaMock.sovereignQuorumProposal.findUnique.mockResolvedValue({
+        id: "prop_db_forge",
+        proposalId: "PROP-FORGE",
+        actionType: "ADD_VAULT",
+        payload: { batchNumber: "FAKE-1" },
+        payloadDigest: payloadDigestAttacker,
+        requiredThreshold: 2,
+        status: "PENDING",
+        expiresAt: new Date(Date.now() + 3600 * 1000),
+      });
+
+      await expect(
+        submitQuorumSignature({
+          proposalId: "PROP-FORGE",
+          signerState: "ML",
+          signature: forgedSig,
+          signerPublicKey: attackerPublicKey,
+        })
+      ).rejects.toThrow(/Invalid Ed25519 signature/);
     });
   });
 

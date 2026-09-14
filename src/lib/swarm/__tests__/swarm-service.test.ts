@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { sign, getPublicKey } from "@noble/ed25519";
 import { bytesToHex, hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
 import {
@@ -34,6 +34,7 @@ describe("Swarm Service - Cryptographic & Storage Logic", () => {
     } as any);
     vi.spyOn(prisma.agentWallet, "update").mockResolvedValue({ balance: 99 } as any);
     vi.spyOn(prisma.agentWallet, "upsert").mockResolvedValue({ balance: 5 } as any);
+    vi.spyOn(prisma.agentEnrollment, "findUnique").mockResolvedValue(null);
   });
   it("computeSwarmDigest produces deterministic canonical SHA-256 hex", () => {
     const payloadA = { z: 1, a: 2, m: { nested_b: "bar", nested_a: "foo" } };
@@ -77,6 +78,34 @@ describe("Swarm Service - Cryptographic & Storage Logic", () => {
 
     expect(result.valid).toBe(false);
     expect(result.reason).toContain("signature mismatch");
+  });
+
+  it("rejects a provided public key that does not match the enrolled agent key", async () => {
+    const digest = computeSwarmDigest({ mission: "forge_creator_identity" });
+    const attackerPrivKey = "ff".repeat(32);
+    const sig = bytesToHex(sign(utf8ToBytes(digest), hexToBytes(attackerPrivKey)));
+    const attackerPubKey = bytesToHex(getPublicKey(hexToBytes(attackerPrivKey)));
+
+    vi.spyOn(prisma.agentEnrollment, "findUnique").mockResolvedValue({
+      publicKey: testPubKeyHex,
+    } as any);
+
+    const result = await verifySwarmSignature(testCommitment, digest, sig, attackerPubKey);
+    expect(result.valid).toBe(false);
+    expect(result.reason).toContain("does not match the enrolled agent key");
+  });
+
+  it("rejects caller-supplied keys for unenrolled agents when enforcement is on", async () => {
+    vi.stubEnv("ENFORCE_SIGNATURES", "1");
+    try {
+      const digest = computeSwarmDigest({ mission: "self_assert" });
+      const sig = bytesToHex(sign(utf8ToBytes(digest), hexToBytes(testPrivKeyHex)));
+      const result = await verifySwarmSignature(testCommitment, digest, sig, testPubKeyHex);
+      expect(result.valid).toBe(false);
+      expect(result.reason).toContain("not trusted");
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("publishes and queries swarm memory", async () => {

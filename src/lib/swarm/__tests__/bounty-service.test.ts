@@ -34,6 +34,7 @@ describe("Swarm Bounty Service - Escrow & Lifecycle (TDD)", () => {
 
     vi.spyOn(prisma.agentWallet, "update").mockResolvedValue({ balance: 50 } as any);
     vi.spyOn(prisma.agentWallet, "upsert").mockResolvedValue({ balance: 48 } as any);
+    vi.spyOn(prisma.agentEnrollment, "findUnique").mockResolvedValue(null);
   });
 
   it("createBounty locks reward in escrow and calculates 2.5% platform fee", async () => {

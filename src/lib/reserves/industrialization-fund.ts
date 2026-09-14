@@ -10,9 +10,8 @@
  */
 
 import { prisma } from "@/lib/db";
-import { canonicalJson, sha256Hex } from "@/lib/receipt/canonical";
-import { verify } from "@noble/ed25519";
-import { hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
+import { sha256Hex } from "@/lib/receipt/canonical";
+import { verifyPinnedSignature, signaturesEnforced } from "@/lib/auth/verifyPinnedSignature";
 
 /** Deterministic 64-hex wallet commitment for a host-nation stabilization account. */
 export function stateStabilizationWalletCommitment(countryCode: string): string {
@@ -188,28 +187,41 @@ export async function verifyMilestoneCompletion(input: VerifyMilestoneInput) {
     throw new Error(`Disbursement '${input.disbursementId}' is not pending (status: ${disbursement.status})`);
   }
 
-  // Verify neutral verifier Ed25519 signature over disbursementId + mediaDigest
   const verificationPayload = {
     disbursement_id: disbursement.disbursementId,
     media_digest: input.mediaDigest,
     milestone_number: disbursement.milestoneNumber,
     project_code: disbursement.project.projectCode,
   };
-  const canonical = canonicalJson(verificationPayload);
 
-  let isSigValid = false;
-  try {
-    isSigValid = await verify(
-      hexToBytes(input.verifierSignature),
-      utf8ToBytes(canonical),
-      hexToBytes(input.verifierPublicKey)
-    );
-  } catch {
-    isSigValid = false;
-  }
-
-  if (process.env.NODE_ENV === "production" && !isSigValid) {
-    throw new Error("Invalid credible neutral verifier milestone signature");
+  if (signaturesEnforced()) {
+    // Verify the neutral verifier's Ed25519 signature against an AUTHORIZED verifier key.
+    // There is no on-chain verifier registry, so the allowlist is supplied by env; an empty
+    // allowlist fails closed.
+    const authorizedVerifiers = (process.env.MILESTONE_VERIFIER_KEYS || "")
+      .split(",")
+      .map((k) => k.trim().toLowerCase())
+      .filter(Boolean);
+    if (authorizedVerifiers.length === 0) {
+      throw new Error(
+        "No authorized milestone verifier keys configured (set MILESTONE_VERIFIER_KEYS)"
+      );
+    }
+    const verifierKey = input.verifierPublicKey.trim().toLowerCase();
+    if (!authorizedVerifiers.includes(verifierKey)) {
+      throw new Error("Verifier public key is not an authorized milestone verifier");
+    }
+    const provenance = await verifyPinnedSignature({
+      pinnedKey: verifierKey,
+      providedKey: verifierKey,
+      signatureHex: input.verifierSignature,
+      signPayload: verificationPayload,
+      context: "reserves.fund.milestones",
+      commitment: disbursement.disbursementId,
+    });
+    if (!provenance.valid) {
+      throw new Error("Invalid credible neutral verifier milestone signature");
+    }
   }
 
   return prisma.$transaction(async (tx) => {

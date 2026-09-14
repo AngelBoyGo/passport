@@ -32,6 +32,7 @@ describe("Swarm Bounty API Routes (Integration)", () => {
 
     vi.spyOn(prisma.agentWallet, "update").mockResolvedValue({ balance: 60 } as any);
     vi.spyOn(prisma.agentWallet, "upsert").mockResolvedValue({ balance: 39 } as any);
+    vi.spyOn(prisma.agentEnrollment, "findUnique").mockResolvedValue(null);
   });
 
   it("POST /api/v1/swarm/bounties creates an open bounty", async () => {

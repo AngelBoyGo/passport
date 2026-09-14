@@ -1,8 +1,6 @@
-import { verify } from "@noble/ed25519";
-import { sha256 } from "@noble/hashes/sha2.js";
-import { bytesToHex, hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
 import { prisma } from "@/lib/db";
-import { sha256Hex, canonicalJson } from "@/lib/receipt/canonical";
+import { sha256Hex } from "@/lib/receipt/canonical";
+import { verifyPinnedSignature, signaturesEnforced } from "@/lib/auth/verifyPinnedSignature";
 
 export interface PublishMemoryInput {
   agentCommitment: string;
@@ -89,39 +87,64 @@ export async function verifySwarmSignature(
 ): Promise<{ valid: boolean; reason?: string; publicKey?: string }> {
   try {
     const cleanCommitment = agentCommitment.trim().toLowerCase();
-    let pubKey = providedPublicKey?.trim().toLowerCase();
+    const provided = providedPublicKey?.trim().toLowerCase() || null;
 
-    if (!pubKey) {
-      const enrollment = await prisma.agentEnrollment.findUnique({
-        where: { subjectCommitment: cleanCommitment },
-      });
-      if (enrollment) {
-        pubKey = enrollment.publicKey.toLowerCase();
+    // Resolve the agent's REGISTERED key from enrollment. A caller-supplied publicKey
+    // must never override it, otherwise anyone could sign as any agent (IDOR/forgery).
+    const enrollment = await prisma.agentEnrollment.findUnique({
+      where: { subjectCommitment: cleanCommitment },
+    });
+    const registeredKey = enrollment?.publicKey?.trim().toLowerCase() || null;
+
+    if (!registeredKey) {
+      if (!provided) {
+        // No pinned key and no caller key: only proceed for a known agent record.
+        const agent = await prisma.agent.findFirst({
+          where: { agentId: cleanCommitment },
+        });
+        if (!agent) {
+          return { valid: false, reason: "Agent public key not found or not enrolled" };
+        }
+        return { valid: false, reason: "Valid 32-byte Ed25519 public key required" };
       }
-    }
-
-    if (!pubKey) {
-      // Check if any agent record exists with this commitment
-      const agent = await prisma.agent.findFirst({
-        where: { agentId: cleanCommitment },
-      });
-      if (!agent && !providedPublicKey) {
-        return { valid: false, reason: "Agent public key not found or not enrolled" };
+      // No pinned key exists for this commitment. Caller-supplied keys are trusted only
+      // outside enforcement (non-production); in production/staging this fails closed.
+      if (signaturesEnforced()) {
+        return {
+          valid: false,
+          reason: "No enrolled public key for agent; caller-supplied keys are not trusted",
+        };
       }
+      const legacy = await verifyPinnedSignature({
+        pinnedKey: provided,
+        signatureHex,
+        signPayload: digestHex,
+        context: "swarm.signature",
+        commitment: cleanCommitment,
+      });
+      return legacy.valid
+        ? { valid: true, publicKey: provided }
+        : { valid: false, reason: "Cryptographic signature mismatch" };
     }
 
-    if (!pubKey || pubKey.length !== 64) {
-      return { valid: false, reason: "Valid 32-byte Ed25519 public key required" };
+    const check = await verifyPinnedSignature({
+      pinnedKey: registeredKey,
+      providedKey: provided,
+      signatureHex,
+      signPayload: digestHex,
+      context: "swarm.signature",
+      commitment: cleanCommitment,
+    });
+    if (check.valid) {
+      return { valid: true, publicKey: registeredKey };
     }
-
-    const digestBytes = utf8ToBytes(digestHex);
-    const sigBytes = hexToBytes(signatureHex.trim());
-    const pkBytes = hexToBytes(pubKey);
-
-    const isMatch = await verify(sigBytes, digestBytes, pkBytes);
-    return isMatch
-      ? { valid: true, publicKey: pubKey }
-      : { valid: false, reason: "Cryptographic signature mismatch" };
+    if (check.reason === "provided_key_mismatch") {
+      return { valid: false, reason: "Provided public key does not match the enrolled agent key" };
+    }
+    if (check.reason === "signature_mismatch") {
+      return { valid: false, reason: "Cryptographic signature mismatch" };
+    }
+    return { valid: false, reason: `Verification error: ${check.reason}` };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     return { valid: false, reason: `Verification error: ${message}` };

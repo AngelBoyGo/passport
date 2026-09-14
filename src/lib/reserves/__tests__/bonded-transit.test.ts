@@ -6,6 +6,7 @@ const { prismaMock } = vi.hoisted(() => ({
     vaultBatch: { findUnique: vi.fn(), update: vi.fn() },
     agentWallet: { findUnique: vi.fn(), update: vi.fn(), upsert: vi.fn() },
     bondedTransitWaybill: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn(), findMany: vi.fn() },
+    customsCheckpoint: { findFirst: vi.fn(), findUnique: vi.fn() },
     $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(prismaMock)),
   },
 }));
@@ -124,6 +125,11 @@ describe("Cross-Border Diplomatic Bonded Customs & Coastal Logistics", () => {
         status: "DISPATCHED",
         checkpointsVisited: ["SIKASSO"],
       });
+      prismaMock.customsCheckpoint.findFirst.mockResolvedValue({
+        checkpointName: "OUAGA",
+        inspectorPublicKey: "pk_ouaga",
+        activeStatus: "ACTIVE",
+      });
       prismaMock.bondedTransitWaybill.update.mockResolvedValue({
         waybillNumber: "WAYBILL-001",
         status: "IN_TRANSIT",
@@ -153,6 +159,11 @@ describe("Cross-Border Diplomatic Bonded Customs & Coastal Logistics", () => {
         waybillNumber: "WAYBILL-001",
         status: "IN_TRANSIT",
         checkpointsVisited: ["SIKASSO", "OUAGA"],
+      });
+      prismaMock.customsCheckpoint.findFirst.mockResolvedValue({
+        checkpointName: "OUAGA",
+        inspectorPublicKey: "pk_ouaga",
+        activeStatus: "ACTIVE",
       });
 
       await expect(
@@ -240,6 +251,44 @@ describe("Cross-Border Diplomatic Bonded Customs & Coastal Logistics", () => {
           enclaveSignature: "sig",
         })
       ).rejects.toThrow(/Port code mismatch/i);
+    });
+
+    it("ignores a caller-supplied enclavePublicKey and rejects a forged production signature", async () => {
+      vi.stubEnv("NODE_ENV", "production");
+      try {
+        prismaMock.bondedTransitWaybill.findUnique.mockResolvedValue({
+          waybillNumber: "WAYBILL-001",
+          batchNumber,
+          enclaveId: "enc_1",
+          destinationPortCode: portCode,
+          status: "IN_TRANSIT",
+          carrierCommitment: carrier,
+          carrierBondAngel: 5000,
+          fineGoldGrams: 500.0,
+          diplomaticSealDigest: sealDigest,
+          enclave: {
+            portCode,
+            countryCode: "TG",
+            enclavePublicKey: "dd".repeat(32),
+            clearingFeeShareBps: 50,
+          },
+        });
+        vi.spyOn(oracle, "getCommoditySpotPrices").mockReturnValue({
+          Au: { symbol: "Au", priceUsd: 75.0, isStale: false },
+        } as unknown as Record<string, CommodityPrice>);
+
+        await expect(
+          recordPortArrival({
+            waybillNumber: "WAYBILL-001",
+            portCode,
+            enclaveSignature: "00".repeat(64),
+            enclavePublicKey: "ee".repeat(32), // attacker key must be ignored
+          })
+        ).rejects.toThrow(/Invalid coastal port enclave/);
+        expect(prismaMock.bondedTransitWaybill.updateMany).not.toHaveBeenCalled();
+      } finally {
+        vi.unstubAllEnvs();
+      }
     });
   });
 
