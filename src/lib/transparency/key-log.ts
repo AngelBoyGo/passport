@@ -1,5 +1,6 @@
-import { verify, getPublicKey } from "@noble/ed25519";
+import { getPublicKey } from "@noble/ed25519";
 import { hexToBytes, utf8ToBytes, bytesToHex } from "@noble/hashes/utils.js";
+import { verifyPinnedSignature } from "@/lib/auth/verifyPinnedSignature";
 import "@/lib/receipt/crypto";
 import {
   buildCanonicalPayload,
@@ -179,9 +180,13 @@ export async function verifyReceiptOffline(
   const pubKeyHex = options?.publicKeyHex ?? getPublicKeyHex();
   let sigValid = false;
   try {
-    const pubKeyBytes = hexToBytes(pubKeyHex);
-    const sigBytes = hexToBytes(receipt.signature);
-    sigValid = await verify(sigBytes, signingMessage(receipt.content_hash), pubKeyBytes);
+    const check = await verifyPinnedSignature({
+      pinnedKey: pubKeyHex,
+      signatureHex: receipt.signature,
+      signPayload: receipt.content_hash,
+      context: "transparency.key-log.verify",
+    });
+    sigValid = check.valid;
   } catch (err) {
     return {
       valid: false,

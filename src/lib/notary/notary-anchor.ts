@@ -1,6 +1,7 @@
 import { sign } from "@noble/ed25519";
 import { bytesToHex, hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
 import { sha256 } from "@noble/hashes/sha2.js";
+import { verifyPinnedSignature } from "@/lib/auth/verifyPinnedSignature";
 import "@/lib/receipt/crypto";
 import { canonicalJson, sha256Hex } from "@/lib/receipt/canonical";
 import { getPublicKeyHex } from "@/lib/receipt/signer";
@@ -98,12 +99,13 @@ export async function verifyNotaryAnchor(
     );
     if (expectedDigest !== payload.anchor_digest) return false;
     const pubKeyHex = getPublicKeyHex();
-    const { verify } = await import("@noble/ed25519");
-    return await verify(
-      hexToBytes(payload.signature),
-      utf8ToBytes(payload.anchor_digest),
-      hexToBytes(pubKeyHex)
-    );
+    const check = await verifyPinnedSignature({
+      pinnedKey: pubKeyHex,
+      signatureHex: payload.signature,
+      signPayload: payload.anchor_digest,
+      context: "notary.anchor.verify",
+    });
+    return check.valid;
   } catch {
     return false;
   }

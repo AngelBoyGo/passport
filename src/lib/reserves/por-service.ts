@@ -11,7 +11,8 @@
 
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
-import { sign, verify, getPublicKey } from "@noble/ed25519";
+import { sign, getPublicKey } from "@noble/ed25519";
+import { verifyPinnedSignature } from "@/lib/auth/verifyPinnedSignature";
 import "@/lib/receipt/crypto";
 import { prisma } from "@/lib/db";
 
@@ -292,11 +293,13 @@ export async function verifyPoRAttestation(
       total_gross_grams: attestation.total_gross_grams,
     };
     const canonical = canonicalJson(payload);
-    return await verify(
-      hexToBytes(attestation.signature),
-      utf8ToBytes(canonical),
-      hexToBytes(attestation.public_key)
-    );
+    const check = await verifyPinnedSignature({
+      pinnedKey: attestation.public_key,
+      signatureHex: attestation.signature,
+      signPayload: canonical,
+      context: "reserves.por.verify",
+    });
+    return check.valid;
   } catch {
     return false;
   }

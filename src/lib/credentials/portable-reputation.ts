@@ -1,6 +1,7 @@
-import { sign, verify, getPublicKey } from "@noble/ed25519";
+import { sign, getPublicKey } from "@noble/ed25519";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
+import { verifyPinnedSignature } from "@/lib/auth/verifyPinnedSignature";
 import "@/lib/receipt/crypto";
 import { canonicalJson, sha256Hex } from "@/lib/receipt/canonical";
 import { getAgentProfile } from "@/lib/public-portal/portal-service";
@@ -185,13 +186,13 @@ export async function verifyAgentVerifiableCredential(
   }
 
   try {
-    const isValid = await verify(
-      hexToBytes(proof.proofValue),
-      utf8ToBytes(canonicalHash),
-      hexToBytes(issuerPubKeyHex)
-    );
-
-    if (!isValid) {
+    const check = await verifyPinnedSignature({
+      pinnedKey: issuerPubKeyHex,
+      signatureHex: proof.proofValue,
+      signPayload: canonicalHash,
+      context: "credentials.reputation.verify",
+    });
+    if (!check.valid) {
       return { valid: false, error: "Invalid signature or tampered credential claims" };
     }
 

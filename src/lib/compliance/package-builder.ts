@@ -1,5 +1,6 @@
-import { sign, verify, getPublicKey } from "@noble/ed25519";
+import { sign, getPublicKey } from "@noble/ed25519";
 import { bytesToHex, hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
+import { verifyPinnedSignature } from "@/lib/auth/verifyPinnedSignature";
 import "@/lib/receipt/crypto";
 import { canonicalJson, sha256Hex } from "@/lib/receipt/canonical";
 import { getPublicKeyHex } from "@/lib/receipt/signer";
@@ -230,7 +231,13 @@ export async function verifyCompliancePackage(
 
   const pubKey = publicKeyHex ?? getPublicKeyHex();
   try {
-    return await verify(hexToBytes(signature), utf8ToBytes(content_hash), hexToBytes(pubKey));
+    const check = await verifyPinnedSignature({
+      pinnedKey: pubKey,
+      signatureHex: signature,
+      signPayload: content_hash,
+      context: "compliance.package.verify",
+    });
+    return check.valid;
   } catch {
     return false;
   }

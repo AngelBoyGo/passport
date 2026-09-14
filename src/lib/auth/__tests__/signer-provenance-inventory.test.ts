@@ -29,13 +29,8 @@ const HELPER = "src/lib/auth/verifyPinnedSignature.ts";
 const APPROVED_VERIFY_CALL_SITES: Record<string, string> = {
   "src/lib/bill-of-rights/rights.ts": "rights manifest signature; signed by the issuing authority key; key embedded in manifest",
   "src/lib/bill-of-rights/violations.ts": "violation report signature; reporter key; key embedded in violation record",
-  "src/lib/compliance/package-builder.ts": "compliance package receipt signature; operator signing key",
-  "src/lib/credentials/portable-reputation.ts": "W3C VC signature; issuer key",
   "src/lib/enrollment/proof.ts": "enrollment challenge signature; low-level fn, verify is the final step in a PoW chain",
-  "src/lib/notary/notary-anchor.ts": "external notary anchor signature",
   "src/lib/receipt/verify.ts": "public offline receipt verification; key embedded in the signed receipt",
-  "src/lib/reserves/por-service.ts": "PoR attestation self-verification; public_key carried in the signed attestation",
-  "src/lib/transparency/key-log.ts": "key-transparency log entry signature; key from the log",
   "src/lib/auth/autonomous-provision.ts": "PoW/signature provisioning; raw SHA-256 hash signing, not compatible with helper's utf-8 signPayload",
   "src/app/api/v1/a2a/hire/route.ts": "A2A hire signature; raw bytes signing over hash digest, not compatible with helper's utf-8 mode",
   "src/app/api/v1/delegation/route.ts": "delegation grant signature; raw message bytes, helper uses utf-8",
@@ -105,6 +100,11 @@ describe("Signer provenance inventory (non-regressable)", () => {
       "src/lib/raillab/settlement.ts",
       "src/lib/receipt/merkle-checkpoint.ts",
       "src/lib/reserves/artisanal-sourcing.ts",
+      "src/lib/transparency/key-log.ts",
+      "src/lib/reserves/por-service.ts",
+      "src/lib/compliance/package-builder.ts",
+      "src/lib/credentials/portable-reputation.ts",
+      "src/lib/notary/notary-anchor.ts",
     ];
     for (const r of hardened) {
       const src = readFileSync(join(ROOT, r), "utf8");
