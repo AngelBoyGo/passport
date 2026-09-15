@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- test mocks use partial Prisma rows and mock objects */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { utils, getPublicKey, sign } from "@noble/ed25519";
 import { bytesToHex, hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
@@ -14,13 +15,13 @@ import {
 } from "@/lib/enrollment/proof";
 import { EnrollmentStatus } from "@prisma/client";
 
-// ── Shared test keypairs ──
+// â”€â”€ Shared test keypairs â”€â”€
 const KEY_A = utils.randomSecretKey();
 const PUB_A = bytesToHex(getPublicKey(KEY_A));
 const KEY_B = utils.randomSecretKey();
 const PUB_B = bytesToHex(getPublicKey(KEY_B));
 
-// ── Prisma mocks ──
+// â”€â”€ Prisma mocks â”€â”€
 const { findUniqueMock, upsertMock, updateMock, findFirstMock, createMock, updateManyMock } =
   vi.hoisted(() => ({
     findUniqueMock: vi.fn(),
@@ -139,9 +140,9 @@ beforeEach(() => {
   updateManyMock.mockResolvedValue({ count: 1 });
 });
 
-// ════════════════════════════════════════════════════════════════
-// A1: KEY REUSE — same Ed25519 key across multiple enrollments
-// ════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// A1: KEY REUSE â€” same Ed25519 key across multiple enrollments
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 describe("A1: Key reuse across multiple enrollments", () => {
   it("ATTACK: allows enrolling the same public key in two different contexts, creating two identities from one keypair", async () => {
     const ctx1 = "domain-alpha";
@@ -159,9 +160,9 @@ describe("A1: Key reuse across multiple enrollments", () => {
   });
 });
 
-// ════════════════════════════════════════════════════════════════
-// A2: CHALLENGE REPLAY — re-use captured nonce+signature after expiry
-// ════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// A2: CHALLENGE REPLAY â€” re-use captured nonce+signature after expiry
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 describe("A2: Challenge replay after expiry", () => {
   it("ATTACK: server allows completing enrollment with a valid sig against an expired challenge if the DB row isn't atomically consumed", async () => {
     const nonce = "expired-test-nonce-0000000";
@@ -174,16 +175,16 @@ describe("A2: Challenge replay after expiry", () => {
       })
     );
     const signature = await sigFor(nonce);
-    // This should throw ChallengeExpiredError — if it doesn't, attack succeeds
+    // This should throw ChallengeExpiredError â€” if it doesn't, attack succeeds
     await expect(
       completeEnrollment(deriveAgentCommitment(PUB_A), signature)
     ).rejects.toThrow();
   });
 });
 
-// ════════════════════════════════════════════════════════════════
-// A3: POW BYPASS — skip PoW in autonomous flow
-// ════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// A3: POW BYPASS â€” skip PoW in autonomous flow
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 describe("A3: PoW bypass in autonomous provisioning", () => {
   it("ATTACK: verifyAutonomousPoW rejects empty/zero pow_nonce even at low difficulty 1", async () => {
     const challenge = "test-nonce-bypass";
@@ -198,11 +199,11 @@ describe("A3: PoW bypass in autonomous provisioning", () => {
   });
 });
 
-// ════════════════════════════════════════════════════════════════
-// A4: SALT INFERENCE — (not unit-testable; documented risk)
-// ════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// A4: SALT INFERENCE â€” (not unit-testable; documented risk)
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 describe("A4: Salt inference (documented)", () => {
-  it("INGESTION_COMMITMENT_SALT must be ≥ 256 bits (32 chars) in production", () => {
+  it("INGESTION_COMMITMENT_SALT must be â‰¥ 256 bits (32 chars) in production", () => {
     const salt = process.env.INGESTION_COMMITMENT_SALT;
     if (salt && process.env.NODE_ENV !== "test") {
       expect(salt.length).toBeGreaterThanOrEqual(32);
@@ -210,9 +211,9 @@ describe("A4: Salt inference (documented)", () => {
   });
 });
 
-// ════════════════════════════════════════════════════════════════
-// A5: COMMITMENT COLLISION — two public keys yielding same sha256
-// ════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// A5: COMMITMENT COLLISION â€” two public keys yielding same sha256
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 describe("A5: Commitment collision resistance", () => {
   it("derived commitments from different public keys are distinct", () => {
     const c1 = deriveAgentCommitment(PUB_A);
@@ -221,9 +222,9 @@ describe("A5: Commitment collision resistance", () => {
   });
 });
 
-// ════════════════════════════════════════════════════════════════
-// A6: API key hash reversal — (not unit-testable; documented)
-// ════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// A6: API key hash reversal â€” (not unit-testable; documented)
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 describe("A6: API key hash has 256 bits of entropy", () => {
   it("generated raw key should have 256-bit entropy (32 random bytes)", () => {
     const raw = bytesToHex(crypto.getRandomValues(new Uint8Array(32)));
@@ -231,9 +232,9 @@ describe("A6: API key hash has 256 bits of entropy", () => {
   });
 });
 
-// ════════════════════════════════════════════════════════════════
-// A7: KEY ROLE ELEVATION — ISSUER key used as HOLDER
-// ════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// A7: KEY ROLE ELEVATION â€” ISSUER key used as HOLDER
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 describe("A7: Cross-operator API key role elevation", () => {
   it("ATTACK: service-auth gate exists but no double-check that an ISSUER key cannot post enrolled evidence", async () => {
     const keyHash = "hash-for-issuer-key";
@@ -244,32 +245,32 @@ describe("A7: Cross-operator API key role elevation", () => {
   });
 });
 
-// ════════════════════════════════════════════════════════════════
-// A8: SESSION FIXATION — IP binding
-// ════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// A8: SESSION FIXATION â€” IP binding
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 describe("A8: Session fixation with IP binding", () => {
   it("ATTACK: session token alone is sufficient for auth; no IP/user-agent binding exists", () => {
     const session = { token: "abc123", operatorId: "op_1", expiresAt: new Date(Date.now() + 3600000) };
     expect(session.token).toBeTruthy();
-    // No ipAddress or userAgent field on session — stolen token works from any IP
+    // No ipAddress or userAgent field on session â€” stolen token works from any IP
   });
 });
 
-// ════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // A9: UNLIMITED AUTONOMOUS OPERATORS
-// ════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 describe("A9: Unlimited autonomous account creation", () => {
   it("ATTACK: no IP-based daily cap on autonomous provisioning per source address", () => {
     // provisionAutonomousAgent creates a new operator + apiKey each call
     // There is no check like "this IP has already provisioned N agents today"
     const allowed = true;
-    expect(allowed).toBe(true); // documented gap — rate limit exists per endpoint but not daily
+    expect(allowed).toBe(true); // documented gap â€” rate limit exists per endpoint but not daily
   });
 });
 
-// ════════════════════════════════════════════════════════════════
-// A10: ENROLLMENT PROOF REPLAY — reuse sig within PENDING window
-// ════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// A10: ENROLLMENT PROOF REPLAY â€” reuse sig within PENDING window
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 describe("A10: Enrollment proof replay within PENDING window", () => {
   it("ATTACK: same signature can be submitted twice to completeEnrollment; nonce not consumed atomically until first complete", async () => {
     const nonce = "replay-attack-nonce-001";
@@ -284,14 +285,14 @@ describe("A10: Enrollment proof replay within PENDING window", () => {
     const r1 = await completeEnrollment(commitment, signature);
     expect(r1.status).toBe(EnrollmentStatus.ISSUED);
     // Second attempt reuses same signature against same commitment (now ISSUED)
-    // should throw ChallengeNotFoundError — if it completes, attack succeeds
+    // should throw ChallengeNotFoundError â€” if it completes, attack succeeds
     await expect(completeEnrollment(commitment, signature)).rejects.toThrow();
   });
 });
 
-// ════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // A11: KEY TRANSPARENCY FORGERY
-// ════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 describe("A11: Key transparency log forgery", () => {
   it("ATTACK: unsigned entries in key log can be freely inserted by any operator", async () => {
     // getKeyTransparencyLog reads env SIGNING_PRIVATE_KEY and SIGNING_PRIVATE_KEY_PREVIOUS
@@ -301,12 +302,12 @@ describe("A11: Key transparency log forgery", () => {
   });
 });
 
-// ════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // A12: DID KEY FORMAT CONFUSION
-// ════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 describe("A12: DID document key format", () => {
   it("ATTACK: autonomous provision embeds hex public key directly in did:key, should use multibase base58btc", () => {
-    // Current format: `did:key:z${PUB_A.toLowerCase()}` — 'z' prefix indicates
+    // Current format: `did:key:z${PUB_A.toLowerCase()}` â€” 'z' prefix indicates
     // base58btc multibase, but hex is not valid base58btc encoding of the key bytes.
     const did = `did:key:z${PUB_A.toLowerCase()}`;
     const pubkeyPart = did.replace("did:key:z", "");
@@ -315,9 +316,9 @@ describe("A12: DID document key format", () => {
   });
 });
 
-// ════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // A13: OPERATOR ID ENUMERATION
-// ════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 describe("A13: Operator ID enumeration", () => {
   it("ATTACK: autonomous operator Stripe customer ID leaks commitment prefix", () => {
     const commitment = "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
@@ -326,9 +327,9 @@ describe("A13: Operator ID enumeration", () => {
   });
 });
 
-// ════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // A14: CHALLENGE NONCE COLLISION
-// ════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 describe("A14: Challenge nonce collision risk", () => {
   it("nonce is 32 random bytes (256-bit) so collision is cryptographically negligible", () => {
     const nonce = generateChallengeNonce();
@@ -338,9 +339,9 @@ describe("A14: Challenge nonce collision risk", () => {
   });
 });
 
-// ════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // A15: KYC BYPASS
-// ════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 describe("A15: KYC bypass via API", () => {
   it("ATTACK: KYC status should have an audit trail on every mutation", async () => {
     // The compliance layer checks KYC status for withdrawals:

@@ -20,7 +20,11 @@ export async function GET(
   }
 
   const { searchParams } = new URL(request.url);
-  const framework = (searchParams.get("framework") as any) || "EU_AI_ACT";
+  const rawFramework = searchParams.get("framework") ?? "EU_AI_ACT";
+  const framework =
+    rawFramework === "NIST_AI_RMF" || rawFramework === "ISO_14064_GHG" || rawFramework === "SOC2_TYPE2"
+      ? rawFramework
+      : "EU_AI_ACT";
 
   const pkg = await buildDataCenterCompliancePackage(id, framework);
   if (!pkg) {

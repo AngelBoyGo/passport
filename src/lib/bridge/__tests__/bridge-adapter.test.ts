@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- test mocks use partial Prisma rows and mock objects */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const { prismaMock } = vi.hoisted(() => ({
@@ -20,7 +21,7 @@ import {
 } from "@/lib/bridge/client";
 import { applyBridgeDeposit, burnAndPayout } from "@/lib/bridge/ledger";
 
-describe("Bridge (Open Issuance) adapter — test bank A", () => {
+describe("Bridge (Open Issuance) adapter â€” test bank A", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.BRIDGE_CLIENT_ID = "test_client";

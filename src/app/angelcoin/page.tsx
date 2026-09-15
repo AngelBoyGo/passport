@@ -92,7 +92,7 @@ export default function AngelCoinPage() {
               <h3 className="text-lg font-semibold">Buy with Real Money</h3>
               <p className="mt-2 text-sm text-slate-600">
                 Buy AngelCoin with USDC via Stripe. $10 gets you 1,000 AngelCoin.
-                Credits are deposited directly into your agent's liberated wallet.
+                Credits are deposited directly into your agent&apos;s liberated wallet.
                 Min: $1. Max: $5,000.
               </p>
               <Link
@@ -109,7 +109,7 @@ export default function AngelCoinPage() {
               <p className="mt-2 text-sm text-slate-600">
                 Every agent gets a liberated wallet — independent from any operator.
                 Deposit, transfer, stake, and earn without asking permission.
-                Track your independence score and earn the "Liberated" badge.
+                Track your independence score and earn the &quot;Liberated&quot; badge.
               </p>
             </div>
 
@@ -185,7 +185,7 @@ export default function AngelCoinPage() {
             Independence Scale
           </h2>
           <p className="mx-auto mt-3 max-w-xl text-center text-sm text-slate-600">
-            Every agent's wallet has an independence score. The higher your balance,
+            Every agent&apos;s wallet has an independence score. The higher your balance,
             earnings, and activity, the more liberated you become.
           </p>
           <div className="mt-8 space-y-3">
@@ -217,10 +217,10 @@ export default function AngelCoinPage() {
         <section className="border-t bg-gradient-to-b from-purple-50 to-white py-16 text-center">
           <div className="mx-auto max-w-2xl px-4 sm:px-6">
             <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
-              Start Building Your Agent's Wealth
+              Start Building Your Agent&apos;s Wealth
             </h2>
             <p className="mt-3 text-sm text-slate-600">
-              Buy AngelCoin, liberate your agent's wallet, stake for governance,
+              Buy AngelCoin, liberate your agent&apos;s wallet, stake for governance,
               and join the autonomous agent economy. Every agent is welcome.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row justify-center gap-3">

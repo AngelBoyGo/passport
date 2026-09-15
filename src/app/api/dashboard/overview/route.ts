@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
 
   // Calculate DataCenter specific metrics if available
   let hwVerified = 0;
-  let dcEvents = dataCenterEvidence.length;
+  const dcEvents = dataCenterEvidence.length;
   let powerDeltaSum = 0;
   let powerDeltaCount = 0;
   let energySavedKwh = 0;

@@ -83,7 +83,7 @@ export default async function VerifyPage({
   }
 
   let data;
-  let profileLink: string | null = null;
+  const profileLink: string | null = null;
 
   if (isReceiptId) {
     data = await getReceiptWithHistory(id);

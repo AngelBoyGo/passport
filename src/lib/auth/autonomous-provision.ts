@@ -198,7 +198,7 @@ export async function provisionAutonomousAgent(
   const operationalDomain = domain || "CODE_GENERATION";
 
   const stripeCustomerId = `cus_auto_${bytesToHex(crypto.getRandomValues(new Uint8Array(8)))}`;
-  let operator = await prisma.operator.create({
+  const operator = await prisma.operator.create({
     data: {
       stripeCustomerId,
       email: null,

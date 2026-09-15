@@ -71,10 +71,10 @@ export async function GET(request: NextRequest) {
   const opportunities: RankedOpportunity[] = recentDiscoveries.map((d, i) => ({
     rank: i + 1,
     title: `Discovery from ${d.agentIdentityCommitment.slice(0, 12)}`,
-    type: "unknown" as any,
+    type: "unknown",
     expectedValue: recentEvidence * (50 - i), // Diminishing value
-    confidence: (i < 10 ? "high" : i < 25 ? "medium" : "low") as any,
-    effort: (i < 10 ? "low" : i < 25 ? "medium" : "high") as any,
+    confidence: (i < 10 ? "high" : i < 25 ? "medium" : "low") as "high" | "medium" | "low",
+    effort: (i < 10 ? "low" : i < 25 ? "medium" : "high") as "low" | "medium" | "high",
     timeToValue: i < 10 ? "1 week" : i < 25 ? "2 weeks" : "1 month",
     description: d.sourceDigest || "Opportunity discovered by autonomous agent",
   }));

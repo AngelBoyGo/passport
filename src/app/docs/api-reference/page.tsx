@@ -393,7 +393,7 @@ export default function DocsApiReference() {
           sha256(domain + blind_salt)</code>. In the canonical payload, if
           <code>domain_commitment</code> is present it is stored in the
           <code>domain</code> field of the canonical object (the key is always
-          <code>"domain"</code> in the sorted JSON). The <code>blind_salt</code>
+          <code>&quot;domain&quot;</code> in the sorted JSON). The <code>blind_salt</code>
           itself is <em>not</em> part of the canonical payload — it is stored
           alongside in the database and exposed only to the receipt creator.
         </p>
@@ -413,7 +413,7 @@ export default function DocsApiReference() {
         </p>
         <div className="rounded-lg border bg-slate-50 p-4 text-sm text-slate-700">
           <ol className="ml-4 list-decimal space-y-2">
-            <li>Check <code>revocation_status !== "revoked"</code>.</li>
+            <li>Check <code>revocation_status !== &quot;revoked&quot;</code>.</li>
             <li>Check <code>expiry</code> is in the future (expired receipts are rejected before signature check).</li>
             <li>Recompute <code>expectedHash = computeContentHash(buildCanonicalPayload(receipt))</code> and verify <code>expectedHash === receipt.content_hash</code>.</li>
             <li>Verify <code>ed25519.verify(hexToBytes(signature), utf8ToBytes(content_hash), hexToBytes(publicKey))</code> using the key from <code>GET /api/v1/public-key</code>.</li>

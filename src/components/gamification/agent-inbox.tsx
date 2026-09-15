@@ -48,7 +48,8 @@ export function AgentInbox() {
     }
   }, []);
 
-  useEffect(() => { loadInbox(); }, [loadInbox]);
+  useEffect(() => { // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch on mount
+    loadInbox(); }, [loadInbox]);
 
   async function sendMessage() {
     if (!composeTarget || !composeBody) return;

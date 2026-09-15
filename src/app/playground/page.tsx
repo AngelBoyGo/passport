@@ -28,7 +28,7 @@ const ENDPOINTS: Endpoint[] = [
 export default function PlaygroundPage() {
   const [selectedEndpoint, setSelectedEndpoint] = useState<Endpoint>(ENDPOINTS[0]);
   const [inputValue, setInputValue] = useState("");
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<unknown>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [curlCmd, setCurlCmd] = useState("");
@@ -48,8 +48,8 @@ export default function PlaygroundPage() {
       const res = await fetch(path);
       const data = await res.json();
       setResult(data);
-    } catch (e: any) {
-      setError(e.message || "Request failed");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Request failed");
     } finally {
       setLoading(false);
     }
@@ -159,7 +159,7 @@ export default function PlaygroundPage() {
               </div>
             )}
 
-            {result && (
+            {result !== null && (
               <div className="rounded-xl border bg-white p-5 shadow-sm">
                 <div className="flex items-center justify-between">
                   <h2 className="text-sm font-semibold text-slate-900">Response</h2>

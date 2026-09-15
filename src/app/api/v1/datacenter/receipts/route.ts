@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { Prisma } from "@prisma/client";
 import { checkInMemoryRateLimit, clientIpFromRequest, rateLimitResponse } from "@/lib/rateLimit";
 import { createReceiptCheckpoint } from "@/lib/receipt/merkle-checkpoint";
 
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
   const origin = searchParams.get("origin") || undefined;
   const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "50", 10)));
 
-  const whereClause: any = {
+  const whereClause: Prisma.AgentEvidenceWhereInput = {
     sourceType: { in: ["datacenter_telemetry", "datacet_control_plane", "hardware_telemetry"] },
   };
 

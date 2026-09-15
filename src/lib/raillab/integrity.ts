@@ -89,9 +89,9 @@ export async function runIntegrityCheck(input: IntegrityInput = {}): Promise<Int
 
   // 2. Cross-ledger conservation.
   let fractionalizedBatches = 0;
-  let fractionalMintBySymbol: Record<string, number> = {};
-  let fractionalHeldBySymbol: Record<string, number> = {};
-  let fractionalPoolReserveBySymbol: Record<string, number> = {};
+  const fractionalMintBySymbol: Record<string, number> = {};
+  const fractionalHeldBySymbol: Record<string, number> = {};
+  const fractionalPoolReserveBySymbol: Record<string, number> = {};
   let fractionalConsistent = true;
   let poolsWithLpTokens = 0;
   let lpTokensPoolSide = 0;
@@ -174,7 +174,7 @@ export async function runIntegrityCheck(input: IntegrityInput = {}): Promise<Int
   let pendingReviewStale = 0;
   let settledTotalCredited = 0;
   let settledTotalRows = 0;
-  let burstSettlementRails: string[] = [];
+  const burstSettlementRails: string[] = [];
   let burstSettlementCount = 0;
   try {
     const cutoff = new Date(Date.now() - PENDING_REVIEW_TTL_MS);

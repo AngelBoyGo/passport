@@ -12,7 +12,7 @@ export function base58btcFromHex(hex: string): string {
   while (zeros < bytes.length && bytes[zeros] === 0) zeros++;
 
   // Big-number division via repeated mod/div by 58.
-  let digits: number[] = [0];
+  const digits: number[] = [0];
   for (let i = zeros; i < bytes.length; i++) {
     let carry = bytes[i];
     for (let j = 0; j < digits.length; j++) {

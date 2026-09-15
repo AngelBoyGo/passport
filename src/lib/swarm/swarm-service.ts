@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { Prisma } from "@prisma/client";
 import { sha256Hex } from "@/lib/receipt/canonical";
 import { verifyPinnedSignature, signaturesEnforced } from "@/lib/auth/verifyPinnedSignature";
 
@@ -239,7 +240,7 @@ export async function publishSwarmMemory(
       agentCommitment: input.agentCommitment.trim().toLowerCase(),
       channel: (input.channel || "global").trim().toLowerCase(),
       topic: input.topic.trim().toLowerCase(),
-      payload: input.payload as any,
+      payload: input.payload as Prisma.InputJsonValue,
       payloadDigest: digest,
       signature: input.signature.trim(),
       parentHash: input.parentHash?.trim() || null,
@@ -274,7 +275,7 @@ export async function querySwarmMemory(filter: {
   since?: Date;
   limit?: number;
 }): Promise<SwarmMemoryRecord[]> {
-  const where: any = {};
+  const where: Prisma.SwarmMemoryWhereInput = {};
   if (filter.channel) where.channel = filter.channel.trim().toLowerCase();
   if (filter.topic) where.topic = filter.topic.trim().toLowerCase();
   if (filter.agentCommitment) where.agentCommitment = filter.agentCommitment.trim().toLowerCase();
@@ -414,7 +415,7 @@ export async function reportThreat(
       reporterCommitment: input.reporterCommitment.trim().toLowerCase(),
       targetDomain: input.targetDomain.trim().toLowerCase(),
       threatType: input.threatType.toUpperCase(),
-      details: (input.details as any) || null,
+      details: input.details ? (input.details as Prisma.InputJsonValue) : Prisma.DbNull,
       evidenceDigest: input.evidenceDigest,
       signature: input.signature,
       bountyAwarded: bounty,
@@ -462,7 +463,7 @@ export async function getActiveThreats(filter?: {
   details: unknown;
   createdAt: string;
 }>> {
-  const where: any = {};
+  const where: Prisma.SwarmThreatReportWhereInput = {};
   if (filter?.domain) where.targetDomain = { contains: filter.domain.trim().toLowerCase() };
   if (filter?.threatType) where.threatType = filter.threatType.toUpperCase();
 

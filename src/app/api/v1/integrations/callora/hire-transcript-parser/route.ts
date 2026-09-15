@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
       });
       if (enrollment?.status === "ISSUED") {
         // Check gate pass
-        const gate = await verifyGatePass(operator.id, domain as any);
+        const gate = await verifyGatePass(operator.id, "CUSTOMER_SUPPORT");
         if (gate.allow_invocation) {
           parserCommitment = agent.agentId;
           break;

@@ -5,10 +5,27 @@ import Link from "next/link";
 import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
 
+interface VerifyResultReceipt {
+  receipt_id: string;
+  status: string;
+  domain?: string | null;
+  expired?: boolean;
+  has_signature?: boolean;
+}
+
+interface VerifyResult {
+  verified: boolean;
+  agent_commitment_hash: string;
+  reputation: { tier: string; tier_color: string; score: number; [key: string]: unknown };
+  totals: { evidence_count: number; artifact_count: number; success_rate_30d: number | null; [key: string]: unknown };
+  trajectory_7d: string;
+  recent_receipts: VerifyResultReceipt[];
+}
+
 export default function VerifyDemoPage() {
   const [commitment, setCommitment] = useState("");
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any | null>(null);
+  const [result, setResult] = useState<VerifyResult | null>(null);
   const [error, setError] = useState("");
 
   async function handleVerify() {
@@ -121,7 +138,7 @@ export default function VerifyDemoPage() {
                 <div className="p-6 border-t border-slate-100">
                   <h3 className="text-sm font-semibold text-slate-900">Recent Receipts</h3>
                   <div className="mt-3 space-y-2">
-                    {result.recent_receipts.map((r: any) => (
+                    {result.recent_receipts.map((r) => (
                       <div key={r.receipt_id} className="flex items-center justify-between rounded-lg border bg-slate-50 px-4 py-2 text-sm">
                         <div className="flex items-center gap-3">
                           <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${

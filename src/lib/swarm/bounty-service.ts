@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { Prisma, SwarmBounty } from "@prisma/client";
 import { computeSwarmDigest, debitSwarmFee, verifySwarmSignature } from "./swarm-service";
 
 export interface CreateBountyInput {
@@ -106,7 +107,7 @@ export async function listBounties(filter?: {
   minReward?: number;
   limit?: number;
 }): Promise<SwarmBountyRecord[]> {
-  const where: any = {};
+  const where: Prisma.SwarmBountyWhereInput = {};
   if (filter?.status) where.status = filter.status.toUpperCase();
   if (filter?.bountyType) where.bountyType = filter.bountyType.toUpperCase();
   if (filter?.creatorCommitment) where.creatorCommitment = filter.creatorCommitment.trim().toLowerCase();
@@ -283,7 +284,7 @@ export async function completeBounty(input: CompleteBountyInput): Promise<{
   };
 }
 
-function formatBounty(b: any): SwarmBountyRecord {
+function formatBounty(b: SwarmBounty): SwarmBountyRecord {
   return {
     id: b.id,
     creatorCommitment: b.creatorCommitment,

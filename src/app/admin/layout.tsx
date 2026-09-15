@@ -50,6 +50,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- session check on route change
     checkSession();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);

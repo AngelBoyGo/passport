@@ -45,6 +45,7 @@ export function ExecutiveDashboard() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch on mount
     load().catch((reason) =>
       setError(reason instanceof Error ? reason.message : "Unable to load dashboard")
     );

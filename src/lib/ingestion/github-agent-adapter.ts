@@ -628,7 +628,7 @@ export function normalizeGenAiTrace(payload: unknown): NormalizedEvidence[] {
 
   let normalized_event_type: NormalizedEventType = "AGENT_RUN_OBSERVED";
   let raw_error_classification: RawErrorClassification | null = "UNKNOWN";
-  let validation_signal_present = explicitValidation;
+  const validation_signal_present = explicitValidation;
 
   if (isError) {
     normalized_event_type = "EXECUTION_FAILURE_OBSERVED";

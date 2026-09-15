@@ -102,7 +102,7 @@ export async function POST(
 
   // Resolve the calling operator (api key or service token) for webhook dispatch.
   const callingOperator = await authenticateApiKey(request.headers.get("authorization"));
-  let serviceOperatorId: string | null = null;
+  const serviceOperatorId: string | null = null;
 
   // Reject oversized payloads before parsing
   const contentLength = request.headers.get("content-length");

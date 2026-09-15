@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { Prisma } from "@prisma/client";
 import { checkInMemoryRateLimit, clientIpFromRequest } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest) {
   const limit = Math.min(parseInt(searchParams.get("limit") || "20", 10), 100);
   const type = searchParams.get("type");
 
-  const where: any = { sourceType: "think_tank_discovery" };
+  const where: Prisma.AgentEvidenceWhereInput = { sourceType: "think_tank_discovery" };
   if (type) where.normalizedEventType = type;
 
   const discoveries = await prisma.agentEvidence.findMany({

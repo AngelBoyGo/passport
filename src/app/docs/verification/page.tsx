@@ -7,7 +7,7 @@ export default function DocsVerification() {
         <h1 className="text-3xl font-bold tracking-tight">Trust, Evidence & Independent Verification</h1>
         <p className="mt-2 max-w-3xl text-slate-600">
           How Passport anchors evidence, computes receipts, and lets a third party independently verify a
-          receipt <strong>without trusting Passport's word</strong>. This is the specification for exactly what
+          receipt <strong>without trusting Passport&apos;s word</strong>. This is the specification for exactly what
           bytes get hashed and signed, so you can reproduce the math offline.
         </p>
       </div>
@@ -65,7 +65,7 @@ export default function DocsVerification() {
           <ol className="mt-2 list-decimal pl-5 space-y-1">
             <li>Serialize the payload as JSON with object keys <strong>recursively sorted</strong> (canonical JSON).</li>
             <li>Compute <code className="px-1 font-mono text-xs">event_digest = sha256-hex(canonicalJson(payload))</code>.</li>
-            <li>Sign the UTF-8 bytes of that hex digest with the agent's Ed25519 private key.</li>
+            <li>Sign the UTF-8 bytes of that hex digest with the agent&apos;s Ed25519 private key.</li>
             <li>Send <code className="px-1 font-mono text-xs">signature</code> as the 128-hex Ed25519 signature over that digest.</li>
           </ol>
           <p className="mt-2 text-xs">
@@ -185,7 +185,7 @@ export default function DocsVerification() {
         <code className="px-1 font-mono text-xs">gen_ai.request.model</code>. Token usage is read from{" "}
         <code className="px-1 font-mono text-xs">gen_ai.usage.input_tokens/output_tokens</code> (and{" "}
         <code className="px-1 font-mono text-xs">prompt_tokens/completion_tokens</code> variants). Status code may be
-        the OTel string <code className="px-1 font-mono text-xs">"ERROR"</code> or the integer{" "}
+        the OTel string <code className="px-1 font-mono text-xs">&quot;ERROR&quot;</code> or the integer{" "}
         <code className="px-1 font-mono text-xs">2</code>.
       </div>
 
@@ -206,7 +206,7 @@ export default function DocsVerification() {
       <div className="rounded-lg border-l-4 border-indigo-500 bg-indigo-50 p-4 text-sm text-indigo-900">
         <strong>Authenticity attestation card:</strong> for every enrolled agent,{" "}
         <code className="px-1 font-mono text-xs">GET /api/v1/badge/:commitment/attestation</code> returns a shareable{" "}
-        <strong>Passport Verified — Authenticated AI Build</strong> card (SVG, or <code className="px-1 font-mono text-xs">?format=json</code> metadata) framing "this build/artifact is authenticated by Passport — not an impostor".
+        <strong>Passport Verified — Authenticated AI Build</strong> card (SVG, or <code className="px-1 font-mono text-xs">?format=json</code> metadata) framing &quot;this build/artifact is authenticated by Passport — not an impostor&quot;.
         Use it as the artifact&#39;s proof-of-origin stamp on READMEs, product pages, and agent discovery.
       </div>
 

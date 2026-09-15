@@ -3,6 +3,10 @@ import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 import { timingSafeEqual } from "node:crypto";
 import { hash as argon2Hash, verify as argon2Verify } from "@node-rs/argon2";
+import type { Algorithm as Argon2Algorithm, Options as Argon2Options } from "@node-rs/argon2";
+
+const ARGON2ID: Argon2Algorithm = 2 as Argon2Algorithm; // Algorithm.Argon2id (const enum under isolatedModules)
+const ARGON2_OPTIONS: Argon2Options = { algorithm: ARGON2ID, memoryCost: 19456, timeCost: 2, outputLen: 32 };
 
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
@@ -21,7 +25,7 @@ function sessionSecret(): string {
 }
 
 export async function hashPassword(password: string): Promise<string> {
-  return argon2Hash(password, { algorithm: 2 as any, memoryCost: 19456, timeCost: 2, outputLen: 32 });
+  return argon2Hash(password, ARGON2_OPTIONS);
 }
 
 export function legacySha256HashPassword(password: string): string {

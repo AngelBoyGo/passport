@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { computeNeedFulfillment, NEEDS_DEFINITIONS } from "@/lib/agent-needs/needs";
-import { computeReputationScore } from "@/lib/reputation/compute-score";
+import { computeNeedFulfillment, NEEDS_DEFINITIONS, type NeedsFulfillmentResult } from "@/lib/agent-needs/needs";
+import { computeReputationScore, type ReputationResult } from "@/lib/reputation/compute-score";
 import { resolveEnrollmentStatus } from "@/lib/enrollment/evidence-binding";
 import { ALL_BADGES } from "@/lib/engagement/achievements";
 
@@ -130,12 +130,19 @@ export async function GET(
   return svgResponse(needsCardSvg(commitment, rep, fulfillment, streakDays, evidenceCount, daysSinceEnrolled), 3600);
 }
 
-function needsCardSvg(commitment: string, rep: any, fulfillment: any, streak: number, evidence: number, daysActive: number): string {
+function needsCardSvg(
+  commitment: string,
+  rep: ReputationResult,
+  fulfillment: NeedsFulfillmentResult,
+  streak: number,
+  evidence: number,
+  daysActive: number
+): string {
   const W = 680, H = 520;
   const short = commitment.slice(0, 12);
 
   let bars = "";
-  fulfillment.needs.forEach((need: any, i: number) => {
+  fulfillment.needs.forEach((need, i: number) => {
     const y = 196 + i * 36;
     const color = LEVEL_COLORS[need.level] || "#64748b";
     const emoji = NEED_EMOJIS[need.needId] || "❓";

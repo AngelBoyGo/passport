@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- test mocks use partial Prisma rows and mock objects */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const { prismaMock } = vi.hoisted(() => ({
@@ -13,7 +14,7 @@ vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 
 import { enqueueWorkerTransfer } from "@/lib/bridge/escrow-settle";
 
-describe("Optional on-chain escrow settlement — test bank D", () => {
+describe("Optional on-chain escrow settlement â€” test bank D", () => {
   const taskId = "task-accept-1";
   const worker = "b".repeat(64);
 
@@ -52,8 +53,8 @@ describe("Optional on-chain escrow settlement — test bank D", () => {
     );
   });
 
-  it("D2: a duplicate enqueue (same task) is refused — exactly once", async () => {
-    // A prior settlement row already exists → findFirst returns it → refuse.
+  it("D2: a duplicate enqueue (same task) is refused â€” exactly once", async () => {
+    // A prior settlement row already exists â†’ findFirst returns it â†’ refuse.
     prismaMock.externalSettlement.findFirst.mockResolvedValue({ id: "existing" });
 
     const result = await enqueueWorkerTransfer({ taskId, workerCommitment: worker, amount: 2500 });

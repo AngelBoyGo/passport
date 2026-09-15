@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- test mocks use partial Prisma rows and mock objects */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 
@@ -15,7 +16,7 @@ import {
   verifyAgentVerifiableCredential,
 } from "@/lib/credentials/portable-reputation";
 
-describe("W3C Verifiable Credential — Portable Agent Reputation (Section 2.1)", () => {
+describe("W3C Verifiable Credential â€” Portable Agent Reputation (Section 2.1)", () => {
   const commitment = "a".repeat(64);
   const agentPubkey = "b".repeat(64);
 

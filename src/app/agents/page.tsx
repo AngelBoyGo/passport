@@ -69,11 +69,13 @@ export default async function AgentsPage({
     const corrections = allEvidence.filter((e) => e.normalizedEventType === "HUMAN_CORRECTION_OBSERVED").length;
     const failures = allEvidence.filter((e) => e.normalizedEventType === "EXECUTION_FAILURE_OBSERVED").length;
 
+    // eslint-disable-next-line react-hooks/purity -- async server component; Date.now() is request-scoped, not hydration-sensitive
     const cutoff30d = Date.now() - 30 * 86400 * 1000;
     const recent30d = allEvidence.filter((e) => e.observedAt.getTime() > cutoff30d);
     const recent30dSuccesses = recent30d.filter((e) => e.normalizedEventType === "AGENT_ARTIFACT_CREATED" || e.normalizedEventType === "VALIDATION_OBSERVED").length;
     const successRate30d = recent30d.length > 0 ? recent30dSuccesses / recent30d.length : null;
 
+    // eslint-disable-next-line react-hooks/purity -- async server component; Date.now() is request-scoped, not hydration-sensitive
     const cutoff7d = Date.now() - 7 * 86400 * 1000;
     const recent7d = allEvidence.filter((e) => e.observedAt.getTime() > cutoff7d);
     const recent7dFailures = recent7d.filter((e) => e.normalizedEventType === "EXECUTION_FAILURE_OBSERVED").length;

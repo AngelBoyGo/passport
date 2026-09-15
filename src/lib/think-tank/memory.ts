@@ -36,6 +36,45 @@ export type MemoryEntryType =
   | "allocation"
   | "error";
 
+/** Shape of the JSON payload persisted inside a think_tank evidence row. */
+interface MemoryPayload {
+  memory_id?: string;
+  run_id?: string;
+  type?: MemoryEntryType;
+  content?: string;
+  summary?: string;
+  value?: number;
+  tags?: string[];
+  parent_memory_id?: string;
+  timestamp?: string;
+}
+
+const MEMORY_ENTRY_TYPES: readonly string[] = [
+  "analysis", "opportunity", "decision", "outcome", "lesson", "insight", "signal", "allocation", "error",
+];
+
+/**
+ * Narrows an unknown evidence payload to the think-tank memory shape with safe defaults.
+ */
+function parseMemoryPayload(payload: unknown): MemoryPayload {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return {};
+  const p = payload as Record<string, unknown>;
+  const rawType = typeof p.type === "string" && MEMORY_ENTRY_TYPES.includes(p.type)
+    ? (p.type as MemoryEntryType)
+    : undefined;
+  return {
+    memory_id: typeof p.memory_id === "string" ? p.memory_id : undefined,
+    run_id: typeof p.run_id === "string" ? p.run_id : undefined,
+    type: rawType,
+    content: typeof p.content === "string" ? p.content : undefined,
+    summary: typeof p.summary === "string" ? p.summary : undefined,
+    value: typeof p.value === "number" ? p.value : undefined,
+    tags: Array.isArray(p.tags) ? p.tags.filter((t): t is string => typeof t === "string") : undefined,
+    parent_memory_id: typeof p.parent_memory_id === "string" ? p.parent_memory_id : undefined,
+    timestamp: typeof p.timestamp === "string" ? p.timestamp : undefined,
+  };
+}
+
 export interface MemoryStore {
   /** Store a memory entry */
   save: (entry: Omit<MemoryEntry, "memoryId" | "contentHash" | "createdAt">) => Promise<MemoryEntry>;
@@ -127,7 +166,7 @@ export function createPassportMemoryStore(deps: {
       });
 
       return results.map((r) => {
-        const p = r.payload as any;
+        const p = parseMemoryPayload(r.payload);
         return {
           memoryId: p.memory_id || "",
           runId: p.run_id || "",
@@ -155,14 +194,14 @@ export function createPassportMemoryStore(deps: {
       const q = query.toLowerCase();
       return results
         .filter((r) => {
-          const p = r.payload as any;
+          const p = parseMemoryPayload(r.payload);
           const content = (p.content || "").toLowerCase();
           const summary = (p.summary || "").toLowerCase();
           const tags = (p.tags || []).join(" ").toLowerCase();
           return content.includes(q) || summary.includes(q) || tags.includes(q);
         })
         .map((r) => {
-          const p = r.payload as any;
+          const p = parseMemoryPayload(r.payload);
           return {
             memoryId: p.memory_id || "",
             runId: p.run_id || "",
@@ -190,14 +229,14 @@ export function createPassportMemoryStore(deps: {
       let lessonsCount = 0;
 
       for (const r of all) {
-        const p = r.payload as any;
+        const p = parseMemoryPayload(r.payload);
         const t = p.type || "unknown";
         byType[t] = (byType[t] || 0) + 1;
         totalValue += p.value || 0;
         if (t === "lesson") lessonsCount++;
       }
 
-      const lastAnalysis = all.find((r) => (r.payload as any).type === "analysis");
+      const lastAnalysis = all.find((r) => parseMemoryPayload(r.payload).type === "analysis");
 
       return {
         totalEntries: all.length,
@@ -232,7 +271,7 @@ export function createInMemoryStore(): MemoryStore {
       return saved;
     },
     getRecent: async (type, limit = 50) => {
-      let filtered = type ? store.filter((e) => e.type === type) : store;
+      const filtered = type ? store.filter((e) => e.type === type) : store;
       return filtered.slice(0, limit);
     },
     search: async (query) => {

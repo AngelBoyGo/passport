@@ -12,7 +12,7 @@
  */
 
 import { prisma } from "@/lib/db";
-import { AngelCoinEntryType, AngelCoinCreditState } from "@prisma/client";
+import { AngelCoinEntryType, AngelCoinCreditState, Prisma } from "@prisma/client";
 
 const PROTOCOL_FEE_BPS = 200; // 2% in basis points
 export const PROTOCOL_TREASURY_COMMITMENT = "protocol_treasury_system";
@@ -36,7 +36,7 @@ export function calculateProtocolFee(amount: number): { fee: number; net: number
 export async function collectProtocolFee(
   amount: number,
   engagementTaskId: string,
-  tx?: Parameters<typeof prisma.$transaction>[0] extends never ? never : any
+  tx?: Prisma.TransactionClient
 ): Promise<{ fee: number; treasuryEntryId: string }> {
   const { fee } = calculateProtocolFee(amount);
   if (fee <= 0) {

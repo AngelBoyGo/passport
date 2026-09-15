@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- test mocks use partial Prisma rows and mock objects */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const { prismaMock } = vi.hoisted(() => ({
@@ -19,7 +20,7 @@ const { prismaMock } = vi.hoisted(() => ({
 
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 
-describe("GET /api/v1/agents — Agent Discovery", () => {
+describe("GET /api/v1/agents â€” Agent Discovery", () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
   it("returns empty list when no agents exist", async () => {

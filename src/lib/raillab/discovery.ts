@@ -7,6 +7,7 @@
  */
 
 import { prisma } from "@/lib/db";
+import { Prisma } from "@prisma/client";
 import { canonicalJson, sha256Hex } from "@/lib/receipt/canonical";
 import { DISCOVERY_SOURCES } from "./sources";
 import type { DiscoverySource } from "./sources";
@@ -76,7 +77,7 @@ export async function runDiscovery(
           data: {
             fingerprint,
             source: input.source,
-            payload: (input.raw ?? (input as unknown as Record<string, unknown>)) as any,
+            payload: (input.raw ?? (input as unknown as Record<string, unknown>)) as Prisma.InputJsonValue,
           },
         });
         created++;

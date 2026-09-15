@@ -12,7 +12,7 @@
  *                human-enabled); any SLA breach → QUARANTINE.
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 import { settleMobileMoneyOnramp } from "@/lib/digital-gateway/mobile-money";
 
 export type SmokeStage = "MOCK" | "SANDBOX" | "LIVE_CANARY";

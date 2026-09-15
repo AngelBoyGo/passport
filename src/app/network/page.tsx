@@ -49,6 +49,7 @@ export default function NetworkPage() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch + 15s poll
     loadNetwork();
     const interval = setInterval(loadNetwork, 15000);
     return () => clearInterval(interval);

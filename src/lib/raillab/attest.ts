@@ -173,7 +173,7 @@ export async function runIntegrityAttestation(): Promise<SignedIntegrityAttestat
     issues: status.issues,
   };
 
-  let attestationHash = hashIntegrityAttestation(body);
+  const attestationHash = hashIntegrityAttestation(body);
   try {
     // Chain to the preceding attestation; entropy in attestationId keeps hashes distinct.
     const prev = await latestAttestationHash();

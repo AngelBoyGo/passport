@@ -17,6 +17,34 @@ export const dynamic = "force-dynamic";
  *
  * Auth: Session (human users) or API key (agents/platforms).
  */
+interface WalletEntryMeta {
+  credit_amount?: number;
+  angl_credited?: number;
+  platform?: string;
+  source_job_id?: string;
+  feature_id?: string;
+  phase?: string;
+}
+
+function parseEntryMeta(raw: string | null): WalletEntryMeta {
+  if (!raw) return {};
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    const p = parsed as Record<string, unknown>;
+    return {
+      credit_amount: typeof p.credit_amount === "number" ? p.credit_amount : undefined,
+      angl_credited: typeof p.angl_credited === "number" ? p.angl_credited : undefined,
+      platform: typeof p.platform === "string" ? p.platform : undefined,
+      source_job_id: typeof p.source_job_id === "string" ? p.source_job_id : undefined,
+      feature_id: typeof p.feature_id === "string" ? p.feature_id : undefined,
+      phase: typeof p.phase === "string" ? p.phase : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ commitment: string }> }
@@ -74,8 +102,7 @@ export async function GET(
   });
 
   const purchaseHistory = purchases.map((p) => {
-    let meta: any = {};
-    try { meta = JSON.parse(p.metadata || "{}"); } catch {}
+    const meta = parseEntryMeta(p.metadata);
     return {
       type: p.kind,
       angl: meta.credit_amount || meta.angl_credited || Math.abs(p.deltaMicros) / 10_000 / 100 || 0,
@@ -103,8 +130,7 @@ export async function GET(
     });
 
     spendHistory = entries.map((e) => {
-      let meta: any = {};
-      try { meta = JSON.parse(e.metadata || "{}"); } catch {}
+      const meta = parseEntryMeta(e.metadata);
       return {
         feature: meta.feature_id || meta.phase || e.entryType.toLowerCase(),
         angl: Math.abs(e.amount),

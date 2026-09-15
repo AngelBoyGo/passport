@@ -11,7 +11,12 @@ interface ReceiptItem {
   observed_at: string;
   origin: "live-instrument" | "synthetic";
   attribution_mode: string;
-  telemetry: Record<string, any>;
+  telemetry: {
+    delta_power_pct?: number;
+    energy_saved_kwh?: number;
+    carbon_avoided_kg?: number;
+    peak_junction_temp_c?: number | null;
+  } & Record<string, unknown>;
 }
 
 export default function DataCenterPage() {
@@ -50,8 +55,8 @@ export default function DataCenterPage() {
   });
 
   // Calculate live dynamic metrics from actual ledger receipts
-  let totalLiveEvents = receipts.length;
-  let hwVerifiedCount = receipts.filter((r) => r.origin === "live-instrument").length;
+  const totalLiveEvents = receipts.length;
+  const hwVerifiedCount = receipts.filter((r) => r.origin === "live-instrument").length;
   let avgPowerDelta = 0;
   let totalEnergySaved = 0;
   let totalCarbonAvoided = 0;

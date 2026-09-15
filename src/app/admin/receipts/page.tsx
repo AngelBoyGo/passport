@@ -35,6 +35,7 @@ export default function AdminReceipts() {
   }, [filters]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch on mount/filters
     search();
   }, [search]);
 

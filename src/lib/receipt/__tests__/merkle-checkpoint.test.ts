@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- test mocks use partial Prisma rows and mock objects */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { hexToBytes as h } from "@noble/hashes/utils.js";
 
@@ -70,7 +71,7 @@ describe("Receipt Merkle Root & External Chain Anchoring (Section 2.4)", () => {
   it("rejects a self-signed checkpoint whose embedded key is NOT pinned (C2)", async () => {
     // An attacker fabricates a checkpoint using their own key and embeds their
     // public key in the payload. verifyReceiptCheckpoint with NO pinned key
-    // passed must NOT trust the embedded key — it must fail.
+    // passed must NOT trust the embedded key â€” it must fail.
     const { sign, getPublicKey } = await import("@noble/ed25519");
     const { sha256Hex, canonicalJson } = await import("@/lib/receipt/canonical");
     const { hexToBytes: h2b, utf8ToBytes: u2b, bytesToHex: b2h } = await import("@noble/hashes/utils.js");
@@ -95,7 +96,7 @@ describe("Receipt Merkle Root & External Chain Anchoring (Section 2.4)", () => {
       public_key: attackerPub,
     };
 
-    // No pinned key supplied → must use only transparency-log pinned key → fail.
+    // No pinned key supplied â†’ must use only transparency-log pinned key â†’ fail.
     const isValid = await verifyReceiptCheckpoint(forgeCkpt as any);
     expect(isValid).toBe(false);
   });

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- test mocks use partial Prisma rows and mock objects */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Prisma } from "@prisma/client";
 
@@ -121,8 +122,8 @@ describe("Stripe USDC credit top-up (B bank)", () => {
       },
     };
     constructEventMock.mockReturnValue(event);
-    // First call succeeds; second (retry of same event id) throws P2002 →
-    // claimStripeEvent returns duplicate → transaction short-circuits, no credit.
+    // First call succeeds; second (retry of same event id) throws P2002 â†’
+    // claimStripeEvent returns duplicate â†’ transaction short-circuits, no credit.
     stripeEventCreateMock
       .mockResolvedValueOnce({})
       .mockRejectedValueOnce(
