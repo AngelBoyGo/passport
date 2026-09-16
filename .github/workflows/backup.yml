@@ -38,7 +38,7 @@ jobs:
             ls -lh /home/deploy/passport/backups/ | tail -8
 
       - name: Fetch dump to runner (off-server copy)
-        uses: appleboy/scp-action@v0.1.7
+        uses: appleboy/scp-action@v1.0.0
         with:
           host: ${{ secrets.DEPLOY_SERVER }}
           username: ${{ secrets.DEPLOY_SSH_USER }}
