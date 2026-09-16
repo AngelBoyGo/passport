@@ -17,7 +17,7 @@ jobs:
         run: docker build -t passport:latest .
 
       - name: Save and compress image
-        run: docker save passport:latest | gzip > /tmp/passport-latest.tar.gz
+        run: docker save passport:latest | gzip > passport-latest.tar.gz
 
       - name: Copy files to server
         uses: appleboy/scp-action@v0.1.7
@@ -25,7 +25,7 @@ jobs:
           host: ${{ secrets.DEPLOY_SERVER }}
           username: ${{ secrets.DEPLOY_SSH_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          source: "/tmp/passport-latest.tar.gz,docker-compose.yml,Caddyfile"
+          source: "passport-latest.tar.gz,docker-compose.yml,Caddyfile"
           target: "/home/deploy/passport"
           strip_components: 0
 
@@ -38,9 +38,9 @@ jobs:
           script: |
             set -euo pipefail
             cd /home/deploy/passport
-            gunzip -c /tmp/passport-latest.tar.gz | docker load
+            gunzip -c passport-latest.tar.gz | docker load
             docker-compose run --rm app npx prisma migrate deploy
             docker-compose up -d --force-recreate app caddy
-            rm -f /tmp/passport-latest.tar.gz
+            rm -f passport-latest.tar.gz
             docker image prune -f
             echo "Deploy complete"
