@@ -17,6 +17,12 @@ jobs:
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
+      # The SDK's tests import the repo root's Prisma client; generate it before tests.
+      - run: npx prisma generate
+        working-directory: .
+        env:
+          # Parse-time only; validate/generate never connect.
+          DATABASE_URL: postgresql://placeholder:placeholder@localhost:5432/placeholder?schema=public
       - run: npm ci
       - run: npm test
       - run: npm run build
