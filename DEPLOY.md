@@ -47,32 +47,50 @@ Your deployment handoff includes a pre-generated key in the agent summary. Use t
 
 The container entrypoint runs `prisma migrate deploy` before `node server.js`.
 
-### 2.3 Environment variables
+### 2.3 Environment matrix (Phase 39)
 
-On the **Passport app service** → **Variables**, set:
+One table, three columns of truth: `dev` = what `.env` sets locally, `staging` = pre-prod with
+`ENFORCE_SIGNATURES=1`, `prod` = `NODE_ENV=production` at passport.metis.gold. **Never commit real
+secret values anywhere.**
 
-| Variable | Value |
-|----------|--------|
-| `DATABASE_URL` | From Postgres plugin (internal URL is fine) |
-| `SIGNING_PRIVATE_KEY` | 64-hex from Section 1 (handoff) |
-| `SIGNING_PRIVATE_KEY_PREVIOUS` | Optional: previous 64-hex signing key during a rotation window. Enables a transition period where artifacts signed under the old key still verify; persisted into the key transparency log. Remove after the rotation window. |
-| `INGESTION_COMMITMENT_SALT` | Long random string (same value across all app instances; never commit to git) |
-| `EVIDENCE_BRIDGE_OPERATOR_ID` | Optional: dedicated minter operator id for the evidence→receipt auto-bridge (its credit balance funds receipt minting) |
-| `EVIDENCE_BRIDGE_AUTO_ENABLED` | Optional (`true`): auto-mint a signed custody receipt for every accepted enrolled-evidence event |
-| `NOTARY_ANCHOR_URL` | Optional: independent append-only notary endpoint (e.g. a hardened audit sink). When set, each `/api/v1/receipts/checkpoints/latest` call publishes the signed Merkle chain head to it for external anchoring |
-| `ANGL_BLOCKED_ADDRESSES` | Optional: comma-separated list of sanctioned withdrawal addresses (case-insensitive) blocked from AngelCoin payouts |
-| `ANGL_BLOCKED_COUNTRIES` | Optional: comma-separated ISO-2 geofenced country codes (e.g. `CU,IR,KP,SY`) blocked from withdrawals |
-| `ANGL_WITHDRAW_KYC_ONLY` | Optional (`true`): enforce KYC-APPROVED before AngelCoin withdrawals even outside live |
-| `SESSION_SECRET` | 64-hex random string (generate with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`) |
-| `UPSTASH_REDIS_REST_URL` | Optional: Upstash Redis REST URL for multi-replica distributed rate-limiting |
-| `UPSTASH_REDIS_REST_TOKEN` | Optional: Upstash Redis REST token |
-| `NEXT_PUBLIC_APP_URL` | `https://passport.metis.gold` |
-| `STRIPE_SECRET_KEY` | `sk_test_...` (rotate if previously exposed) |
-| `STRIPE_PRICE_PRO` | `price_...` from Section 3 |
-| `STRIPE_WEBHOOK_SECRET` | `whsec_...` from Section 3 |
-| `NODE_ENV` | `production` |
+| Variable | dev | staging | prod | If missing → behavior (fail-closed policy) |
+|---|---|---|---|---|
+| `DATABASE_URL` | required | required | required | App cannot start; do not use SQLite in staging/prod |
+| `SIGNING_PRIVATE_KEY` | required | required | required | Signed surfaces fail closed (never "OK" without it) |
+| `SIGNING_PRIVATE_KEY_PREVIOUS` | optional | optional | optional | Rotation window only; remove after the window |
+| `INGESTION_COMMITMENT_SALT` | required | required | required | Evidence ingestion refuses to derive commitments |
+| `SESSION_SECRET` | dev fallback | required | required | Hard error outside dev (auth-service fails fast) |
+| `NODE_ENV` | — | `production`-allowed† | `production` | Runtime fail-closed gates (`signaturesEnforced`) key off this |
+| `ENFORCE_SIGNATURES` | optional | **`"1"` required** | optional ("1" harmless) | Without `1` and without prod NODE_ENV, signer-provenance checks skip (dev only) |
+| `SOVEREIGN_KEY_ML/BF/NE` | optional | required | required | `/quorum/sign` → **401**; `/quorum/heartbeat` → **401** (no registered sovereign key) |
+| `MILESTONE_VERIFIER_KEYS` | optional | required | required | `/fund/milestones` → **400** always (`No authorized milestone verifier keys configured`) |
+| `EVIDENCE_SERVICE_AUTH_REQUIRED` | `true` | `true` | `true` | Evidence ingestion is unauthenticated otherwise (dev only) |
+| `PASSPORT_SERVICE_TOKEN` | value | required | required | Inbound tenant evidence posts rejected when auth required |
+| `EVIDENCE_BRIDGE_OPERATOR_ID` / `EVIDENCE_BRIDGE_AUTO_ENABLED` | optional | optional | optional | No auto custody receipts (feature dark, no failure) |
+| `EVIDENCE_ENFORCEMENT_ENABLED` | `false` | `true` | `true` | Enforcement off = advisory only |
+| `ENFORCE_ENROLLMENT_FOR_CREDITS` | `false` | `true` | `true` | Credits readable without enrollment otherwise |
+| `NEXT_PUBLIC_APP_URL` | localhost | yes | `https://passport.metis.gold` | Stripe checkout/links point to wrong host |
+| `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` + `STRIPE_PRICE_PRO` | optional group | as needed | as needed | If any set: all three required (conditional group) |
+| `SCHEDULER_SECRET` | optional | required | required | `/scheduler/tick`, `/brain/cycle`, heartbeat routes → **401** for cron triggers |
+| `REVENUE_BRIDGE_SECRET` | optional | optional | required for partner rails | Non-ISSUER `/agent-revenue` calls → **503** `not_configured` |
+| `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` | optional | optional | optional | Command Brain + factory brain run but every LLM decision → **NOOP** (fail closed) |
+| `BRAIN_SCHEDULE` | optional | optional | optional | Brain cron defaults to every 10 min |
+| `REVENUE_RUNNER_ENABLED` | optional | optional | **leave unset** | Default `0`; enabling in prod fabricates revenue — never enable outside dev/test |
+| `UPSTASH_REDIS_REST_URL` / `TOKEN` | optional | optional | optional | Single-replica in-memory rate limit (correct but not shared) |
+| `ADMIN_OPERATOR_EMAILS` | optional | optional | required for console | Dev/CEO console inaccessible (fail closed) |
+| `ALLOW_DEV_PROVISION` | optional `"1"` | **unset** | **unset** | Hard 404 in prod regardless; only non-prod opt-in works |
+| `NOTARY_ANCHOR_URL` | optional | optional | optional | External anchoring skipped (chain remains internally verifiable) |
+| `ANGL_*` compliance vars | optional | required | required | Withdraw controls default to permissive variants — set them in staging+ |
+| `SOVEREIGN_*` heartbeat cadence | — | — | — | Dead-man switch: states DARK after 72h silence (no env needed) |
 
-Reference: `.env.production.example`
+† Staging runs `NODE_ENV=production`-equivalent fail-closed paths via `ENFORCE_SIGNATURES=1`; see §9.
+
+Route-level darkness map (quick reference):
+
+- Unset `SOVEREIGN_KEY_*` + prod → `POST /api/v1/reserves/quorum/sign` **401**, `POST /api/v1/reserves/quorum/heartbeat` **401**.
+- Unset `MILESTONE_VERIFIER_KEYS` + prod → `POST /api/v1/reserves/fund/milestones` **always 400** (config error, fail closed).
+- Unset `SIGNING_PRIVATE_KEY` → attestation/console/lighthouse report `degraded`, receipts issue **403**.
+- Unset `REVENUE_BRIDGE_SECRET` → partner-sourced revenue rejected; ISSUER-key credits still work.
 
 ### 2.4 Deploy and verify (before custom domain)
 
@@ -285,3 +303,52 @@ PASSPORT_SMOKE_ALLOW=1 npm run smoke:rwa
 - Public key: `GET /api/v1/public-key`
 - Checkout: `POST /api/stripe/checkout` `{ "email": "you@example.com" }`
 - Webhook: `POST /api/stripe/webhook` (Stripe-signed)
+
+---
+
+## 9. Staging validation runbook (human-executed, Phase 39)
+
+Purpose: prove, **before prod**, that the fail-closed hardening works under an enforced
+environment and that the deploy tooling (Docker/SSH via `deploy.yml`) lands cleanly.
+
+Staging env deltas (everything prod-like, except pointers):
+
+- `NODE_ENV=production`
+- `ENFORCE_SIGNATURES=1`
+- `EVIDENCE_SERVICE_AUTH_REQUIRED=true`
+- `ALLOW_DEV_PROVISION` **unset**
+- Real `SOVEREIGN_KEY_ML/BF/NE` test-keypairs (never the git benchmark keys)
+- Real `MILESTONE_VERIFIER_KEYS` (verifier test key)
+- `DATABASE_URL` pointing at managed staging Postgres (migrations, not `db push`)
+
+### 9.1 Checklist
+
+1. Deploy via the normal flow (Railway variables per §2.3, or the existing
+   `deploy.yml` docker pipeline).
+2. `curl -sS https://<staging-host>/api/health` → `{"status":"ok"}`.
+3. `npm run doctor:passport` (against staging `DATABASE_URL`) → all checks green.
+4. `npm run premortem` → no monetary invariant violations.
+5. **Signer-provenance penetration drill** — the key Phase 39 invariant:
+
+```bash
+# Forge an unsigned/invalid sovereign vote: 128-hex zero signature.
+SIG=$(printf '0%.0s' {1..128})
+curl -s -X POST https://<staging-host>/api/v1/reserves/quorum/sign \
+  -H "Content-Type: application/json" \
+  -d "{\"proposal_id\":\"PROP-STAGING-1\",\"signer_state\":\"ML\",\"signature\":\"$SIG\"}"
+```
+
+   Expected: HTTP **401**, and the service logs emit an
+   `{"event":"signature_provenance_rejected","outcome":"rejected","http_status":401,"reason_code":"signature_mismatch"|...}`
+   line within seconds of the request.
+6. Unenrolled swarm key probe: `POST /api/v1/swarm/bounties` with a caller-supplied
+   `public_key` only (no enrollment row) → rejected under `ENFORCE_SIGNATURES=1`.
+7. Confirm the read-only surfaces stay open: `/verify/[commitment]` gate returns
+   `verified: true` for an enrolled agent (fail-closed must not break happy paths).
+8. Record results in the honesty protocol table (§5.4 style) — include the log excerpt.
+
+### 9.2 Non-goals during staging
+
+- Never enable `REVENUE_RUNNER_ENABLED=1` on staging data that prod will inherit.
+- Never post real POLITICAL/PoR artifacts; use dedicated staging commitments.
+- Never run `prisma db push` — staging DB must be migrated-only (`migrate deploy`), matching CI.

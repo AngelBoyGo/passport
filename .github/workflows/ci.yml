@@ -6,14 +6,22 @@ on:
   pull_request:
     branches: [main, dev]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   security:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Scan for Git secrets (Gitleaks)
         uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           config-path: .gitleaks.toml
 
@@ -21,7 +29,7 @@ jobs:
         run: npm audit --audit-level=high
         continue-on-error: true
 
-  test:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,8 +45,61 @@ jobs:
       - name: Validate Prisma schema
         run: npx prisma validate
 
-      - name: Type check
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Type check (root)
         run: npx tsc --noEmit
 
+      - name: Type check (SDK)
+        run: npx tsc --noEmit -p sdk/tsconfig.json
+
+      - name: Lint (zero-error budget)
+        run: npx eslint src
+
       - name: Run tests
-        run: npm test
+        run: npx vitest run
+
+  build:
+    runs-on: ubuntu-latest
+    needs: verify
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: passport
+          POSTGRES_PASSWORD: passport
+          POSTGRES_DB: passport
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://passport:passport@localhost:5432/passport?schema=public
+      # Build-time placeholders only — never real secrets. Required prod vars fail
+      # closed at runtime, and next build must not depend on them.
+      SIGNING_PRIVATE_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+      SESSION_SECRET: "ci-build-session-secret-not-real"
+      NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Apply migrations to fresh Postgres (catches schema drift)
+        run: npx prisma migrate deploy
+
+      - name: Production build
+        run: npx next build
