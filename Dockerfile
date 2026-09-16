@@ -6,9 +6,9 @@ WORKDIR /app
 # Install dependencies
 FROM base AS deps
 COPY package.json package-lock.json* ./
-# Schema is not copied yet in this stage; skip the npm postinstall prisma generate.
-# The builder stage re-runs prisma generate after COPY . .
-ENV PRISMA_SKIP_POSTINSTALL_GENERATE=true
+# Schema needed at npm-ci time: the postinstall script runs prisma generate.
+# The builder stage still re-runs prisma generate after COPY . .
+COPY prisma ./prisma
 RUN npm ci
 
 # Build the app
