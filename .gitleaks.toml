@@ -1,30 +1,28 @@
-# Passport Security — Git Secrets & Dependency Scanning
+# Passport Security — Git Secrets scanning config (gitleaks v8 format)
+# Extends the built-in default rules plus Passport-specific allowlists.
 
-extends: https://raw.githubusercontent.com/gitleaks/gitleaks/master/.gitleaks.toml
+[extend]
+useDefault = true
 
 [allowlist]
-description = "Passport-specific allowlist — known safe patterns"
-
+description = "Passport-specific allowlist — docs, examples and known-safe test fixtures"
 paths = [
-  # Test fixtures and SDK examples
-  "sdk/src/__tests__/",
-  "src/lib/__tests__/",
-  "src/lib/ingestion/tests/",
-  "src/lib/public-portal/tests/",
-  "python/tests/",
-  "audit/",
-  "docs/",
-  "*.md",
+  '''^sdk/src/__tests__/''',
+  '''^src/lib/__tests__/''',
+  '''^src/lib/ingestion/tests/''',
+  '''^src/lib/public-portal/tests/''',
+  '''^python/tests/''',
+  '''^audit/''',
+  '''^docs/''',
+  '''\.md$''',
 ]
-
-[allowlist.regexes]
-description = "Known safe regex patterns"
-
-# Example key hashes used in tests
-- (?i)deadbeef
-- (?i)example\.com
-- (?i)localhost
-- (?i)vitest-
-- (?i)pp_test
-- (?i)sk_test_
-- (?i)whsec_test
+# Known-safe placeholder patterns (test fixtures and Stripe test-mode prefixes)
+regexes = [
+  '''(?i)deadbeef''',
+  '''(?i)example\.com''',
+  '''(?i)localhost''',
+  '''(?i)vitest-''',
+  '''(?i)pp_test''',
+  '''(?i)sk_test_''',
+  '''(?i)whsec_test''',
+]
