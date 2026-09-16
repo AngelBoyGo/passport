@@ -19,13 +19,19 @@ jobs:
       - name: Save and compress image
         run: docker save passport:latest | gzip > passport-latest.tar.gz
 
+      - name: Resolve pinned Prisma CLI version (must match the repo's prisma dependency)
+        run: |
+          V=$(node -p "require('./package.json').devDependencies.prisma.replace(/^[\^~]/,'')")
+          echo "PRISMA_VERSION=$V" >> "$GITHUB_ENV"
+          echo "Deploy will migrate with prisma@$V"
+
       - name: Copy files to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.DEPLOY_SERVER }}
           username: ${{ secrets.DEPLOY_SSH_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          source: "passport-latest.tar.gz,docker-compose.yml,Caddyfile"
+          source: "passport-latest.tar.gz,docker-compose.yml,Caddyfile,prisma/**"
           target: "/home/deploy/passport"
           strip_components: 0
 
@@ -39,8 +45,38 @@ jobs:
             set -euo pipefail
             cd /home/deploy/passport
             gunzip -c passport-latest.tar.gz | docker load
-            docker-compose run --rm app npx prisma migrate deploy
-            docker-compose up -d --force-recreate app caddy
             rm -f passport-latest.tar.gz
+
+            # Migrations run in a dedicated pinned-CLI toolchain container (the runtime
+            # image's standalone output has no prisma CLI, and npx@latest broke schema
+            # parsing when it pulled prisma 7). Version is taken from package.json.
+            set -a; source .env; set +a
+            docker run --rm \
+              --network passport_default \
+              -v /home/deploy/passport/prisma:/app/prisma \
+              -w /app \
+              -e DATABASE_URL="postgresql://passport:${POSTGRES_PASSWORD}@db:5432/passport?schema=public" \
+              node:20-alpine \
+              npx --yes prisma@${{ env.PRISMA_VERSION }} migrate deploy
+
+            # Recreate app+caddy with the v1-safe stop/rm/up path (the recreate flag
+            # crashes on containers made by a newer engine). The db service is never
+            # touched — its volume holds the data.
+            docker-compose stop app caddy
+            docker-compose rm -f app caddy
+            docker-compose up -d
             docker image prune -f
-            echo "Deploy complete"
+
+            # Post-deploy gate: app must be healthy within 60s or the deploy FAILED.
+            ok=0
+            for i in 1 2 3 4 5 6; do
+              code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/health || true)
+              if [ "$code" = "200" ]; then ok=1; break; fi
+              sleep 10
+            done
+            if [ "$ok" != "1" ]; then
+              echo "Post-deploy health check FAILED (app did not return 200 within 60s)"
+              docker logs --tail 20 passport_app_1 || true
+              exit 1
+            fi
+            echo "Deploy complete — /api/health is 200"

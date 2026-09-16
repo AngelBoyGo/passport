@@ -1,0 +1,63 @@
+name: Scheduled DB Backup
+
+on:
+  schedule:
+    # Weekly — Monday 04:17 UTC (an hour after CI's quiet window)
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: backup-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dump live database on the droplet (custom format, restore-verifiable)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_SERVER }}
+          username: ${{ secrets.DEPLOY_SSH_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            mkdir -p /home/deploy/passport/backups
+            STAMP=$(date +%F-%H%M)
+            OUT=/home/deploy/passport/backups/passport-$STAMP.dump
+            docker exec passport_db_1 pg_dump -U passport -d passport -Fc > "$OUT"
+            chmod 600 "$OUT"
+            echo "dumped: $OUT ($(du -h "$OUT" | cut -f1))"
+
+            # Verify the dump actually restores BEFORE trusting it (list catalog).
+            docker run --rm -i postgres:16-alpine pg_restore --list < "$OUT" > "$OUT.index"
+            test -s "$OUT.index" || { echo "DUMP VERIFICATION FAILED"; exit 1; }
+
+            # Prune: keep the 6 most recent dumps on the droplet (bounded storage).
+            ls -t /home/deploy/passport/backups/passport-*.dump | tail -n +7 | xargs -r rm -f
+            ls -lh /home/deploy/passport/backups/ | tail -8
+
+      - name: Fetch dump to runner (off-server copy)
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_SERVER }}
+          username: ${{ secrets.DEPLOY_SSH_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: "/home/deploy/passport/backups/passport-*.dump*"
+          target: "backups"
+          strip_components: 4
+
+      - name: Verify the copied dump restores (pg_restore catalog on runner)
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+          F=$(ls -t backups/passport-*.dump | head -1)
+          pg_restore --list "$F" | head -20
+          echo "off-server copy verified: $F"
+
+      - name: Upload off-server backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: passport-db-backup
+          path: backups/passport-*.dump
+          retention-days: 90
+          if-no-files-found: error

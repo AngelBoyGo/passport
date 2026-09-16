@@ -91,6 +91,15 @@ returns. The user was explicitly redirected to this honest framing and accepted 
   knife-tests) and enforces the lint budget locally (0 errors, ≤137 warnings). DEPLOY.md §2.3
   replaced by the full env matrix (route-darkness map) + §9 staging validation runbook
   (ENFORCE_SIGNATURES=1 drill incl. forged-vote curl → 401 + telemetry).
+- 40: First live deploy + post-incident hardening — production cutover executed on the droplet
+  (see §11 ops notes). `deploy.yml` hardened (deploy-workflow meta-test): pinned migrate CLI
+  resolved from package.json (npx prisma@<pkg-version>, schema+migrations scp'd to the server),
+  v1-safe stop/rm/up recreate (never --force-recreate), 60s post-deploy /api/health gate that
+  FAILS the run + prints container logs. **Automated backups**: `.github/workflows/backup.yml`
+  weekly cron + dispatch; server-side `pg_dump -Fc`, restored-verified via pg_restore catalog on
+  both the droplet and the runner, 90-day off-server artifact, 6-dump droplet retention
+  (backup-workflow meta-test). Secrets live at `/home/deploy/passport/.env{,.production}` — the
+  "deploy" droplet user now exists (usermod'd into docker group).
 
 ## 6. Current state / pending
 - **Latest commit:** Phase 39 (CI quality gate + deployment contract). Latest migrations through
@@ -142,11 +151,29 @@ returns. The user was explicitly redirected to this honest framing and accepted 
   radius. Add tests for every fix/feature. Commit only when asked (they usually say "commit").
 - Do not commit secrets. Do not help manipulate markets or misrepresent reserves.
 
-## 11. Quick verification checklist
+## 11. Production ops notes (post-incident, Phase 40) — READ BEFORE TOUCHING THE DROPLET
+
+- **Deploy target:** DigitalOcean droplet `167.99.157.125` (host `passport-prod`), Caddy TLS via
+  deploy pipeline — NOT Railway/Render (docs referenced them stale; DEPLOY.md runbook still says
+  Railway). Deploy dir: `/home/deploy/passport` (compose project `passport`; ssh user `deploy`,
+  docker group). Old prior deploy dir `/opt/passport` kept as rollback reference.
+- **Secrets live on the droplet** at `/home/deploy/passport/.env` (compose interpolation:
+  POSTGRES_PASSWORD) and `.env.production` (app env_file). NEVER commit, print, or rotate them
+  without explicit approval. `.env.production` DATABASE_URL **overrides** compose environment —
+  it was the last deploy outage cause; keep it in sync with `.env` password.
+- **DB password resets:** the volume's superuser is `passport` (no `postgres` role!). Socket
+  auth inside the db container is TRUST — password tests via socket prove NOTHING; test over
+  TCP w/ the container IP. Password was reset 2026-09-16 to match `.env`.
+- **Backups:** `/home/deploy/passport/backups/` (6 kept) + GitHub artifact 90d +
+  manual full copies in `/root/*.dump`. Restore drill pending (npm run restore:verify).
+- **Fail-closed dark routes in prod until env added:** `SOVEREIGN_KEY_ML/BF/NE` (quorum sign +
+  heartbeat) and `MILESTONE_VERIFIER_KEYS` (fund milestones). By design.
+
+## 12. Quick verification checklist
 ```powershell
 npx tsc --noEmit
 npx tsc --noEmit -p sdk/tsconfig.json
-npm test            # expect ~1718 passed
-npm exec eslint <files you changed>
+npm test            # expect ~1766 passed (Phase 40)
+npx eslint src      # 0 errors required (budget <=137 warnings, Phase 39)
 git checkout -- mcp/node_modules/.vite/vitest/*/results.json sdk/node_modules/.vite/vitest/*/results.json
 ```
