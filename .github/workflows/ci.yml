@@ -31,6 +31,9 @@ jobs:
 
   verify:
     runs-on: ubuntu-latest
+    env:
+      # Parse-time wrapper for prisma validate/generate; never connects and is not a secret.
+      DATABASE_URL: postgresql://placeholder:placeholder@localhost:5432/placeholder?schema=public
     steps:
       - uses: actions/checkout@v4
 
