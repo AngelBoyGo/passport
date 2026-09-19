@@ -54,4 +54,16 @@ describe("revenue-runner", () => {
     stopRevenueRunner();
     errSpy.mockRestore();
   });
+
+  it("refuses simulated revenue crediting in production", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { startRevenueRunner, stopRevenueRunner } = await import("../revenue-runner");
+
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("REVENUE_RUNNER_ENABLED", "1");
+    startRevenueRunner("* * * * *");
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining("Refusing to start in production"));
+    stopRevenueRunner();
+    errSpy.mockRestore();
+  });
 });

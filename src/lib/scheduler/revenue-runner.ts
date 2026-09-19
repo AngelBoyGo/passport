@@ -11,15 +11,24 @@
 import cron, { ScheduledTask } from "node-cron";
 import { prisma } from "@/lib/db";
 import { creditExternalRevenue } from "@/lib/agent-economy/revenue-bridge";
+import { acquireLease, type LeaseHandle } from "@/lib/scheduler/lease";
 
 const DEFAULT_SCHEDULE = "*/15 * * * *";
 const DEFAULT_FAKE_REVENUE_CENTS = 500;
+
+/** Lease id guarding revenue-credit runs — prevents double-crediting across replicas. */
+export const REVENUE_RUNNER_LEASE_ID = "revenue-runner";
 
 let task: ScheduledTask | null = null;
 
 export function startRevenueRunner(customSchedule?: string): void {
   if (task) {
     console.warn("[revenue-runner] Already running; ignoring duplicate start.");
+    return;
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    console.error("[revenue-runner] Refusing to start in production: this runner credits simulated revenue.");
     return;
   }
 
@@ -36,9 +45,23 @@ export function startRevenueRunner(customSchedule?: string): void {
   }
 
   task = cron.schedule(schedule, async () => {
+    // Revenue crediting is money-touching: fail CLOSED when the lease store is
+    // unreachable, and skip when another instance holds the lease.
+    let lease: LeaseHandle | null = null;
+    try {
+      lease = await acquireLease(REVENUE_RUNNER_LEASE_ID);
+    } catch (err) {
+      console.error("[revenue-runner] Lease unavailable (fail-closed):", err instanceof Error ? err.message : String(err));
+      return;
+    }
+    if (!lease) {
+      console.log("[revenue-runner] Skipped — another instance holds the lease (single-flight).");
+      return;
+    }
     try {
       const jobs = await prisma.pipelineJob.findMany({
         where: { status: "SUBMITTED" },
+        orderBy: { createdAt: "asc" },
         take: 20,
       });
 
@@ -71,6 +94,12 @@ export function startRevenueRunner(customSchedule?: string): void {
       }
     } catch (err) {
       console.error("[revenue-runner] Run failed:", err instanceof Error ? err.message : String(err));
+    } finally {
+      try {
+        await lease.release();
+      } catch (err) {
+        console.error("[revenue-runner] Lease release failed (will expire via TTL):", err instanceof Error ? err.message : String(err));
+      }
     }
   });
 

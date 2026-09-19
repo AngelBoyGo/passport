@@ -488,10 +488,11 @@ model PipelineJob {
 
 /// Command Brain persistent memory (Phase 37): append-only observations, decisions, and outcomes
 /// so the central brain retains context across cycles and can learn which actions help.
+/// Phase 41 adds EVALUATION rows — measured before/after health attribution per action.
 model BrainMemory {
   id           String   @id @default(cuid())
   cycleId      String?
-  kind         String // OBSERVATION | DECISION | OUTCOME | NOTE
+  kind         String // OBSERVATION | DECISION | OUTCOME | NOTE | EVALUATION
   summary      String
   data         Json?
   action       String?
@@ -501,6 +502,68 @@ model BrainMemory {
 
   @@index([kind])
   @@index([createdAt])
+}
+
+/// Distributed lease registry (Phase 40, generalized Phase 42): guards ALL in-process
+/// scheduled jobs (command brain cycle, scheduler tick, revenue runner) so only one
+/// instance runs each job at a time. One row per job, acquired via a conditional
+/// updateMany (atomic) — an expired lease may be taken over; a live lease blocks
+/// concurrent runs. Lease ids: "command-brain", "scheduler-tick", "revenue-runner".
+model BrainLease {
+  id        String   @id @default("command-brain")
+  ownerId   String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Improvement proposal (Phase 43): a typed, testable hypothesis produced by the
+/// brain's research pipeline. Advances ONLY through the promotion state machine —
+/// no proposal can touch money, balances, or production code. Current maximum
+/// authority is CANARY (shadow decisions recorded, never executed).
+model ImprovementProposal {
+  id                  String   @id @default(cuid())
+  proposalId          String   @unique
+  objective           String
+  expectedImprovement String
+  riskClass           String   @default("low") // low | medium | high
+  /// PROPOSED -> REPLAYED -> AUDITED -> APPROVAL_REQUIRED -> APPROVED -> CANARY
+  ///   -> PROMOTED; REJECTED / ROLLED_BACK are terminal. Transitions are
+  ///   service-enforced (illegal transitions throw).
+  status              String   @default("PROPOSED")
+  sourceScanId        String?
+  /// Candidate policy knobs (allowlisted thresholds only — never money rules).
+  params              Json?
+  replayId            String?
+  replayScore         Float?
+  approvedBy          String?
+  approvedAt          DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([status])
+}
+
+/// Replay run (Phase 43): a deterministic counterfactual evaluation of a proposal
+/// against historical brain cycles. Pure simulation — no production writes, no
+/// money movement, no LLM calls.
+model ReplayRun {
+  id                String   @id @default(cuid())
+  replayId          String   @unique
+  proposalId        String
+  windowDays        Int      @default(7)
+  cyclesCompared    Int      @default(0)
+  decisionMatches   Int      @default(0)
+  negativeAvoided   Int      @default(0) // candidate differs where actual was NEGATIVE-attributed
+  positiveDisplaced Int      @default(0) // candidate differs where actual was POSITIVE-attributed
+  unknownDiffs      Int      @default(0) // candidate differs where outcome not yet attributed
+  score             Float
+  /// IMPROVE | NEUTRAL | REGRESS — REGRESS auto-rejects the proposal.
+  verdict           String
+  details           Json?
+  createdAt         DateTime @default(now())
+
+  @@index([proposalId])
 }
 
 /// Marketplace hire → hold → deliver → accept loop keyed by external task id.

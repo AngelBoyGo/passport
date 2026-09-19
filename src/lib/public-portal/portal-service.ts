@@ -31,6 +31,9 @@ const ELIGIBLE_EVENT_TYPES = new Set([
   "AGENT_ARTIFACT_CREATED",
 ]);
 
+/** Internal writers must never become public agents through their telemetry. */
+export const PUBLIC_LEADERBOARD_EXCLUDED_IDENTITIES = ["scheduler", "command-brain"] as const;
+
 export type PortalRates = {
   success_rate: number | null;
   correction_rate: number | null;
@@ -225,6 +228,7 @@ export async function getLeaderboard(opts: {
 
   const grouped = await prisma.agentEvidence.groupBy({
     by: ["agentIdentityCommitment"],
+    where: { agentIdentityCommitment: { notIn: [...PUBLIC_LEADERBOARD_EXCLUDED_IDENTITIES] } },
     _count: { _all: true },
     _max: { observedAt: true },
   });

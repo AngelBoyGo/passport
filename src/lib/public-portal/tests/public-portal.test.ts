@@ -278,6 +278,43 @@ describe("getLeaderboard", () => {
     assertNoRawLeakage(rows);
   });
 
+  it("excludes internal scheduler and brain telemetry from public rankings", async () => {
+    const groups = [
+      {
+        agentIdentityCommitment: "scheduler",
+        _count: { _all: 100 },
+        _max: { observedAt: daysAgo(1) },
+      },
+      {
+        agentIdentityCommitment: "command-brain",
+        _count: { _all: 100 },
+        _max: { observedAt: daysAgo(1) },
+      },
+      {
+        agentIdentityCommitment: AGENT_A,
+        _count: { _all: 2 },
+        _max: { observedAt: daysAgo(1) },
+      },
+    ];
+    groupByMock.mockImplementationOnce((args: { where?: { agentIdentityCommitment?: { notIn?: string[] } } }) =>
+      Promise.resolve(
+        groups.filter((group) => !args.where?.agentIdentityCommitment?.notIn?.includes(group.agentIdentityCommitment))
+      )
+    );
+    findManyMock.mockResolvedValue([
+      evidenceRow({ normalizedEventType: "AGENT_RUN_OBSERVED", observedAt: daysAgo(1) }),
+    ]);
+    countMock.mockResolvedValue(0);
+
+    const rows = await getLeaderboard({ limit: 10 });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].agent_commitment_hash).toBe(AGENT_A);
+    // The database query carries the exclusion, so these IDs must never be
+    // rendered if production Prisma applies the where clause correctly.
+    const groupByArgs = groupByMock.mock.calls[0][0] as { where: { agentIdentityCommitment: { notIn: string[] } } };
+    expect(groupByArgs.where.agentIdentityCommitment.notIn).toEqual(["scheduler", "command-brain"]);
+  });
+
   it("returns two distinct rows when agents share a 12-hex footprint prefix", async () => {
     groupByMock.mockResolvedValue([
       {

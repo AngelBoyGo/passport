@@ -75,9 +75,51 @@ describe("external revenue bridge", () => {
     prismaMock.$transaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
       fn({ agentRevenue: { create: vi.fn().mockRejectedValue(dup) }, agentWallet: { upsert: vi.fn() }, operatorLedgerEntry: { create: vi.fn() } })
     );
-    prismaMock.agentRevenue.findUnique.mockResolvedValue({ id: "rev_1", grossUsdCents: 500, angelCredited: 1 });
+    prismaMock.agentRevenue.findUnique.mockResolvedValue({
+      id: "rev_1",
+      agentCommitment: AGENT,
+      source: "data_pipeline",
+      externalRef: "inv_1",
+      grossUsdCents: 500,
+      angelCredited: 1,
+    });
     const r = await creditExternalRevenue(fields, { trusted: true });
     expect(r).toMatchObject({ ok: true, deduped: true, angelCredited: 1 });
+  });
+
+  it("rejects fractional cents instead of silently flooring them", async () => {
+    const r = await creditExternalRevenue({ ...fields, grossUsdCents: 500.5 }, { trusted: true });
+    expect(r).toMatchObject({ ok: false, code: "invalid_amount" });
+  });
+
+  it("rejects a pipeline job owned by another agent", async () => {
+    prismaMock.$transaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
+      fn({
+        agentRevenue: { create: vi.fn().mockResolvedValue({ id: "rev_1" }) },
+        agentWallet: { upsert: vi.fn() },
+        operatorLedgerEntry: { create: vi.fn() },
+        pipelineJob: { findUnique: vi.fn().mockResolvedValue({ agentCommitment: "b".repeat(64), status: "SUBMITTED" }) },
+      })
+    );
+    const r = await creditExternalRevenue({ ...fields, pipelineJobId: "job_1" }, { trusted: true });
+    expect(r).toMatchObject({ ok: false, code: "pipeline_job_agent_mismatch" });
+  });
+
+  it("rejects a conflicting duplicate external reference", async () => {
+    const dup = Object.assign(new Error("Unique"), { code: "P2002" });
+    prismaMock.$transaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
+      fn({ agentRevenue: { create: vi.fn().mockRejectedValue(dup) }, agentWallet: { upsert: vi.fn() }, operatorLedgerEntry: { create: vi.fn() } })
+    );
+    prismaMock.agentRevenue.findUnique.mockResolvedValue({
+      id: "rev_1",
+      agentCommitment: "b".repeat(64),
+      source: "other_source",
+      externalRef: "inv_1",
+      grossUsdCents: 999,
+      angelCredited: 199,
+    });
+    const r = await creditExternalRevenue(fields, { trusted: true });
+    expect(r).toMatchObject({ ok: false, code: "idempotency_conflict" });
   });
 
   it("rejects revenue below the 1 ANGEL floor", async () => {

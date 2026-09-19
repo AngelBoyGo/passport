@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { checkInMemoryRateLimit, clientIpFromRequest } from "@/lib/rateLimit";
 import { runTick, type SchedulerDeps } from "@/lib/scheduler/scheduler-service";
 import { isSchedulerAuthorized } from "@/lib/scheduler/auth";
+import { acquireLease, type LeaseHandle } from "@/lib/scheduler/lease";
 
 export const dynamic = "force-dynamic";
 
@@ -101,12 +102,28 @@ export async function POST(request: NextRequest) {
 
     now: () => new Date().toISOString(),
     generateId: () => Math.random().toString(36).slice(2, 14),
+    // Phase 40: real decision outcomes from brain memory (no synthetic lessons).
+    getDecisionOutcomes: async () => {
+      const { getRecentBrainOutcomeHistory } = await import("@/lib/brain/outcomes");
+      return getRecentBrainOutcomeHistory(20).catch(() => []);
+    },
     runIntegrityAttestation: async () => {
       const { runIntegrityAttestation } = await import("@/lib/raillab/attest");
       const att = await runIntegrityAttestation();
       return { attestationHash: att.attestationHash, ok: att.ok, checkedAt: att.checkedAt };
     },
   };
+
+  let lease: LeaseHandle | null = null;
+  try {
+    lease = await acquireLease("scheduler-tick");
+  } catch (err) {
+    console.error("[scheduler] API tick lease unavailable (fail-closed):", err instanceof Error ? err.message : String(err));
+    return NextResponse.json({ error: "Scheduler lease unavailable" }, { status: 503 });
+  }
+  if (!lease) {
+    return NextResponse.json({ error: "Scheduler tick already running" }, { status: 409 });
+  }
 
   try {
     const result = await runTick(deps);
@@ -132,6 +149,12 @@ export async function POST(request: NextRequest) {
     console.error(`[scheduler] Tick failed after ${durationMs}ms: ${message}`);
 
     return NextResponse.json({ error: message }, { status: 500 });
+  } finally {
+    try {
+      await lease.release();
+    } catch (err) {
+      console.error("[scheduler] API tick lease release failed (will expire via TTL):", err instanceof Error ? err.message : String(err));
+    }
   }
 }
 

@@ -15,6 +15,8 @@ const STATUS_BY_CODE: Record<string, number> = {
   not_configured: 503,
   agent_not_found: 404,
   below_floor: 400,
+  pipeline_job_agent_mismatch: 409,
+  idempotency_conflict: 409,
   internal_error: 500,
 };
 

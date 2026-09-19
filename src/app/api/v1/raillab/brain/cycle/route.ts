@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit, clientIpFromRequest, rateLimitResponse } from "@/lib/rateLimit";
 import { authenticateApiKey } from "@/lib/operator";
 import { runBrainCycle } from "@/lib/brain/command-brain";
+import { isSchedulerAuthorized } from "@/lib/scheduler/auth";
 
 export const dynamic = "force-dynamic";
 const NO_STORE = { "Cache-Control": "no-store, max-age=0" };
@@ -9,6 +10,8 @@ const NO_STORE = { "Cache-Control": "no-store, max-age=0" };
 /**
  * POST /api/v1/raillab/brain/cycle — run one Command Brain cycle.
  * Auth: ISSUER API key or SCHEDULER_SECRET (x-scheduler-secret header).
+ * Phase 40: secret comparison is timing-safe and fail-closed in production
+ * via the shared isSchedulerAuthorized helper.
  */
 export async function POST(request: NextRequest) {
   const ip = clientIpFromRequest(request.headers);
@@ -18,11 +21,10 @@ export async function POST(request: NextRequest) {
   }
 
   const authHeader = request.headers.get("authorization");
-  const schedulerSecret = process.env.SCHEDULER_SECRET;
   const providedSecret = request.headers.get("x-scheduler-secret");
 
   let authorized = false;
-  if (schedulerSecret && providedSecret === schedulerSecret) {
+  if (isSchedulerAuthorized(providedSecret, process.env.SCHEDULER_SECRET, process.env.NODE_ENV)) {
     authorized = true;
   } else {
     const operator = await authenticateApiKey(authHeader);

@@ -3,11 +3,48 @@
  * Replaces Vercel Cron Jobs. Starts when the Next.js server boots.
  */
 
-import cron, { ScheduledTask } from "node-cron";
+import cron from "node-cron";
 import { prisma } from "@/lib/db";
 import { runTick, type SchedulerDeps } from "@/lib/scheduler/scheduler-service";
+import { acquireLease, type LeaseHandle } from "@/lib/scheduler/lease";
 
 let initialized = false;
+
+/** Lease id guarding scheduler ticks — one tick at a time across all replicas. */
+export const SCHEDULER_TICK_LEASE_ID = "scheduler-tick";
+
+/** Runs one tick under the distributed lease (fail-closed). */
+async function runLeasedTick(context: string): Promise<void> {
+  let lease: LeaseHandle | null = null;
+  try {
+    lease = await acquireLease(SCHEDULER_TICK_LEASE_ID);
+  } catch (err) {
+    console.error(`[scheduler] ${context}: lease unavailable (fail-closed):`, err instanceof Error ? err.message : String(err));
+    return;
+  }
+  if (!lease) {
+    console.log(`[scheduler] ${context}: skipped — another instance holds the lease (single-flight).`);
+    return;
+  }
+  try {
+    const startedAt = Date.now();
+    const deps = createSchedulerDeps();
+    const result = await runTick(deps);
+    const durationMs = Date.now() - startedAt;
+    console.log(`[scheduler] ${context} tick ${result.tick_id} completed in ${durationMs}ms: ${result.runtime.summary}`);
+  } catch (err) {
+    console.error(
+      `[scheduler] ${context} tick failed:`,
+      err instanceof Error ? err.message : String(err)
+    );
+  } finally {
+    try {
+      await lease.release();
+    } catch (err) {
+      console.error("[scheduler] Lease release failed (will expire via TTL):", err instanceof Error ? err.message : String(err));
+    }
+  }
+}
 
 export function startScheduler(): void {
   if (initialized) return;
@@ -27,30 +64,12 @@ export function startScheduler(): void {
   console.log(`[scheduler] Starting with schedule: "${schedule}" (${isDev ? "dev" : "production"} mode)`);
 
   cron.schedule(schedule, async () => {
-    const startedAt = Date.now();
-    console.log(`[scheduler] Tick starting at ${new Date().toISOString()}`);
-
-    try {
-      const deps = createSchedulerDeps();
-      const result = await runTick(deps);
-      const durationMs = Date.now() - startedAt;
-      console.log(`[scheduler] Tick ${result.tick_id} completed in ${durationMs}ms: ${result.runtime.summary}`);
-    } catch (err) {
-      const durationMs = Date.now() - startedAt;
-      console.error(`[scheduler] Tick failed after ${durationMs}ms:`, err instanceof Error ? err.message : String(err));
-    }
+    await runLeasedTick("Tick");
   });
 
   // Run the first tick immediately after a short delay (let the server settle)
   setTimeout(async () => {
-    console.log("[scheduler] Running initial tick...");
-    try {
-      const deps = createSchedulerDeps();
-      const result = await runTick(deps);
-      console.log(`[scheduler] Initial tick ${result.tick_id}: ${result.runtime.summary}`);
-    } catch (err) {
-      console.error("[scheduler] Initial tick failed:", err instanceof Error ? err.message : String(err));
-    }
+    await runLeasedTick("Initial");
   }, 10000);
 }
 
@@ -117,5 +136,10 @@ function createSchedulerDeps(): SchedulerDeps {
     },
     now: () => new Date().toISOString(),
     generateId: () => Math.random().toString(36).slice(2, 14),
+    // Phase 40: real decision outcomes from brain memory (no synthetic lessons).
+    getDecisionOutcomes: async () => {
+      const { getRecentBrainOutcomeHistory } = await import("@/lib/brain/outcomes");
+      return getRecentBrainOutcomeHistory(20).catch(() => []);
+    },
   };
 }

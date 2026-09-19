@@ -68,14 +68,14 @@ export async function creditExternalRevenue(
   const agentCommitment = input.agentCommitment.toLowerCase();
   const source = input.source.trim();
   const externalRef = input.externalRef.trim();
-  const grossUsdCents = Math.floor(input.grossUsdCents);
+  const grossUsdCents = input.grossUsdCents;
 
   if (!/^[0-9a-f]{64}$/i.test(agentCommitment)) {
     return { ok: false, code: "invalid_commitment", error: "agent_commitment must be 64-hex" };
   }
   if (!source) return { ok: false, code: "invalid_source", error: "source is required" };
   if (!externalRef) return { ok: false, code: "invalid_ref", error: "external_ref is required" };
-  if (!Number.isFinite(grossUsdCents) || grossUsdCents <= 0) {
+  if (!Number.isFinite(grossUsdCents) || !Number.isInteger(grossUsdCents) || grossUsdCents <= 0) {
     return { ok: false, code: "invalid_amount", error: "gross_usd_cents must be a positive integer" };
   }
 
@@ -137,6 +137,15 @@ export async function creditExternalRevenue(
         },
       });
       if (input.pipelineJobId) {
+        const pipelineJob = await tx.pipelineJob.findUnique({
+          where: { jobId: input.pipelineJobId.toLowerCase() },
+          select: { agentCommitment: true, status: true },
+        });
+        if (!pipelineJob || pipelineJob.agentCommitment !== agentCommitment) {
+          const mismatch = new Error("pipeline_job_agent_mismatch");
+          (mismatch as Error & { code?: string }).code = "PIPELINE_JOB_AGENT_MISMATCH";
+          throw mismatch;
+        }
         await markJobSold(tx as never, input.pipelineJobId, externalRef);
       }
       return created;
@@ -155,6 +164,19 @@ export async function creditExternalRevenue(
     if ((err as { code?: string }).code === "P2002") {
       const existing = await prisma.agentRevenue.findUnique({ where: { externalRef } });
       if (existing) {
+        if (
+          existing.agentCommitment !== agentCommitment ||
+          existing.source !== source ||
+          existing.externalRef !== externalRef ||
+          existing.grossUsdCents !== grossUsdCents ||
+          existing.angelCredited !== angelCredited
+        ) {
+          return {
+            ok: false,
+            code: "idempotency_conflict",
+            error: "external_ref already exists with different revenue fields",
+          };
+        }
         return {
           ok: true,
           entryId: existing.id,
@@ -165,6 +187,9 @@ export async function creditExternalRevenue(
           deduped: true,
         };
       }
+    }
+    if ((err as { code?: string }).code === "PIPELINE_JOB_AGENT_MISMATCH") {
+      return { ok: false, code: "pipeline_job_agent_mismatch", error: "pipeline job belongs to a different agent" };
     }
     return { ok: false, code: "internal_error", error: err instanceof Error ? err.message : "credit failed" };
   }

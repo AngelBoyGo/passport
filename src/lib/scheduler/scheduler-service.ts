@@ -11,7 +11,13 @@
  * The tick is designed to be called by Vercel Cron Jobs (or any external cron)
  * at regular intervals. Every tick is recorded as evidence — the Think Tank
  * grows smarter over time.
+ *
+ * Phase 40: runtime output is labeled PLAN_ONLY — it is a computed plan, not
+ * proof of executed infrastructure change. "Insights" derive from real decision
+ * outcomes (via the getDecisionOutcomes dep) instead of synthetic samples.
  */
+
+import type { DecisionOutcome } from "@/lib/think-tank/kernel";
 
 export interface TickResult {
   tick_id: string;
@@ -43,6 +49,8 @@ export interface TickResult {
     total_revenue: number;
     profitability: number;
     summary: string;
+    /** Phase 40: true — the runtime stage computes a plan only; no instances/tasks are changed. */
+    plan_only: boolean;
   };
   evidence_hash?: string;
   integrity_attestation?: {
@@ -85,6 +93,11 @@ export interface SchedulerDeps {
     ok: boolean;
     checkedAt: string;
   }>;
+  /**
+   * Phase 40: real decision-outcome history for lessons. When omitted, the
+   * tick reports NO synthetic insights — lessons require real data.
+   */
+  getDecisionOutcomes?: () => Promise<DecisionOutcome[]>;
   /** Get current time */
   now: () => string;
   /** Generate a unique ID */
@@ -152,10 +165,16 @@ export async function runTick(deps: SchedulerDeps): Promise<TickResult> {
     description: o.description,
   })));
 
-  const lessons = extractLessons([
-    { decisionId: "d1", expectedValue: 1000, actualValue: 1200, success: true, lessonsLearned: "" },
-    { decisionId: "d2", expectedValue: 500, actualValue: 100, success: false, lessonsLearned: "" },
-  ]);
+  // Phase 40: lessons come from REAL decision outcomes when the caller supplies
+  // them; previously this used hardcoded example history on every tick.
+  let lessons: string[] = [];
+  if (deps.getDecisionOutcomes) {
+    try {
+      lessons = extractLessons(await deps.getDecisionOutcomes());
+    } catch {
+      lessons = ["outcome history unavailable; lessons skipped"];
+    }
+  }
 
   // 3. Run Runtime Cycle
   const { computeRuntimeCycle } = await import("@/lib/agent-runtime/runtime-service");
@@ -262,7 +281,8 @@ export async function runTick(deps: SchedulerDeps): Promise<TickResult> {
       total_cost: runtimeResult.totalCost,
       total_revenue: runtimeResult.totalRevenue,
       profitability: runtimeResult.profitability,
-      summary: runtimeResult.summary,
+      summary: `PLAN_ONLY (no live execution): ${runtimeResult.summary}`,
+      plan_only: true,
     },
     evidence_hash: evidenceHash,
   };
