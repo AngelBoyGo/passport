@@ -93,6 +93,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <Link href="/admin" className="text-slate-600 hover:text-slate-900">
             Dashboard
           </Link>
+          <Link href="/admin/brain" className="text-slate-600 hover:text-slate-900">
+            Brain
+          </Link>
           <Link href="/admin/api-keys" className="text-slate-600 hover:text-slate-900">
             API Keys
           </Link>
