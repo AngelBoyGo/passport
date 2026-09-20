@@ -76,8 +76,8 @@ export async function GET(request: NextRequest) {
   const health = await checkHealth();
   const activity = [
     ...recentReceipts.map((item) => ({ type: "receipt", label: `${item.status} ${item.receiptType} receipt`, detail: item.receiptId, at: item.issuedAt, href: `/verify/${item.receiptId}` })),
-    ...recentEvidence.map((item) => ({ type: "evidence", label: `${item.sourceType} evidence`, detail: item.normalizedEventType, at: item.createdAt, href: `/profiles/${item.agentIdentityCommitment}` })),
-    ...recentEngagements.map((item) => ({ type: "engagement", label: `${item.status.toLowerCase()} engagement`, detail: `${item.taskId} · $${(item.amount / 100).toFixed(2)}`, at: item.updatedAt, href: "/admin" })),
+    ...recentEvidence.map((item) => ({ type: "evidence", label: `${item.sourceType} evidence`, detail: item.normalizedEventType, at: item.createdAt, href: `/trace/${item.id}` })),
+    ...recentEngagements.map((item) => ({ type: "engagement", label: `${item.status.toLowerCase()} engagement`, detail: `${item.taskId} · $${(item.amount / 100).toFixed(2)}`, at: item.updatedAt, href: "/admin?tab=economy" })),
   ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime()).slice(0, 12);
 
   return NextResponse.json(

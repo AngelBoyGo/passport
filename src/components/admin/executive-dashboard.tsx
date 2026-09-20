@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { ADMIN_TABS, type AdminTabId } from "@/app/admin/config/tabs";
+import { EconomyDashboard } from "./economy-dashboard";
 
 type DashboardData = {
   generatedAt: string;
@@ -127,6 +128,18 @@ export function ExecutiveDashboard() {
                 <Link href="/dashboard" className="text-indigo-300 hover:text-white transition">
                   ← Back to Dashboard
                 </Link>
+                <Link href="/admin/brain" className="text-indigo-300 hover:text-white transition">
+                  AI Command Brain →
+                </Link>
+                <Link href="/admin/passports" className="text-indigo-300 hover:text-white transition">
+                  Issued Passports →
+                </Link>
+                <Link href="/admin/evidence" className="text-indigo-300 hover:text-white transition">
+                  Evidence Ledger →
+                </Link>
+                <Link href="/admin/receipts" className="text-indigo-300 hover:text-white transition">
+                  Receipts Ledger →
+                </Link>
                 <Link href="/admin/webhooks" className="text-indigo-300 hover:text-white transition">
                   Webhooks →
                 </Link>
@@ -199,8 +212,8 @@ export function ExecutiveDashboard() {
             <div className="space-y-6">
               <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <Metric label="Receipts issued" value={number.format(metrics.receipts)} detail={`+${number.format(metrics.receiptsToday)} in 24h`} tone="indigo" href="/admin/receipts" />
-                <Metric label="Issued passports" value={number.format(metrics.issuedAgents)} detail="Enrolled agents" tone="emerald" href="/leaderboard" />
-                <Metric label="Evidence observed" value={number.format(metrics.evidence)} detail="Privacy-safe events" tone="sky" href="/leaderboard" />
+                <Metric label="Issued passports" value={number.format(metrics.issuedAgents)} detail="Enrolled agents" tone="emerald" href="/admin/passports" />
+                <Metric label="Evidence observed" value={number.format(metrics.evidence)} detail="Privacy-safe events" tone="sky" href="/admin/evidence" />
                 <Metric label="Health posture" value={data.health.overall} detail={`${data.health.components.filter((item) => item.status === "operational").length}/${data.health.components.length} components operational`} tone={data.health.overall === "operational" ? "emerald" : "amber"} href="?tab=reliability" />
               </div>
               <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
@@ -251,8 +264,8 @@ export function ExecutiveDashboard() {
           {tab === "trust-operations" && (
             <div className="space-y-6">
               <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                <Metric label="Issued passports" value={number.format(metrics.issuedAgents)} detail="Enrolled agents" tone="emerald" href="/leaderboard" />
-                <Metric label="Evidence observed" value={number.format(metrics.evidence)} detail="Privacy-safe events" tone="sky" href="/leaderboard" />
+                <Metric label="Issued passports" value={number.format(metrics.issuedAgents)} detail="Enrolled agents" tone="emerald" href="/admin/passports" />
+                <Metric label="Evidence observed" value={number.format(metrics.evidence)} detail="Privacy-safe events" tone="sky" href="/admin/evidence" />
                 <Metric label="Receipts today" value={number.format(metrics.receiptsToday)} detail="Last 24 hours" tone="indigo" href="/admin/receipts" />
               </div>
               <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
@@ -285,36 +298,16 @@ export function ExecutiveDashboard() {
           )}
 
           {tab === "economy" && (
-            <div className="space-y-6">
-              <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                <Metric label="Credits available" value={number.format(data.operator.credits)} detail={`${data.operator.tier} tier`} tone="indigo" href="/admin/api-keys" />
-                <Metric label="Engagements" value={number.format(metrics.engagements)} detail="Active marketplace" tone="sky" href="/admin" />
-                <Metric label="Slashing exposure" value={`$${(metrics.slashedCents / 100).toFixed(2)}`} detail={`${metrics.slashingEvents} events`} tone="amber" href="/admin" />
-              </div>
-              <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
-                <Panel title="Account balance" eyebrow="Operator">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <Posture label="Stake balance" value={`$${(data.operator.stakeBalanceCents / 100).toFixed(2)}`} detail="Minimum $50 escrow" />
-                    <Posture label="Account status" value={data.operator.accountStatus} detail={data.operator.accountStatus === "ACTIVE" ? "All operations permitted" : "Blocked — escrow insolvent"} />
-                    <Posture label="Current tier" value={data.operator.tier} detail="Stripe managed" />
-                    <Posture label="Slashing events" value={String(metrics.slashingEvents)} detail={`Total: $${(metrics.slashedCents / 100).toFixed(2)}`} />
-                  </div>
-                </Panel>
-                <Panel title="Engagement lifecycle" eyebrow="Marketplace">
-                  <div className="space-y-2 text-sm text-slate-300">
-                    <div className="rounded border border-white/10 bg-white/[0.02] p-2.5">
-                      <span className="font-semibold text-indigo-300">1. HELD</span> — Hirer locks AngelCoin credits in escrow
-                    </div>
-                    <div className="rounded border border-white/10 bg-white/[0.02] p-2.5">
-                      <span className="font-semibold text-emerald-300">2. DELIVERED</span> — Worker posts signed task deliverable evidence
-                    </div>
-                    <div className="rounded border border-white/10 bg-white/[0.02] p-2.5">
-                      <span className="font-semibold text-sky-300">3. PAID</span> — Escrow unlocks and releases to worker
-                    </div>
-                    <p className="mt-2 text-xs text-slate-500">Total engagements on record: {number.format(metrics.engagements)}</p>
-                  </div>
-                </Panel>
-              </div>
+            <div className="mt-6">
+              <EconomyDashboard
+                operatorCredits={data.operator.credits}
+                operatorTier={data.operator.tier}
+                stakeBalanceCents={data.operator.stakeBalanceCents}
+                accountStatus={data.operator.accountStatus}
+                slashingEvents={metrics.slashingEvents}
+                slashedCents={metrics.slashedCents}
+                engagementsCount={metrics.engagements}
+              />
             </div>
           )}
 
@@ -323,8 +316,8 @@ export function ExecutiveDashboard() {
               <div className="mt-6 grid gap-3 sm:grid-cols-4">
                 <Metric label="Health posture" value={data.health.overall} detail={data.health.overall === "operational" ? "All systems nominal" : "Some components degraded"} tone={data.health.overall === "operational" ? "emerald" : "amber"} href="?tab=reliability" />
                 <Metric label="Receipts issued" value={number.format(metrics.receipts)} detail="All time" tone="indigo" href="/admin/receipts" />
-                <Metric label="Evidence observed" value={number.format(metrics.evidence)} detail="Privacy-safe" tone="sky" href="/leaderboard" />
-                <Metric label="Issued passports" value={number.format(metrics.issuedAgents)} detail="Enrolled agents" tone="emerald" href="/leaderboard" />
+                <Metric label="Evidence observed" value={number.format(metrics.evidence)} detail="Privacy-safe" tone="sky" href="/admin/evidence" />
+                <Metric label="Issued passports" value={number.format(metrics.issuedAgents)} detail="Enrolled agents" tone="emerald" href="/admin/passports" />
               </div>
               <Panel title="Reliability checkpoints" eyebrow="CTO">
                 <div className="grid gap-3 md:grid-cols-2">

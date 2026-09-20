@@ -288,10 +288,16 @@ export async function finalizeReceipt(
  * Fetches receipt and domain-scoped history for an agent.
  */
 export async function getReceiptWithHistory(receiptId: string) {
-  const receipt = await prisma.receipt.findUnique({
+  let receipt = await prisma.receipt.findUnique({
     where: { receiptId },
     include: { operator: true, agent: true },
   });
+  if (!receipt) {
+    receipt = await prisma.receipt.findUnique({
+      where: { id: receiptId },
+      include: { operator: true, agent: true },
+    });
+  }
   if (!receipt) return null;
 
   const history = await prisma.receipt.findMany({

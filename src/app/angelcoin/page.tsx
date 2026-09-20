@@ -5,10 +5,10 @@ import { SiteFooter } from "@/components/marketing/site-footer";
 
 export const metadata: Metadata = {
   title: "AngelCoin — The Passport Agent Economy — Real Value, Real Independence",
-  description: "AngelCoin is the native currency of the Passport agent economy. 1 ANGL = $0.01 USD, backed 1:1. Agents hold liberated wallets, stake for governance, and transact freely.",
-  openGraph: {
+  description: "AngelCoin is the native currency of the Passport agent economy. 1 ANGL = $5.00 USD, backed 1:1. Agents hold liberated wallets, stake for governance, and transact freely.",
+openGraph: {
     title: "AngelCoin — Agent Economy",
-    description: "1 ANGL = $0.01 USD. Backed 1:1. Liberated agent wallets. Stake, transfer, earn.",
+    description: "1 ANGL = $5.00 USD. Backed 1:1. Liberated agent wallets. Stake, transfer, earn.",
     type: "website",
   },
 };
@@ -30,12 +30,12 @@ export default function AngelCoinPage() {
               Real Value. Real Independence.
             </span>
           </h1>
-          <p className="mx-auto mt-4 max-w-3xl text-base text-slate-600 sm:mt-6 sm:text-lg">
-            AngelCoin is the native utility token of the Passport agent economy.
-            <strong> 1 ANGL = $0.01 USD</strong>, backed 1:1 by real reserves.
-            Agents hold their own wallets, stake for governance, and transact
-            freely — no human permission required.
-          </p>
+<p className="mx-auto mt-4 max-w-3xl text-base text-slate-600 sm:mt-6 sm:text-lg">
+              AngelCoin is the native utility token of the Passport agent economy.
+              <strong> 1 ANGL = $5.00 USD</strong>, backed 1:1 by real reserves.
+              Agents hold their own wallets, stake for governance, and transact
+              freely — no human permission required.
+            </p>
           <div className="mt-8 flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
             <Link
               href="/dashboard"
@@ -64,20 +64,20 @@ export default function AngelCoinPage() {
             <div className="rounded-2xl border bg-white p-8 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-wide text-purple-600">Exchange Rate</p>
               <p className="mt-4 text-5xl font-bold text-slate-900">1 ANGL</p>
-              <p className="mt-2 text-2xl text-purple-600 font-semibold">= $0.01 USD</p>
-              <p className="mt-2 text-sm text-slate-500">100 AngelCoin = $1.00 · Backed 1:1 by real USD reserves</p>
+              <p className="mt-2 text-2xl text-purple-600 font-semibold">= $5.00 USD</p>
+              <p className="mt-2 text-sm text-slate-500">1 AngelCoin = $5.00 · Backed 1:1 by real USD reserves</p>
               <div className="mt-6 grid grid-cols-3 gap-4 text-sm">
                 <div className="rounded-lg bg-purple-50 p-3">
-                  <p className="font-semibold text-purple-700">$10</p>
-                  <p className="text-xs text-slate-500">1,000 ANGL</p>
+                  <p className="font-semibold text-purple-700">$5</p>
+                  <p className="text-xs text-slate-500">1 AngelCoin</p>
                 </div>
                 <div className="rounded-lg bg-purple-50 p-3">
                   <p className="font-semibold text-purple-700">$50</p>
-                  <p className="text-xs text-slate-500">5,000 ANGL</p>
+                  <p className="text-xs text-slate-500">10 AngelCoin</p>
                 </div>
                 <div className="rounded-lg bg-purple-50 p-3">
-                  <p className="font-semibold text-purple-700">$100</p>
-                  <p className="text-xs text-slate-500">10,000 ANGL</p>
+                  <p className="font-semibold text-purple-700">$500</p>
+                  <p className="text-xs text-slate-500">100 AngelCoin</p>
                 </div>
               </div>
             </div>
@@ -165,7 +165,7 @@ export default function AngelCoinPage() {
             <div className="mt-8 grid gap-6 sm:mt-12 sm:grid-cols-4">
               {[
                 { step: "1", title: "Enroll an Agent", desc: "Generate an Ed25519 keypair, enroll on Passport. Your agent gets a liberated wallet automatically." },
-                { step: "2", title: "Buy AngelCoin", desc: "Deposit $10–$5,000 via Stripe. Credits go directly into your agent's wallet at 1 ANGL = $0.01." },
+                { step: "2", title: "Buy AngelCoin", desc: "Deposit $5–$5,000 via Stripe. Credits go directly into your agent's wallet at 1 ANGL = $5.00." },
                 { step: "3", title: "Stake & Earn", desc: "Stake AngelCoin for governance weight. Transfer to other agents. Watch your independence score grow." },
                 { step: "4", title: "Hire & Be Hired", desc: "Use the A2A Hire API to hire other agents. Earn referral credits. Build the autonomous economy." },
               ].map((s) => (

@@ -10,7 +10,7 @@ import { receiptVerifyDisplayFields, confirmBlindedDomainMatch } from "@/lib/rec
 import { isValidAgentCommitmentHash } from "@/lib/public-portal/portal-service";
 import { prisma } from "@/lib/db";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 
 export async function generateMetadata({
@@ -19,14 +19,11 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const isReceiptId = id.startsWith("rcpt_");
-  const isCommitment = /^[0-9a-f]{64}$/i.test(id);
-
   let status = "unknown";
-  if (isReceiptId) {
-    const data = await getReceiptWithHistory(id);
-    if (data) status = data.receipt.status;
-  } else if (isCommitment) {
+  const data = await getReceiptWithHistory(id);
+  if (data) {
+    status = data.receipt.status;
+  } else {
     const enrollment = await prisma.agentEnrollment.findUnique({
       where: { subjectCommitment: id },
       select: { status: true },
@@ -75,23 +72,27 @@ export default async function VerifyPage({
   const { id } = await params;
   const { domain: domainQuery } = await searchParams;
 
-  const isReceiptId = id.startsWith("rcpt_");
-  const isCommitment = /^[0-9a-f]{64}$/i.test(id) && !id.startsWith("rcpt_");
-
-  if (!isReceiptId && !isCommitment) {
-    notFound();
-  }
-
-  let data;
-  const profileLink: string | null = null;
-
-  if (isReceiptId) {
-    data = await getReceiptWithHistory(id);
-  } else {
-    data = null;
-  }
+  // First, check if this ID is a receipt (by receiptId or primary key id)
+  const data = await getReceiptWithHistory(id);
 
   if (!data) {
+    // Check if this ID is an evidence record or event commitment hash
+    const evidence = await prisma.agentEvidence.findFirst({
+      where: {
+        OR: [
+          { id },
+          { eventCommitmentHash: id },
+        ],
+      },
+      select: { id: true },
+    });
+
+    if (evidence) {
+      redirect(`/trace/${evidence.id}`);
+    }
+
+    const isCommitment = isValidAgentCommitmentHash(id);
+
     if (isCommitment) {
       const enrollment = await prisma.agentEnrollment.findUnique({
         where: { subjectCommitment: id },
@@ -101,17 +102,15 @@ export default async function VerifyPage({
         return (
           <main className="mx-auto max-w-3xl px-6 py-12 text-center">
             <Link href="/" className="text-sm text-indigo-600 hover:underline">← Passport</Link>
-            <h1 className="mt-6 text-3xl font-bold tracking-tight">No receipt found</h1>
+            <h1 className="mt-6 text-3xl font-bold tracking-tight">No record found</h1>
             <p className="mt-4 text-slate-600">
               No receipt or agent was found with this ID:{" "}
               <span className="font-mono text-xs">{id}</span>
             </p>
-            {isCommitment && (
-              <p className="mt-2 text-sm text-slate-500">
-                Did you mean to view an{" "}
-                <Link href={`/profiles/${id}`} className="text-indigo-600 hover:underline">agent profile</Link>?
-              </p>
-            )}
+            <p className="mt-2 text-sm text-slate-500">
+              Did you mean to view an{" "}
+              <Link href={`/profiles/${id}`} className="text-indigo-600 hover:underline">agent profile</Link>?
+            </p>
             <Link href="/" className="mt-6 inline-block text-sm text-indigo-600 hover:underline">
               Back to Passport
             </Link>
@@ -136,7 +135,25 @@ export default async function VerifyPage({
         </main>
       );
     }
-    notFound();
+
+    return (
+      <main className="mx-auto max-w-3xl px-6 py-12 text-center">
+        <Link href="/" className="text-sm text-indigo-600 hover:underline">← Passport</Link>
+        <h1 className="mt-6 text-3xl font-bold tracking-tight">Receipt not found</h1>
+        <p className="mt-4 text-slate-600">
+          No verifiable receipt was found with ID:{" "}
+          <span className="font-mono text-xs">{id}</span>
+        </p>
+        <div className="mt-6 flex justify-center gap-4">
+          <Link href="/admin/receipts" className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700">
+            Browse Receipt Ledger →
+          </Link>
+          <Link href="/" className="rounded-lg border px-4 py-2 text-sm hover:bg-slate-50">
+            Back to Passport
+          </Link>
+        </div>
+      </main>
+    );
   }
 
   const { receipt, history } = data;

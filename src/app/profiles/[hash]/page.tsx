@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { ProfileCard } from "@/app/profiles/ProfileCard";
 import {
@@ -50,13 +50,67 @@ export default async function ProfilePage({
 }) {
   const { hash } = await params;
 
+  if (hash === "command-brain") {
+    redirect("/admin/brain");
+  }
+  if (hash === "scheduler") {
+    redirect("/admin");
+  }
+
   if (!isValidAgentCommitmentHash(hash)) {
-    notFound();
+    return (
+      <main className="mx-auto max-w-3xl px-6 py-12 text-center">
+        <Link href="/" className="text-sm text-indigo-600 hover:underline">
+          ← Passport
+        </Link>
+        <div className="mt-8 rounded-2xl border border-slate-200 bg-slate-50 p-8 shadow-sm">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Agent Profile Not Found</h1>
+          <p className="mt-3 text-sm text-slate-600">
+            The identifier <code className="font-mono text-xs bg-slate-200 px-2 py-0.5 rounded">{hash}</code> is not a valid 64-character agent commitment hash.
+          </p>
+          <div className="mt-6 flex justify-center gap-4">
+            <Link
+              href="/leaderboard"
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700 transition"
+            >
+              View Evidence Leaderboard →
+            </Link>
+          </div>
+        </div>
+      </main>
+    );
   }
 
   const profile = await getAgentProfile(hash);
   if (!profile) {
-    notFound();
+    return (
+      <main className="mx-auto max-w-3xl px-6 py-12 text-center">
+        <Link href="/" className="text-sm text-indigo-600 hover:underline">
+          ← Passport
+        </Link>
+        <div className="mt-8 rounded-2xl border border-slate-200 bg-slate-50 p-8 shadow-sm">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Agent Profile Not Found</h1>
+          <p className="mt-3 text-sm text-slate-600">
+            No public agent profile or active enrollment exists for commitment:{" "}
+            <code className="font-mono text-xs bg-slate-200 px-2 py-0.5 rounded break-all">{hash}</code>
+          </p>
+          <div className="mt-6 flex justify-center gap-4">
+            <Link
+              href="/leaderboard"
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700 transition"
+            >
+              View Evidence Leaderboard →
+            </Link>
+            <Link
+              href={`/verify/${hash}`}
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition"
+            >
+              Check Verification Status →
+            </Link>
+          </div>
+        </div>
+      </main>
+    );
   }
 
   const view = mapAgentProfileToViewModel(profile);
