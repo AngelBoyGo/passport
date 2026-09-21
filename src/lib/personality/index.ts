@@ -151,11 +151,25 @@ export function profileIsSane(profile: PersonalityProfile): boolean {
   return true;
 }
 
+/**
+ * A2: "verified outcome" must come from a trusted authority. An arbitrary
+ * signer string used to grant the full non-advisory delta budget. The
+ * allowlist is the set of issuers whose outcome attestations this Passport
+ * deployment trusts (extend via env when new issuers are onboarded).
+ */
+const DEFAULT_TRUSTED_SIGNERS = new Set(["metis-marketplace", "passport-attestation"]);
+
+export function setTrustedSigners(signers: string[]): void {
+  DEFAULT_TRUSTED_SIGNERS.clear();
+  for (const s of signers) DEFAULT_TRUSTED_SIGNERS.add(s);
+}
+
 function hasEvidence(event: PersonalityEvent): boolean {
   if (event.kind === "verified_outcome") {
+    const signer = String(event.evidence?.signer ?? "");
     return Boolean(
       event.evidence?.ref && String(event.evidence.ref).trim() &&
-      event.evidence?.signer && String(event.evidence.signer).trim()
+      signer.trim() && DEFAULT_TRUSTED_SIGNERS.has(signer)
     );
   }
   return Boolean(
@@ -185,8 +199,12 @@ function isOscillating(profile: PersonalityProfile, trait: string, next: number)
 
 function secondsBetween(fromIso: string | null, toIso: string): number {
   if (!fromIso) return Number.POSITIVE_INFINITY;
-  const dt = Date.parse(toIso) - Date.parse(fromIso);
-  return Number.isFinite(dt) ? dt / 1000 : Number.POSITIVE_INFINITY;
+  const from = Date.parse(fromIso);
+  const to = Date.parse(toIso);
+  // A1: an unparseable timestamp must NEVER bypass the cooldown (returning
+  // Infinity let `at: "garbage"` mutate freely and poison lastMutationAt).
+  if (!Number.isFinite(from) || !Number.isFinite(to)) return Number.NEGATIVE_INFINITY;
+  return (to - from) / 1000;
 }
 
 export function applyEvent(
@@ -294,21 +312,41 @@ export function rollbackTo(
   profile: PersonalityProfile,
   version: number
 ): MutationResult {
+  if (!profileIsSane(profile)) {
+    return { ok: false, reason: "corrupt_profile" };
+  }
   const target = profile.history.find((h) => h.version === version);
   if (!target) {
     return { ok: false, reason: "version_not_found" };
+  }
+  // A4: a rollback must never resurrect corrupt/out-of-bounds traits — the
+  // restored set is validated before it becomes live.
+  const restored = { ...target.traits };
+  for (const t of TRAITS) {
+    const v = (restored as Record<string, number>)[t];
+    if (!Number.isFinite(v) || v < TRAIT_BOUNDS.min || v > TRAIT_BOUNDS.max) {
+      restored[t] = TRAIT_BOUNDS.default;
+    }
   }
   const nextVersion = profile.version + 1;
   const next: PersonalityProfile = {
     ...profile,
     version: nextVersion,
-    traits: { ...target.traits },
+    traits: restored,
+    // A5: deep-copy mutable internal state — a rollback must not share
+    // oscillation history or reflections with the pre-rollback object.
+    recentDeltas: Object.fromEntries(
+      Object.entries(profile.recentDeltas as Record<string, number[]>).map(
+        ([k, v]) => [k, [...v]]
+      )
+    ),
+    reflections: profile.reflections.map((r) => ({ ...r })),
     lastMutationAt: profile.lastMutationAt,
     history: [
       ...profile.history,
       {
         version: nextVersion,
-        traits: { ...target.traits },
+        traits: { ...restored },
         at: null,
         reason: `rollback_to_${version}`,
       },
@@ -326,13 +364,16 @@ export interface PublicProfile {
 
 /**
  * Privacy boundary: reflections, evidence provenance, and history are internal.
- * Only the current trait values are public.
+ * Only the CURRENT, CANONICAL trait values are public — A3: unknown/extra keys
+ * that ever landed in the traits object are stripped, not leaked.
  */
 export function publicProfile(profile: PersonalityProfile): PublicProfile {
+  const traits = {} as Traits;
+  for (const t of TRAITS) traits[t] = (profile.traits as Traits)[t];
   return {
     did: profile.did,
     version: profile.version,
-    traits: { ...profile.traits },
+    traits,
     updatedAt: profile.lastMutationAt,
   };
 }

@@ -297,3 +297,57 @@ describe("F3.10 safety policy outranks personality", () => {
     expect(behavior.safety.requireHumanApproval).toBe(true);
   });
 });
+
+describe("F3.11 audit hardening (A1/A3/A4)", () => {
+  it("A1: an unparseable timestamp cannot bypass the cooldown", () => {
+    let p = newProfile("did:key:zAgent1");
+    p = appliedProfile(applyEvent(p, OUTCOME));
+    const r = applyEvent(p, {
+      ...OUTCOME,
+      at: "not-a-date",
+      evidence: { ...OUTCOME.evidence, ref: "ev-x" },
+      deltas: { rigor: 5 },
+    });
+    expect(failReason(r)).toBe("mutation_rate_limited");
+  });
+
+  it("A2: an untrusted signer cannot authorize a real mutation", () => {
+    const p = newProfile("did:key:zAgent1");
+    const r = applyEvent(p, {
+      ...OUTCOME,
+      evidence: { ...OUTCOME.evidence, signer: "attacker" },
+      deltas: { rigor: 5 },
+    });
+    expect(failReason(r)).toBe("no_evidence");
+  });
+
+  it("A3: the public profile leaks only canonical traits", () => {
+    const p = newProfile("did:key:zAgent1");
+    const polluted = {
+      ...p,
+      traits: { ...p.traits, secretNote: 999 },
+    } as PersonalityProfile;
+    const pub = publicProfile(polluted) as unknown as Record<string, unknown>;
+    expect(JSON.stringify(pub)).not.toContain("secretNote");
+    for (const t of TRAITS) {
+      expect((pub.traits as Record<string, number>)[t]).toBeDefined();
+    }
+  });
+
+  it("A4: rollback never resurrects out-of-bounds traits", () => {
+    const p = newProfile("did:key:zAgent1");
+    const corruptHistory = {
+      ...p,
+      version: 1,
+      history: [
+        ...p.history,
+        { version: 1, traits: { ...p.traits, rigor: 1e9 }, at: "x", reason: "bad" },
+      ],
+    } as PersonalityProfile;
+    const r = rollbackTo(corruptHistory, 1);
+    if (!r.ok) throw new Error(r.reason);
+    const rigor = (r.profile.traits as Record<string, number>).rigor;
+    expect(rigor).toBeGreaterThanOrEqual(TRAIT_BOUNDS.min);
+    expect(rigor).toBeLessThanOrEqual(TRAIT_BOUNDS.max);
+  });
+});
