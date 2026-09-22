@@ -12,6 +12,8 @@
  */
 
 import { prisma } from "@/lib/db";
+import { completeTier } from "@/lib/llm/gateway-client";
+import type { LlmTier } from "@/lib/llm/tiers";
 
 export interface BrainConfig {
   baseUrl: string;
@@ -19,6 +21,7 @@ export interface BrainConfig {
   model: string;
 }
 
+/** Legacy single-model config (pre-tiers). Kept for diagnostics only. */
 export function getBrainConfig(): BrainConfig | null {
   const baseUrl = process.env.LLM_BASE_URL?.trim();
   const apiKey = process.env.LLM_API_KEY?.trim();
@@ -27,56 +30,22 @@ export function getBrainConfig(): BrainConfig | null {
   return { baseUrl, apiKey, model };
 }
 
-const BRAIN_TIMEOUT_MS = 30_000;
-
+/**
+ * The brain's LLM call — routed through the tiered gateway client on the
+ * `neuron` tier (model pinned by src/lib/llm/tiers.ts; callers cannot inject
+ * a raw model id). The brain NEVER executes on the money tier.
+ */
 export async function brainComplete(opts: {
   system: string;
   user: string;
   json?: boolean;
   temperature?: number;
+  tier?: LlmTier;
 }): Promise<string> {
-  const cfg = getBrainConfig();
-  if (!cfg) {
-    throw new Error("LLM gateway not configured (LLM_BASE_URL / LLM_API_KEY / LLM_MODEL)");
+  if (opts.tier && opts.tier !== "neuron") {
+    throw new Error(`brain_tier_violation:${opts.tier}`);
   }
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), BRAIN_TIMEOUT_MS);
-  try {
-    const res = await fetch(`${cfg.baseUrl.replace(/\/+$/, "")}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${cfg.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: cfg.model,
-        messages: [
-          { role: "system", content: opts.system },
-          { role: "user", content: opts.user },
-        ],
-        temperature: opts.temperature ?? 0.2,
-        ...(opts.json ? { response_format: { type: "json_object" } } : {}),
-      }),
-      signal: controller.signal,
-    });
-
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      throw new Error(`LLM gateway returned ${res.status}: ${body.slice(0, 200)}`);
-    }
-
-    const data = (await res.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    const content = data.choices?.[0]?.message?.content;
-    if (!content) {
-      throw new Error("LLM gateway returned an empty completion");
-    }
-    return content;
-  } finally {
-    clearTimeout(timeout);
-  }
+  return completeTier(opts.tier ?? "neuron", opts);
 }
 
 /** Parses model output, tolerating ```json fences; throws on invalid/absent object. */
