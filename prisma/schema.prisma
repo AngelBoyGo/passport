@@ -183,12 +183,15 @@ model MoneyIntent {
   signature           String?
   status              String            @default("PENDING") // PENDING|AUTHORIZED|REJECTED|EXECUTED
   rejectionReason     String?
+  attemptCount        Int               @default(0)
+  lastAttemptAt       DateTime?
   cycleRef            String?
   reason              String?
   executedAt          DateTime?
   createdAt           DateTime          @default(now())
 
   @@index([status])
+  @@index([status, lastAttemptAt])
   @@index([workerCommitment, status])
 }
 

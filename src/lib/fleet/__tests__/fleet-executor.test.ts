@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { prismaMock, createEngagementMock, leaseAcquireMock, leaseReleaseMock } = vi.hoisted(() => ({
+const { prismaMock, createEngagementMock, getEngagementMock, leaseAcquireMock, leaseReleaseMock } = vi.hoisted(() => ({
   prismaMock: {
     moneyIntent: {
       findMany: vi.fn(),
@@ -8,18 +8,23 @@ const { prismaMock, createEngagementMock, leaseAcquireMock, leaseReleaseMock } =
     },
   },
   createEngagementMock: vi.fn(),
+  getEngagementMock: vi.fn(),
   leaseAcquireMock: vi.fn(),
   leaseReleaseMock: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
-vi.mock("@/lib/engagement/engagement-service", () => ({ createEngagement: createEngagementMock }));
+vi.mock("@/lib/engagement/engagement-service", () => ({
+  createEngagement: createEngagementMock,
+  getEngagement: getEngagementMock,
+}));
 vi.mock("@/lib/scheduler/lease", () => ({
   acquireLease: leaseAcquireMock,
   releaseLease: leaseReleaseMock,
 }));
 
 const { executeAuthorizedIntents, runFleetDispatchTick } = await import("@/lib/fleet/fleet-executor");
+const { EngagementNotFoundError } = await import("@/lib/engagement/errors");
 
 function authorizedIntent(overrides: Record<string, unknown> = {}) {
   return {
@@ -38,8 +43,13 @@ function authorizedIntent(overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
   prismaMock.moneyIntent.findMany.mockReset();
   prismaMock.moneyIntent.update.mockReset();
-  prismaMock.moneyIntent.update.mockResolvedValue({});
+  prismaMock.moneyIntent.update.mockImplementation((args: { data?: Record<string, unknown> }) => {
+    if (args?.data && "attemptCount" in args.data) return Promise.resolve({ attemptCount: 1 });
+    return Promise.resolve({});
+  });
   createEngagementMock.mockReset();
+  getEngagementMock.mockReset();
+  getEngagementMock.mockRejectedValue(new EngagementNotFoundError("fleet_mi_1"));
   process.env.FLEET_HALT = "";
 });
 
@@ -88,13 +98,50 @@ describe("fleet executor — authorized intents become real escrowed engagements
     expect(report.retriable_failures[0].error).toBe("invalid_parties");
   });
 
-  it("unsupported intent kinds are skipped (recorded), not executed, simulate not executed forever", async () => {
-    prismaMock.moneyIntent.findMany.mockResolvedValue([
-      authorizedIntent({ intentKind: "fund_compute" }),
-    ]);
-    const report = await executeAuthorizedIntents();
-    expect(report.skipped).toBe(1);
+  it("unsupported intent kinds are never even scanned (no head-of-line blocking)", async () => {
+    // The query filters intentKind:'hire_agent' in the WHERE clause, so the
+    // scan returns nothing for unsupported kinds and they cannot occupy the
+    // batch or starve newer intents.
+    prismaMock.moneyIntent.findMany.mockResolvedValue([]);
+    await executeAuthorizedIntents();
     expect(createEngagementMock).not.toHaveBeenCalled();
+    const where = prismaMock.moneyIntent.findMany.mock.calls[0][0].where;
+    expect(where.intentKind).toBe("hire_agent");
+  });
+
+  it("crash-recovery: an engagement that already exists is adopted as EXECUTED, not re-created", async () => {
+    prismaMock.moneyIntent.findMany.mockResolvedValue([authorizedIntent()]);
+    getEngagementMock.mockResolvedValue({ taskId: "fleet_mi_1", status: "HELD" });
+    const report = await executeAuthorizedIntents();
+    expect(createEngagementMock).not.toHaveBeenCalled();
+    expect(report.executed).toEqual(["mi_1"]);
+    expect(prismaMock.moneyIntent.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: "EXECUTED" }) })
+    );
+  });
+
+  it("retriable failure increments attempts and rotates (not terminal below the cap)", async () => {
+    prismaMock.moneyIntent.findMany.mockResolvedValue([authorizedIntent()]);
+    createEngagementMock.mockRejectedValue(new Error("insufficient balance"));
+    const report = await executeAuthorizedIntents();
+    expect(report.exhausted).toEqual([]);
+    expect(prismaMock.moneyIntent.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ attemptCount: { increment: 1 } }) })
+    );
+  });
+
+  it("past MAX_EXEC_ATTEMPTS the intent is terminally rejected (no infinite loop)", async () => {
+    prismaMock.moneyIntent.findMany.mockResolvedValue([authorizedIntent()]);
+    createEngagementMock.mockRejectedValue(new Error("insufficient balance"));
+    prismaMock.moneyIntent.update.mockImplementation((args: { data?: Record<string, unknown> }) => {
+      if (args?.data && "attemptCount" in args.data) return Promise.resolve({ attemptCount: 10 });
+      return Promise.resolve({});
+    });
+    const report = await executeAuthorizedIntents();
+    expect(report.exhausted).toEqual(["mi_1"]);
+    expect(prismaMock.moneyIntent.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: "REJECTED" }) })
+    );
   });
 
   it("FLEET_HALT blocks every execution (kill switch covers money flows too)", async () => {

@@ -12,8 +12,17 @@ import type { BrainAction } from "@/lib/brain/command-brain";
 
 const REASON_MAX = 500;
 const ID_MAX = 200;
-/** Cap on any single brain-staged money intent (defense-in-depth with the cap inside money-intent.ts). */
-const MAX_MONEY_INTENT_ANGEL = 5000;
+/**
+ * Cap on any single brain-staged money intent. MUST track the enforcement cap
+ * in fleet/money-intent.ts (env FLEET_MONEY_MAX_INTENT_ANGEL, default 5000) so
+ * the brain's schema is never LOOSER than the executor's check. Read lazily so
+ * an env change applies without a rebuild; fall back to the default on NaN.
+ */
+const DEFAULT_MONEY_INTENT_ANGEL = 5000;
+function maxMoneyIntentAngels(): number {
+  const n = Number(process.env.FLEET_MONEY_MAX_INTENT_ANGEL);
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_MONEY_INTENT_ANGEL;
+}
 /** Bounded fleet blast radius per brain cycle (matches fleet-actions MAX_SCALE_PER_CYCLE). */
 const MAX_SCALE_PER_CYCLE = 3;
 
@@ -69,10 +78,19 @@ export const REQUEST_MONEY_INTENT_PARAMS = z
       .string()
       .regex(/^[0-9a-fA-F]{64}$/, "worker_commitment must be 64-hex")
       .optional(),
-    amount_angels: z.number().positive().max(MAX_MONEY_INTENT_ANGEL),
+    amount_angels: z.number().positive(),
     reason: z.string().min(1).max(REASON_MAX),
   })
-  .strict();
+  .strict()
+  .superRefine((val, ctx) => {
+    // Cap is env-driven and must never exceed the executor's own check.
+    if (val.amount_angels > maxMoneyIntentAngels()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `amount_angels exceeds cap ${maxMoneyIntentAngels()}`,
+      });
+    }
+  });
 
 /**
  * Strict param schema per allowlisted action. Unknown keys are rejected.
