@@ -54,6 +54,11 @@ export function moneyMintEnabled(): boolean {
   return String(process.env.FLEET_MINT_MONEY_ENABLED || "false").toLowerCase() === "true";
 }
 
+/** Fleet kill switch — every governor-checked fleet operation refuses while set. */
+export function fleetHalted(): boolean {
+  return String(process.env.FLEET_HALT || "false").toLowerCase() === "true";
+}
+
 export interface MintInstanceInput {
   capability: string;
   llmTier: LlmTier;
@@ -93,6 +98,9 @@ async function countLiveInstances(): Promise<number> {
  * is minted removes the partial rows — no zombie identities.
  */
 export async function mintFleetAgent(input: MintInstanceInput): Promise<MintedInstance> {
+  if (fleetHalted()) {
+    throw new Error("fleet_halted");
+  }
   if (!isLlmTier(input.llmTier)) {
     throw new Error(`unknown_llm_tier:${String(input.llmTier)}`);
   }
