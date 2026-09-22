@@ -13,6 +13,7 @@ import { checkRateLimit, clientIpFromRequest, rateLimitResponse } from "@/lib/ra
 import { authenticateApiKey } from "@/lib/operator";
 import { isSchedulerAuthorized } from "@/lib/scheduler/auth";
 import { runFleetDispatchTick } from "@/lib/fleet/fleet-executor";
+import { runReputationSweepTick } from "@/lib/fleet/reputation-sweep";
 import { fleetHalted } from "@/lib/fleet/fleet-service";
 
 export const dynamic = "force-dynamic";
@@ -43,6 +44,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "fleet_halted", halted: true }, { status: 503, headers: NO_STORE });
   }
 
-  const result = await runFleetDispatchTick();
-  return NextResponse.json({ success: true, ...result }, { status: 200, headers: NO_STORE });
+  const dispatch = await runFleetDispatchTick();
+  const sweep = await runReputationSweepTick().catch(() => ({
+    ran_lease: false,
+    swept: 0,
+    signals_dispatched: [] as Array<{ commitment: string; kind: string; to: string }>,
+  }));
+  return NextResponse.json(
+    { success: true, dispatch, reputation_sweep: sweep },
+    { status: 200, headers: NO_STORE }
+  );
 }

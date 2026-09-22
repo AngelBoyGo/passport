@@ -143,6 +143,8 @@ model AgentInstance {
   llmTier          String
   displayName      String?
   status           String    @default("provisioning") // provisioning|active|idle|stopped|failed
+  reputationTier   String?
+  lastSweepAt      DateTime?
   desiredCostCents Int       @default(0)
   totalEarnedCents Int       @default(0)
   totalSpentCents  Int       @default(0)
