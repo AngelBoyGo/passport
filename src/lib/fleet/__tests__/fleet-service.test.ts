@@ -5,9 +5,9 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-// Env BEFORE dynamic imports: DATABASE_URL must use 127.0.0.1 (Windows ::1 is
-// unreachable) and the fleet switches pinned for the run.
-process.env.DATABASE_URL = "postgresql://passport:passport@127.0.0.1:5433/passport?schema=public";
+// Env BEFORE dynamic imports. DATABASE_URL is only filled when unset (another
+// suite may have already pinned its own target — never stomp a sibling pool).
+process.env.DATABASE_URL ??= "postgresql://passport:passport@127.0.0.1:5433/passport?schema=public";
 delete process.env.FLEET_MINT_MONEY_ENABLED;
 
 const CAP = "t_fleettestlocum";
@@ -107,7 +107,8 @@ describe("fleet-service — mint / stop / rehydrate against a real Passport", ()
     const stopped = await prisma.agentInstance.findUnique({ where: { commitment: minted.commitment } });
     expect(stopped?.status).toBe("stopped");
     expect(stopped?.stopReason).toBe("test_stop");
-    expect(stopped?.capsuleDigest).toBeTruthy();
+    // capsuleDigest is the digest OF THE PAYLOAD the agent signed — never a row id.
+    expect(stopped?.capsuleDigest).toBe(digest);
 
     // RETENTION: the Passport is still ISSUED and capsule exists.
     const enrollment = await prisma.agentEnrollment.findUnique({ where: { subjectCommitment: minted.commitment } });
@@ -155,5 +156,36 @@ describe("fleet-service — mint / stop / rehydrate against a real Passport", ()
       if (previous === undefined) delete process.env.FLEET_MINT_MONEY_ENABLED;
       else process.env.FLEET_MINT_MONEY_ENABLED = previous;
     }
+  });
+
+  it("the money governance switch CANNOT be bypassed via stop-then-rehydrate", async () => {
+    // The audit regression: a neuron agent stops, and an operator tries to
+    // rehydrate it directly into the money tier with the switch OFF — this
+    // must refuse with the same code as a money-tier mint.
+    delete process.env.FLEET_MINT_MONEY_ENABLED;
+    const minted = await fleet.mintFleetAgent({ capability: CAP, llmTier: "neuron" });
+    commitments.push(minted.commitment);
+    await fleet.stopFleetAgent(minted.commitment, { reason: "bypass_attempt" });
+    await expect(fleet.rehydrateFleetAgent(minted.commitment, "money")).rejects.toThrow(
+      /money_tier_mint_disabled/
+    );
+  });
+
+  it("a stuck provisioning instance can be abandoned (stopped) without capping leakage", async () => {
+    // Simulate the crash path: instance row exists in provisioning, never
+    // reached active; stopping must be legal (was: illegal_transition forever).
+    const minted = await fleet.mintFleetAgent({ capability: CAP, llmTier: "neuron" });
+    commitments.push(minted.commitment);
+    await prisma.agentInstance.update({
+      where: { commitment: minted.commitment },
+      data: { status: "provisioning" },
+    });
+    await fleet.stopFleetAgent(minted.commitment, { reason: "abandoned" });
+    const row = await prisma.agentInstance.findUnique({ where: { commitment: minted.commitment } });
+    expect(row?.status).toBe("stopped");
+
+    // It retains its Passport for later rehydration.
+    const re = await fleet.rehydrateFleetAgent(minted.commitment);
+    expect(re.tier).toBe("neuron");
   });
 });

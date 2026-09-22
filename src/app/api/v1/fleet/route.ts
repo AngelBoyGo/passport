@@ -67,10 +67,16 @@ interface FleetStatusPayload {
 async function statusPayload(): Promise<FleetStatusPayload> {
   const { getFleetStatus } = await import("@/lib/fleet/fleet-service");
   const s = await getFleetStatus();
+  // The cap counts provisioning+active+idle (countLive basis) — cap_used MUST
+  // report the same accounting or the dashboard shows phantom headroom.
+  const live = ["provisioning", "active", "idle"].reduce(
+    (a, k) => a + (s.byStatus[k] ?? 0),
+    0
+  );
   return {
     halt: fleetHalted(),
     money_mint: moneyMintEnabled(),
-    cap_used: s.byStatus["active"] ?? 0,
+    cap_used: live,
     cap_max: s.cap,
     by_status: s.byStatus,
     by_tier: s.byTier,
@@ -118,7 +124,11 @@ export async function POST(request: NextRequest) {
       if (!isLlmTier(tierInput)) {
         return NextResponse.json({ error: `unknown_llm_tier:${String(tierInput)}` }, { status: 400, headers: NO_STORE });
       }
-      const count = Math.min(Math.max(Number(body.count ?? 1), 1), MAX_BATCH);
+      const countRaw = Number(body.count ?? 1);
+      if (!Number.isInteger(countRaw) || countRaw < 1) {
+        return NextResponse.json({ error: "invalid_count" }, { status: 400, headers: NO_STORE });
+      }
+      const count = Math.min(countRaw, MAX_BATCH);
       const minted: unknown[] = [];
       const errors: string[] = [];
       for (let i = 0; i < count; i++) {

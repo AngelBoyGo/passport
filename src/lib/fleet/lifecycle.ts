@@ -6,11 +6,11 @@
  * spin-up rehydrates the same identity (see fleet-service.rehydrateFleetAgent).
  *
  * Legal transitions (fail-closed: anything not listed is illegal):
- *   provisioning -> active | failed
+ *   provisioning -> active | failed | stopped   (stop releases a stuck mint)
  *   active       -> idle | stopped | failed
  *   idle         -> active | stopped | failed
  *   stopped      -> provisioning   (rehydration re-enters via provisioning)
- *   failed       -> provisioning   (retry ramps the tier, never drops it)
+ *   failed       -> provisioning | stopped   (retry up, or abandon)
  *
  * The upgrade-only invariant lives in llm/tiers.ts: a re-provision must use a
  * tier whose rank is >= the previous one. lowerTierThan() is the check.
@@ -29,11 +29,11 @@ export const INSTANCE_STATUSES = [
 export type InstanceStatus = (typeof INSTANCE_STATUSES)[number];
 
 export const LEGAL_TRANSITIONS: Record<InstanceStatus, readonly InstanceStatus[]> = {
-  provisioning: ["active", "failed"],
+  provisioning: ["active", "failed", "stopped"],
   active: ["idle", "stopped", "failed"],
   idle: ["active", "stopped", "failed"],
   stopped: ["provisioning"],
-  failed: ["provisioning"],
+  failed: ["provisioning", "stopped"],
 };
 
 export function canTransition(from: InstanceStatus, to: InstanceStatus): boolean {

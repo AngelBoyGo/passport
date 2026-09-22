@@ -35,6 +35,7 @@ import {
   validateInstanceSpec,
   type InstanceStatus,
 } from "./lifecycle";
+import { sha256Hex } from "@/lib/receipt/canonical";
 import { saveResurrectionCapsule, getResurrectionCapsule } from "@/lib/swarm/swarm-service";
 
 const FLEET_DEFAULT_CAP = 25;
@@ -86,12 +87,6 @@ function hexToBytes(hex: string): Uint8Array {
   return out;
 }
 
-async function countLiveInstances(): Promise<number> {
-  return prisma.agentInstance.count({
-    where: { status: { in: ["provisioning", "active", "idle"] } },
-  });
-}
-
 /**
  * Mints one fleet agent with a real Passport (enrollment ISSUED) and a
  * persisted AgentInstance row. Fail-closed: any failure after the enrollment
@@ -113,10 +108,6 @@ export async function mintFleetAgent(input: MintInstanceInput): Promise<MintedIn
   }
 
   const cap = maxFleetAgents();
-  const live = await countLiveInstances();
-  if (live >= cap) {
-    throw new Error(`fleet_cap_reached:${live}/${cap}`);
-  }
 
   // 1. Keypair — the private key is handed to the runtime layer exactly once.
   const privateKeyHex = bytesToHex(ed.utils.randomSecretKey());
@@ -129,69 +120,89 @@ export async function mintFleetAgent(input: MintInstanceInput): Promise<MintedIn
   );
   const passport = await completeEnrollment(challengePassport.subjectCommitment, signatureHex);
 
-  // 3. Operator + bound HOLDER key + Agent row (mirrors external provision).
-  const operator = await prisma.operator.create({
-    data: {
-      stripeCustomerId: `cus_fleet_${bytesToHex(crypto.getRandomValues(new Uint8Array(8)))}`,
-      email: null,
-      tier: "free",
-      credits: 0,
-    },
-  });
-
-  const rawApiKey = `pp_flt_${bytesToHex(crypto.getRandomValues(new Uint8Array(32)))}`;
-  await prisma.apiKey.create({
-    data: {
-      operatorId: operator.id,
-      keyHash: hashApiKey(rawApiKey),
-      name: input.displayName || `fleet-${input.capability}`,
-      role: "HOLDER",
-    },
-  });
-
-  const agentRecord = await prisma.agent.create({
-    data: {
-      operatorId: operator.id,
-      agentId: passport.subjectCommitment,
-      domain: input.capability,
-    },
-  });
-
+  // 3. Operator + bound HOLDER key + Agent + lifecycle row — with the fleet
+  //    cap guard INSIDE a serializable transaction: count-then-create is only
+  //    race-free when the read and the write commit at the serializable level.
   let instance;
+  let createdOperatorId: string | undefined;
   try {
-    instance = await prisma.agentInstance.create({
-      data: {
-        commitment: passport.subjectCommitment,
-        operatorId: operator.id,
-        agentRecordId: agentRecord.id,
-        capability: input.capability.trim(),
-        llmTier: input.llmTier,
-        displayName: input.displayName || null,
-        status: "provisioning",
+    instance = await prisma.$transaction(
+      async (tx) => {
+        const live = await tx.agentInstance.count({
+          where: { status: { in: ["provisioning", "active", "idle"] } },
+        });
+        if (live >= cap) {
+          throw new Error(`fleet_cap_reached:${live}/${cap}`);
+        }
+
+        const operator = await tx.operator.create({
+          data: {
+            stripeCustomerId: `cus_fleet_${bytesToHex(crypto.getRandomValues(new Uint8Array(8)))}`,
+            email: null,
+            tier: "free",
+            credits: 0,
+          },
+        });
+        createdOperatorId = operator.id;
+
+        const rawApiKey = `pp_flt_${bytesToHex(crypto.getRandomValues(new Uint8Array(32)))}`;
+        await tx.apiKey.create({
+          data: {
+            operatorId: operator.id,
+            keyHash: hashApiKey(rawApiKey),
+            name: input.displayName || `fleet-${input.capability}`,
+            role: "HOLDER",
+          },
+        });
+
+        const agentRecord = await tx.agent.create({
+          data: {
+            operatorId: operator.id,
+            agentId: passport.subjectCommitment,
+            domain: input.capability,
+          },
+        });
+
+        const created = await tx.agentInstance.create({
+          data: {
+            commitment: passport.subjectCommitment,
+            operatorId: operator.id,
+            agentRecordId: agentRecord.id,
+            capability: input.capability.trim(),
+            llmTier: input.llmTier,
+            displayName: input.displayName || null,
+            status: "provisioning",
+          },
+        });
+        await tx.agentInstance.update({
+          where: { id: created.id },
+          data: { status: "active" },
+        });
+        return { created, rawApiKey };
       },
-    });
-    await prisma.agentInstance.update({
-      where: { id: instance.id },
-      data: { status: "active" },
-    });
+      { isolationLevel: "Serializable" }
+    );
   } catch (err) {
-    // No zombie identities: failing to create the lifecycle row removes the
-    // partial records minted just above.
-    await prisma.agent.deleteMany({ where: { id: agentRecord.id } });
+    // No zombie identities: any failure after enrollment removes the partial
+    // records — INCLUDING the ISSUED passport (this enrollment's keypair is
+    // discarded; the key never persisted elsewhere).
+    await prisma.agent.deleteMany({ where: { agentId: passport.subjectCommitment } });
     await prisma.agentEnrollment.deleteMany({
       where: { subjectCommitment: challengePassport.subjectCommitment },
     });
-    await prisma.apiKey.deleteMany({ where: { operatorId: operator.id } });
-    await prisma.operator.delete({ where: { id: operator.id } }).catch(() => undefined);
+    if (createdOperatorId) {
+      await prisma.apiKey.deleteMany({ where: { operatorId: createdOperatorId } });
+      await prisma.operator.delete({ where: { id: createdOperatorId } }).catch(() => undefined);
+    }
     throw err;
   }
 
   return {
     commitment: passport.subjectCommitment,
-    instanceId: instance.id,
-    operatorId: operator.id,
+    instanceId: instance.created.id,
+    operatorId: instance.created.operatorId,
     enrollment: { privateKeyHex, publicKeyHex },
-    rawApiKey,
+    rawApiKey: instance.rawApiKey,
     tier: input.llmTier,
     resolvedModel: resolveTierModel(input.llmTier),
   };
@@ -223,14 +234,16 @@ export async function stopFleetAgent(
 
   let capsuleDigest: string | undefined;
   if (opts.capsulePayload && opts.capsuleSignature && opts.capsulePublicKey) {
-    const capsule = await saveResurrectionCapsule({
+    await saveResurrectionCapsule({
       agentCommitment: commitment,
       encryptedPayload: opts.capsulePayload,
       signature: opts.capsuleSignature,
       publicKey: opts.capsulePublicKey,
       ttlHours: opts.ttlHours,
     });
-    capsuleDigest = String(capsule.id);
+    // digest OF THE PAYLOAD (the same value the agent signed), not a row id —
+    // downstream uses capsuleDigest to runtime-verify continuity.
+    capsuleDigest = sha256Hex(opts.capsulePayload);
   }
 
   await prisma.agentInstance.update({
@@ -281,6 +294,12 @@ export async function rehydrateFleetAgent(
     }
     if (!tierNotDowngraded(currentTier, newTier)) {
       throw new Error(`tier_downgrade_rejected:${currentTier}->${newTier}`);
+    }
+    // Money governance closes the stop-then-rehydrate bypass: a tier UPGRADE
+    // into money must satisfy the same switch as minting a money agent.
+    // (Compared against currentTier — finalTier is assigned only after this.)
+    if (newTier !== currentTier && newTier === "money" && !moneyMintEnabled()) {
+      throw new Error("money_tier_mint_disabled");
     }
     finalTier = newTier;
   }

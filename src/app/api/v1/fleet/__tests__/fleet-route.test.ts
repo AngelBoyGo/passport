@@ -185,4 +185,19 @@ describe("fleet route — actions", () => {
     expect(res.status).toBe(400);
     expect(mintMock).not.toHaveBeenCalled();
   });
+
+  it("non-integer / zero / NaN count → 400 invalid_count, no silent empty batch", async () => {
+    for (const count of [0, -3, 2.5, "NaN-ish"]) {
+      const res = await POST(
+        req("https://passport.test/api/v1/fleet", {
+          method: "POST",
+          body: JSON.stringify({ action: "mint", capability: "x", llm_tier: "neuron", count }),
+          headers: { "content-type": "application/json" },
+        })
+      );
+      expect(res.status).toBe(400);
+      expect((await res.json()).error).toBe("invalid_count");
+      expect(mintMock).not.toHaveBeenCalled();
+    }
+  });
 });
