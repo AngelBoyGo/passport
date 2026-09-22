@@ -123,6 +123,42 @@ model Agent {
   @@unique([operatorId, agentId])
 }
 
+/**
+ * Fleet control plane — persisted instance lifecycle for fleet agents.
+ *
+ * One instance per Passport: `commitment` (= Agent.agentId / AgentEnrollment.
+ * subjectCommitment) is unique, and stopping an instance NEVER deletes the
+ * Passport, enrollment, wallet, or evidence — it only releases the runtime
+ * (status -> stopped) so a later spin-up rehydrates the same identity.
+ *
+ * llmTier values are restricted to src/lib/llm/tiers.ts LLM_TIERS
+ * ("neuron" | "money"); the string column is intentional — it is exposed to
+ * raw SQL surfaces and must not depend on an app-only enum.
+ */
+model AgentInstance {
+  id               String    @id @default(cuid())
+  commitment       String    @unique
+  operatorId       String
+  agentRecordId    String
+  capability       String
+  llmTier          String
+  displayName      String?
+  status           String    @default("provisioning") // provisioning|active|idle|stopped|failed
+  desiredCostCents Int       @default(0)
+  totalEarnedCents Int       @default(0)
+  totalSpentCents  Int       @default(0)
+  capsuleDigest    String?
+  rehydratedAt     DateTime?
+  stoppedAt        DateTime?
+  stopReason       String?
+  lastHeartbeatAt  DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([operatorId, status])
+  @@index([capability, status])
+}
+
 model Receipt {
   id               String    @id @default(cuid())
   receiptId        String    @unique @default(cuid())
