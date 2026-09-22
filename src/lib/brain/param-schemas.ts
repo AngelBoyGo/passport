@@ -12,6 +12,10 @@ import type { BrainAction } from "@/lib/brain/command-brain";
 
 const REASON_MAX = 500;
 const ID_MAX = 200;
+/** Cap on any single brain-staged money intent (defense-in-depth with the cap inside money-intent.ts). */
+const MAX_MONEY_INTENT_ANGEL = 5000;
+/** Bounded fleet blast radius per brain cycle (matches fleet-actions MAX_SCALE_PER_CYCLE). */
+const MAX_SCALE_PER_CYCLE = 3;
 
 export const NOOP_PARAMS = z.object({}).strict();
 
@@ -43,6 +47,33 @@ export const RUN_EXTERNAL_RESEARCH_PARAMS = z
   .object({ focus: z.string().min(1).max(200).optional() })
   .strict();
 
+export const SCALE_FLEET_UP_PARAMS = z
+  .object({
+    capability: z.string().min(1).max(ID_MAX),
+    llm_tier: z.enum(["neuron", "money"]),
+    count: z.number().int().min(1).max(MAX_SCALE_PER_CYCLE).optional(),
+  })
+  .strict();
+
+export const RETIRE_AGENT_PARAMS = z
+  .object({
+    commitment: z.string().regex(/^[0-9a-fA-F]{64}$/, "commitment must be 64-hex"),
+    reason: z.string().min(1).max(REASON_MAX).optional(),
+  })
+  .strict();
+
+export const REQUEST_MONEY_INTENT_PARAMS = z
+  .object({
+    intent_kind: z.enum(["hire_agent", "treasury_transfer", "fund_compute"]),
+    worker_commitment: z
+      .string()
+      .regex(/^[0-9a-fA-F]{64}$/, "worker_commitment must be 64-hex")
+      .optional(),
+    amount_angels: z.number().positive().max(MAX_MONEY_INTENT_ANGEL),
+    reason: z.string().min(1).max(REASON_MAX),
+  })
+  .strict();
+
 /**
  * Strict param schema per allowlisted action. Unknown keys are rejected.
  * Every action MUST have an entry — enforced by the Record<BrainAction, ...> type.
@@ -57,6 +88,9 @@ export const ACTION_PARAM_SCHEMAS: Record<BrainAction, z.ZodTypeAny> = {
   INVESTIGATE_DISPUTE: INVESTIGATE_DISPUTE_PARAMS,
   RUN_RESEARCH_SCAN: RUN_RESEARCH_SCAN_PARAMS,
   RUN_EXTERNAL_RESEARCH: RUN_EXTERNAL_RESEARCH_PARAMS,
+  SCALE_FLEET_UP: SCALE_FLEET_UP_PARAMS,
+  RETIRE_AGENT: RETIRE_AGENT_PARAMS,
+  REQUEST_MONEY_INTENT: REQUEST_MONEY_INTENT_PARAMS,
 };
 
 /**

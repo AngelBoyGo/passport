@@ -125,7 +125,6 @@ model Agent {
 
 /**
  * Fleet control plane — persisted instance lifecycle for fleet agents.
- *
  * One instance per Passport: `commitment` (= Agent.agentId / AgentEnrollment.
  * subjectCommitment) is unique, and stopping an instance NEVER deletes the
  * Passport, enrollment, wallet, or evidence — it only releases the runtime
@@ -157,6 +156,38 @@ model AgentInstance {
 
   @@index([operatorId, status])
   @@index([capability, status])
+}
+
+/**
+ * Money movement intents (the money-execution trigger, Phase 3).
+ *
+ * The brain can ONLY create a PENDING intent row — it never moves balances.
+ * Execution requires, in code order, ALL THREE conditions verified at
+ * authorizeMoneyMovement():
+ *   1. the fleet execution switch is armed (FLEET_MONEY_MOVEMENT_ENABLED),
+ *   2. the acting agent's PROVISIONED tier (AgentInstance.llmTier) is 'money'
+ *      — never the model that happened to answer a prompt,
+ *   3. the agent's own Ed25519 signature over the canonical intent matches the
+ *      enrollment-pinned key (a forged or stolen prompt cannot move ANGEL).
+ * intentDigest @unique makes each signed intent single-use and replay-safe.
+ */
+model MoneyIntent {
+  id                  String            @id @default(cuid())
+  intentKind          String
+  requesterCommitment String?
+  workerCommitment    String?
+  amountAngels        Float
+  intentDigest        String            @unique
+  signature           String?
+  status              String            @default("PENDING") // PENDING|AUTHORIZED|REJECTED|EXECUTED
+  rejectionReason     String?
+  cycleRef            String?
+  reason              String?
+  executedAt          DateTime?
+  createdAt           DateTime          @default(now())
+
+  @@index([status])
+  @@index([workerCommitment, status])
 }
 
 model Receipt {

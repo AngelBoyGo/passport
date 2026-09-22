@@ -38,8 +38,12 @@ import { isOutcomeSuccessful } from "@/lib/brain/outcomes";
 import { evaluateRecentOutcomes } from "@/lib/brain/attribution";
 import { createProposalsFromScan, getCanaryPolicy } from "@/lib/brain/proposal-service";
 import { decideFromPolicy } from "@/lib/brain/policy";
+import { getFleetStatus } from "@/lib/fleet/fleet-service";
 
-/** The ONLY actions the brain may take. No money-moving operation is ever in this list. */
+/** The ONLY actions the brain may take. No money-moving operation is ever in this list.
+ * REQUEST_MONEY_INTENT only STAGES a PENDING intent row — execution needs the
+ * fleet money switch + a provisioned money-tier agent + a signed intent
+ * (see fleet/money-intent.ts), so the brain still can NEVER move money itself. */
 export const BRAIN_ACTIONS = [
   "NOOP",
   "RECORD_NOTE",
@@ -50,6 +54,9 @@ export const BRAIN_ACTIONS = [
   "INVESTIGATE_DISPUTE",
   "RUN_RESEARCH_SCAN",
   "RUN_EXTERNAL_RESEARCH",
+  "SCALE_FLEET_UP",
+  "RETIRE_AGENT",
+  "REQUEST_MONEY_INTENT",
 ] as const;
 export type BrainAction = (typeof BRAIN_ACTIONS)[number];
 
@@ -69,6 +76,14 @@ export interface BrainDatapoints {
   rails: { enabled: number; quarantined: number };
   disputes_open: number;
   health_score: number;
+  fleet?: {
+    by_status: Record<string, number>;
+    by_tier: Record<string, number>;
+    cap_used: number;
+    cap_max: number;
+    halt: boolean;
+    money_mint: boolean;
+  };
 }
 
 /** Composite 0..1 health used for trend/learning. Penalties for under-collateralization,
@@ -86,12 +101,24 @@ export function computeHealthScore(
 }
 
 export async function gatherDatapoints(now: Date): Promise<BrainDatapoints> {
-  const [economyRes, integrity, enabled, quarantined, disputesOpen] = await Promise.all([
+  const [economyRes, integrity, enabled, quarantined, disputesOpen, fleet] = await Promise.all([
     buildEconomyHealth(now).catch(() => null),
     runIntegrityCheck().catch(() => ({ ok: false, issues: ["integrity read failed"] })),
     prisma.railSpec.count({ where: { state: "ENABLED" } }).catch(() => 0),
     prisma.railSpec.count({ where: { state: "QUARANTINED" } }).catch(() => 0),
     prisma.computeDispute.count({ where: { status: "OPEN" } }).catch(() => 0),
+    // Fleet visibility degrades gracefully: an outage widens the datapoint gap
+    // (recorded), never breaks the cycle.
+    getFleetStatus()
+      .then((s) => ({
+        by_status: s.byStatus,
+        by_tier: s.byTier,
+        cap_used: ["provisioning", "active", "idle"].reduce((a, k) => a + (s.byStatus[k] ?? 0), 0),
+        cap_max: s.cap,
+        halt: s.halt ?? false,
+        money_mint: s.moneyMintEnabled,
+      }))
+      .catch(() => null),
   ]);
 
   const economy = (economyRes?.health ?? {}) as { reserve_adequate?: boolean };
@@ -101,6 +128,7 @@ export async function gatherDatapoints(now: Date): Promise<BrainDatapoints> {
     integrity: { ok: Boolean(integ.ok), issues: integ.issues ?? [] },
     rails: { enabled, quarantined },
     disputes_open: disputesOpen,
+    ...(fleet ? { fleet } : {}),
     health_score: computeHealthScore(
       { reserve_adequate: Boolean((economy as any).reserve_adequate) },
       { ok: Boolean(integ.ok) },
@@ -172,6 +200,28 @@ async function defaultAct(action: BrainAction, params: Record<string, unknown>):
       const injectionFlagged = scan.items.filter((i) => !i.injection_scan.safe).length;
       return `ok: items=${scan.items.length} injection_flagged=${injectionFlagged} llm_used=${scan.llm_used}`;
     }
+    case "SCALE_FLEET_UP": {
+      const { runScaleFleetUp } = await import("@/lib/brain/fleet-actions");
+      return runScaleFleetUp(params as unknown as Parameters<typeof runScaleFleetUp>[0]);
+    }
+    case "RETIRE_AGENT": {
+      const { runRetireAgent } = await import("@/lib/brain/fleet-actions");
+      return runRetireAgent(params as unknown as Parameters<typeof runRetireAgent>[0]);
+    }
+    case "REQUEST_MONEY_INTENT": {
+      // STAGES ONLY. The intent stays PENDING until a provisioned money-tier
+      // agent authorizes it with its own Ed25519 signature (triple gate).
+      const { stageMoneyIntent } = await import("@/lib/fleet/money-intent");
+      const staged = await stageMoneyIntent({
+        intentKind: String(params.intent_kind ?? ""),
+        workerCommitment: params.worker_commitment ? String(params.worker_commitment) : null,
+        amountAngels: Number(params.amount_angels ?? 0),
+        reason: String(params.reason ?? ""),
+      });
+      return staged.ok
+        ? `ok: staged intent_id=${staged.intentId} digest=${staged.digest.slice(0, 16)} (pending: NOT executed)`
+        : `error: ${staged.reason}`;
+    }
     default:
       return "error: unknown action";
   }
@@ -204,7 +254,12 @@ const SYSTEM_PROMPT =
   "and a playbook of per-action success rates. Decide EXACTLY ONE action for this cycle. " +
   "You may ONLY choose from this allowlist: " +
   BRAIN_ACTIONS.join(", ") +
-  ". You can NEVER move money or change balances. Prefer NOOP unless a datapoint clearly " +
+  ". You can NEVER move money or change balances — REQUEST_MONEY_INTENT merely stages a " +
+  "pending intent row that agents must authorize cryptographically; it executes nothing. " +
+  "Fleet rules: SCALE_FLEET_UP (max 3/cycle) when demand on a capability is unmet and " +
+  "cap_used < cap_max; RETIRE_AGENT when an agent is persistently failing or stranded and " +
+  "demand no longer needs it (identity is retained; it can be rehydrated later). " +
+  "Prefer NOOP unless a datapoint clearly " +
   "warrants action (e.g. integrity issues -> TRIGGER_ATTESTATION; a broken rail -> QUARANTINE_RAIL; " +
   "stale discovery -> RUN_DISCOVERY; no recent self-research -> RUN_RESEARCH_SCAN; " +
   "stale outside-world picture -> RUN_EXTERNAL_RESEARCH). Use the " +

@@ -342,6 +342,7 @@ export async function getFleetStatus() {
     total: Object.values(byStatus).reduce((a, b) => a + b, 0),
     cap: maxFleetAgents(),
     moneyMintEnabled: moneyMintEnabled(),
+    halt: fleetHalted(),
   };
 }
 
