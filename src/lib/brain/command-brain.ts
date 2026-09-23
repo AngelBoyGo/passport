@@ -274,6 +274,9 @@ const SYSTEM_PROMPT =
   "Fleet rules: SCALE_FLEET_UP (max 3/cycle) when demand on a capability is unmet and " +
   "cap_used < cap_max; RETIRE_AGENT when an agent is persistently failing or stranded and " +
   "demand no longer needs it (identity is retained; it can be rehydrated later). " +
+  "RUN_LOCUM_SEARCH (candidate_id) drives the locum staffing capability: it pay-ranks open " +
+  "locum roles, verifies the ranking, and queues outreach for the single highest-paying job. " +
+  "Use it when a physician candidate needs higher-paying locum work. " +
   "Prefer NOOP unless a datapoint clearly " +
   "warrants action (e.g. integrity issues -> TRIGGER_ATTESTATION; a broken rail -> QUARANTINE_RAIL; " +
   "stale discovery -> RUN_DISCOVERY; no recent self-research -> RUN_RESEARCH_SCAN; " +

@@ -62,6 +62,11 @@ describe("callora fleet client", () => {
     expect(result.drift).toBe(true);
     expect(result.agreement.agree).toBe(false);
     expect(result.agreement.rank1_match).toBe(false);
+    // INVARIANT: on drift the brain trusts its OWN order — ranked[0] is the
+    // brain's top ($465), NOT the served top ($360).
+    expect(result.ranked[0].job_id).toBe("high");
+    expect(result.served_order).toEqual(["low", "high"]);
+    expect(result.brain_order).toEqual(["high", "low"]);
   });
 
   it("agreeing orders produce no drift signal", async () => {
@@ -106,6 +111,9 @@ describe("callora fleet client", () => {
     const { searchLocumJobs } = await import("../callora-fleet-client");
     const result = await searchLocumJobs({ candidateId: "c1" });
     expect(result.drift).toBe(true);
+    // The brain could not rate it → dropped from the brain's own order.
+    expect(result.ranked).toEqual([]);
+    expect(result.served_ranked.length).toBe(1);
   });
 
   it("an unknown order_version is a hard failure (contract change detected)", async () => {

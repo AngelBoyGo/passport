@@ -51,6 +51,14 @@
       "type": "locum"
     },
     {
+      "id": "job-bill-rate-only",
+      "title": "Locum EM (bill rate only, no physician rate)",
+      "specialty": "locum_em",
+      "state": "CO",
+      "type": "locum",
+      "bill_rate_per_day": 6000
+    },
+    {
       "id": "job-tie-a",
       "title": "Locum EM Tie A",
       "specialty": "locum_em",
@@ -77,7 +85,8 @@
   "expectedExcluded": [
     { "id": "job-low-expresscare", "reason": "below_floor" },
     { "id": "job-perm-hospitalist", "reason": "not_locum" },
-    { "id": "job-no-rate", "reason": "no_rate" }
+    { "id": "job-no-rate", "reason": "no_rate" },
+    { "id": "job-bill-rate-only", "reason": "no_rate" }
   ],
   "expectedRates": {
     "job-top-rural-em": 465,

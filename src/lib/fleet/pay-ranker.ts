@@ -38,7 +38,15 @@ function isPerDayText(s: unknown): boolean {
   return typeof s === "string" && /day|daily|\/day|per\s*day/i.test(s);
 }
 
-/** Normalize any job's pay to HOURLY USD, or null when no rate exists. */
+/**
+ * Normalize any job's pay to HOURLY USD, or null when no rate exists.
+ *
+ * PARITY + CORRECTNESS NOTE (audit 2026-09-23): `bill_rate_per_day` is
+ * deliberately NOT a rate source. It is what the FACILITY is billed (it
+ * carries the agency margin), not what the physician is paid — ranking the
+ * physician's pay off it overstates earnings. Callora's ranker omits it for
+ * the same reason, and the shared fixture locks the parity.
+ */
 export function hourlyRate(job: Record<string, unknown>): number | null {
   if (!job || typeof job !== "object") return null;
 
@@ -59,9 +67,7 @@ export function hourlyRate(job: Record<string, unknown>): number | null {
       ? job.day_rate
       : compText && isPerDayText(job.comp_display)
         ? compText
-        : typeof job.bill_rate_per_day === "number" && job.bill_rate_per_day > 0
-          ? job.bill_rate_per_day
-          : null;
+        : null;
   if (dailyRaw) return Math.round(dailyRaw / shiftHours);
   if (typeof job.rate_min === "number" && job.rate_type === "day") {
     return Math.round((job.rate_min as number) / shiftHours);

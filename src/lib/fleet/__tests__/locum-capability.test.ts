@@ -79,12 +79,20 @@ describe("locum capability — the A1 loop", () => {
     expect(playMock).toHaveBeenCalledWith({ candidateId: "cand", jobIds: ["top"] });
   });
 
-  it("records a brain NOTE when drift is detected, still plays the brain's plan", async () => {
+  it("records a brain NOTE when drift is detected, and plays the BRAIN's top job", async () => {
+    // The client returns `ranked` in the BRAIN's order (invariant: on drift the
+    // brain trusts its own judgment). So ranked[0] is the brain's pick.
     searchMock.mockResolvedValue({
       ranked: [
+        { job_id: "brain_top", rate_usd_hourly: 465, match_score: 0 },
+        { job_id: "server_top", rate_usd_hourly: 360, match_score: 0 },
+      ],
+      served_ranked: [
         { job_id: "server_top", rate_usd_hourly: 360, match_score: 0 },
         { job_id: "brain_top", rate_usd_hourly: 465, match_score: 0 },
       ],
+      served_order: ["server_top", "brain_top"],
+      brain_order: ["brain_top", "server_top"],
       agreement: { agree: false, rank1_match: false, transpositions: 1 },
       order_version: "pay-v1",
       drift: true,
@@ -95,7 +103,7 @@ describe("locum capability — the A1 loop", () => {
 
     expect(r.drift).toBe(true);
     expect(r.ranked_count).toBe(2);
-    expect(searchMock).toHaveBeenCalled();
+    expect(playMock).toHaveBeenCalledWith({ candidateId: "cand", jobIds: ["brain_top"] });
     expect(prismaMock.brainMemory.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ kind: "NOTE" }) })
     );

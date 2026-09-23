@@ -52,6 +52,15 @@ describe("brain mirror — edge parity", () => {
   it("null rate, never a phantom estimate", () => {
     expect(hourlyRate({ title: "x" })).toBeNull();
   });
+
+  it("bill_rate_per_day is NOT physician pay (parity with Callora)", () => {
+    // Audit 2026-09-23: the brain used to treat the facility BILL rate as the
+    // physician's rate — overstating earnings and diverging from Callora.
+    // It is deliberately not a rate source now.
+    expect(hourlyRate({ bill_rate_per_day: 6000 })).toBeNull();
+    // ...but an explicit physician rate still wins alongside a bill rate.
+    expect(hourlyRate({ bill_rate_per_day: 6000, rate_per_hour: 410 })).toBe(410);
+  });
 });
 
 describe("runtime order-agreement (the drift guard)", () => {

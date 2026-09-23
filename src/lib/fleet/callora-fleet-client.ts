@@ -99,7 +99,12 @@ export interface CalloraRankedJob {
 }
 
 export interface LocumSearchResult {
+  /** The BRAIN's own pay-ordered jobs — the authoritative list callers must use. */
   ranked: CalloraRankedJob[];
+  /** Exactly what Callora served, for observability/drift inspection. */
+  served_ranked: CalloraRankedJob[];
+  served_order: string[];
+  brain_order: string[];
   agreement: { agree: boolean; rank1_match: boolean; transpositions: number };
   order_version: string;
   drift: boolean;
@@ -107,10 +112,13 @@ export interface LocumSearchResult {
 
 /**
  * Fetches Callora's pay-ranked locum jobs for a candidate AND verifies the
- * order with the brain's own ranker over the identical payload. If the two
- * rankers' understanding of the shapes ever diverges (missing entries,
- * different order), it surfaces as agreement.agree=false rather than passing
- * silently.
+ * order with the brain's own ranker over the identical payload.
+ *
+ * The returned `ranked` list is ALWAYS the brain's own order (the documented
+ * invariant: on disagreement the brain trusts its own judgment). Callora's
+ * exact serving is preserved in `served_ranked`/`served_order` for audit. Any
+ * job the brain cannot rate (unknown shape) drops out of the brain list —
+ * never pursued at a phantom price — and shows up as drift.
  */
 export async function searchLocumJobs(input: {
   candidateId: string;
@@ -123,7 +131,8 @@ export async function searchLocumJobs(input: {
     limit: input.limit ?? 25,
   });
 
-  const ranked = (res.ranked as CalloraRankedJob[] | undefined) ?? [];
+  // Garbage-shape guard: a non-array `ranked` must never crash the brain.
+  const served = Array.isArray(res.ranked) ? (res.ranked as CalloraRankedJob[]) : [];
   const servedVersion = String(res.order_version ?? "");
   if (servedVersion && servedVersion !== ORDER_VERSION) {
     throw new Error(`order_version_mismatch:${servedVersion}`);
@@ -131,18 +140,27 @@ export async function searchLocumJobs(input: {
 
   // Re-rank the identical payload with the brain's own implementation.
   const reRank = rankJobsByPay({
-    jobs: ranked as unknown as Array<Record<string, unknown>>,
+    jobs: served as unknown as Array<Record<string, unknown>>,
     payFloor: input.payFloor,
   });
+  const byId = new Map(served.map((r) => [String(r.job_id), r]));
   const brainOrder = reRank.ranked.map((r) => jobIdOf(r.job));
-  const servedOrder = ranked.map((r) => r.job_id);
+  // `ranked` = brain order, enriched with Callora's rows (its own order wins).
+  const ranked = brainOrder
+    .map((id) => byId.get(id))
+    .filter((r): r is CalloraRankedJob => Boolean(r));
+
+  const servedOrder = served.map((r) => String(r.job_id));
   const agreement = assertOrderAgreement(servedOrder, brainOrder, (id) => {
-    const row = ranked.find((r) => r.job_id === id);
+    const row = served.find((r) => String(r.job_id) === id);
     return row?.rate_usd_hourly ?? reRank.ranked.find((r) => jobIdOf(r.job) === id)?.rate ?? null;
   });
 
   return {
     ranked,
+    served_ranked: served,
+    served_order: servedOrder,
+    brain_order: brainOrder,
     agreement: {
       agree: agreement.agree,
       rank1_match: agreement.rank1_match,
