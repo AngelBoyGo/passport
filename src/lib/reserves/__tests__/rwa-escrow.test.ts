@@ -27,6 +27,23 @@ const batch = "BKO-AU-2026-001";
 describe("RWA Commodity Escrow Service", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    // Default: a FRESH live feed (as an operator would supply). The oracle
+    // honesty fix means benchmarks read STALE by design — escrows against a
+    // stale reference are refused; each test below overrides as needed.
+    vi.spyOn(oracle, "getCommoditySpotPrices").mockReturnValue({
+      Au: {
+        symbol: "Au",
+        commodityType: "GOLD",
+        name: "Fine Physical Gold (99.5%+)",
+        unit: "gram",
+        priceUsd: 75,
+        change24hPercent: 0,
+        volatility30dPercent: 4,
+        lastUpdated: new Date().toISOString(),
+        isStale: false,
+        source: "operator_live_feed",
+      },
+    } as never);
     prismaMock.vaultBatch.findUnique.mockReset();
     prismaMock.vaultBatch.update.mockReset();
     prismaMock.agentWallet.findUnique.mockReset();

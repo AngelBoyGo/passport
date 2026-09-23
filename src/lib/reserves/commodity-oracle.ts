@@ -63,6 +63,13 @@ export const COMMODITY_BENCHMARKS: Record<
 export const MAX_FEED_AGE_MS = 2 * 60 * 60 * 1000; // 2 hours max staleness window
 
 /**
+ * The date the benchmark reference table was compiled. Baselines are frozen
+ * references, not live prices — they must read as stale in the oracle output
+ * until a genuinely timestamped override replaces them.
+ */
+export const BENCHMARK_AS_OF = "2026-09-22T00:00:00.000Z";
+
+/**
  * Checks if a price feed timestamp exceeds maximum acceptable staleness.
  */
 export function isFeedStale(timestamp: Date | string, maxAgeMs = MAX_FEED_AGE_MS): boolean {
@@ -88,18 +95,27 @@ export function isPriceWithinBounds(
 
 /**
  * Retrieves current active spot prices across all supported commodities.
- * Merges benchmark baselines with optional environment or dynamic overrides.
+ * Merges benchmark baselines with optional live overrides.
+ *
+ * HONESTY CONTRACT (the 2026-09-22 audit fix): the `lastUpdated` of a
+ * BENCHMARK entry is its declared as-of date — NEVER "now". Previously this
+ * function stamped `now` at call time, which made isStale always false and
+ * downstream consumers (fractional-amm, rwa-escrow, basket-valuation) believed
+ * they were consuming a live feed when there was none. A benchmark is a
+ * frozen reference: it must read as stale until a real override with a real
+ * timestamp replaces it. Fail-safe, not fail-open.
  */
 export function getCommoditySpotPrices(
   overrides?: Record<string, Partial<CommodityPrice>>
 ): Record<string, CommodityPrice> {
-  const now = new Date().toISOString();
   const result: Record<string, CommodityPrice> = {};
 
   for (const [symbol, benchmark] of Object.entries(COMMODITY_BENCHMARKS)) {
     const override = overrides?.[symbol];
     const priceUsd = override?.priceUsd ?? benchmark.priceUsd;
-    const lastUpdated = override?.lastUpdated ?? now;
+    // Benchmarks never masquerade as fresh data: their lastUpdated is the
+    // published benchmark date; only a real override carries a live timestamp.
+    const lastUpdated = override?.lastUpdated ?? BENCHMARK_AS_OF;
     const isStaleFlag = override?.isStale ?? isFeedStale(lastUpdated);
 
     result[symbol] = {
@@ -107,7 +123,7 @@ export function getCommoditySpotPrices(
       ...override,
       priceUsd,
       lastUpdated,
-      isStale: isStaleFlag,
+      isStale: override?.isStale ?? isStaleFlag,
     };
   }
 
