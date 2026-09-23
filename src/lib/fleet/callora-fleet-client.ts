@@ -121,12 +121,14 @@ export interface LocumSearchResult {
  * never pursued at a phantom price — and shows up as drift.
  */
 export async function searchLocumJobs(input: {
-  candidateId: string;
+  candidateId?: string;
+  candidateName?: string;
   payFloor?: number;
   limit?: number;
 }): Promise<LocumSearchResult> {
   const res = await callCallora("/api/fleet/locum-search", {
-    candidate_id: input.candidateId,
+    ...(input.candidateId ? { candidate_id: input.candidateId } : {}),
+    ...(input.candidateName ? { candidate_name: input.candidateName } : {}),
     pay_floor: input.payFloor,
     limit: input.limit ?? 25,
   });

@@ -53,8 +53,8 @@ describe("locum capability — guards", () => {
     expect((await runLocumJobSearchCycle({ candidateId: "c1" })).reason).toBe("capability_disabled");
   });
 
-  it("missing candidate id is refused before any call", async () => {
-    expect((await runLocumJobSearchCycle({ candidateId: "" })).reason).toBe("candidate_id_required");
+  it("missing candidate id AND name is refused before any call", async () => {
+    expect((await runLocumJobSearchCycle({ candidateId: "" })).reason).toBe("candidate_required");
     expect(searchMock).not.toHaveBeenCalled();
   });
 });

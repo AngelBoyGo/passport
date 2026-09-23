@@ -42,31 +42,35 @@ export function locumCapabilityEnabled(): boolean {
  * Bounded: exactly ONE top job is queued per invocation.
  */
 export async function runLocumJobSearchCycle(input: {
-  candidateId: string;
+  candidateId?: string;
+  candidateName?: string;
   payFloor?: number;
 }): Promise<LocumSearchCycleReport> {
   if (fleetHalted()) return { ok: false, reason: "fleet_halted" };
   if (!locumCapabilityEnabled()) return { ok: false, reason: "capability_disabled" };
   if (!calloraClientConfigured()) return { ok: false, reason: "callora_not_configured" };
   const candidateId = String(input.candidateId ?? "").trim();
-  if (!candidateId) return { ok: false, reason: "candidate_id_required" };
+  const candidateName = String(input.candidateName ?? "").trim();
+  if (!candidateId && !candidateName) return { ok: false, reason: "candidate_required" };
 
   let search;
   try {
     search = await searchLocumJobs({
-      candidateId,
+      ...(candidateId ? { candidateId } : {}),
+      ...(candidateName ? { candidateName } : {}),
       payFloor: input.payFloor,
       limit: 10,
     });
   } catch (err) {
     return { ok: false, reason: String(err instanceof Error ? err.message : err).slice(0, 200) };
   }
+  const resolvedId = candidateId || candidateName;
 
   const top = search.ranked[0];
   if (!top) {
     return {
       ok: true,
-      candidate_id: candidateId,
+      candidate_id: resolvedId,
       ranked_count: 0,
       top_job: null,
       drift: search.drift,
@@ -81,7 +85,7 @@ export async function runLocumJobSearchCycle(input: {
         data: {
           kind: "NOTE",
           summary:
-            `locum_rank_drift (candidate=${candidateId}): rank1_match=${search.agreement.rank1_match} ` +
+            `locum_rank_drift (candidate=${resolvedId}): rank1_match=${search.agreement.rank1_match} ` +
             `transpositions=${search.agreement.transpositions}`,
         },
       })
@@ -91,21 +95,21 @@ export async function runLocumJobSearchCycle(input: {
   let played: Record<string, unknown> | null = null;
   try {
     played = await playLocumJobs({
-      candidateId,
+      candidateId: resolvedId,
       jobIds: [String(top.job_id)],
     });
   } catch (err) {
     return {
       ok: false,
       reason: `play_failed:${String(err instanceof Error ? err.message : err).slice(0, 160)}`,
-      candidate_id: candidateId,
+      candidate_id: resolvedId,
       drift: search.drift,
     };
   }
 
   return {
     ok: true,
-    candidate_id: candidateId,
+    candidate_id: resolvedId,
     ranked_count: search.ranked.length,
     top_job: {
       job_id: String(top.job_id),
