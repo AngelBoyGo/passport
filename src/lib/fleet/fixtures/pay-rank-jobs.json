@@ -1,0 +1,89 @@
+{
+  "_comment": "Shared pay-first ranking fixture. Both Callora (lib/medical/rank-jobs-by-pay.js) and the Passport fleet brain (src/lib/fleet/pay-ranker.ts) MUST produce this exact order for this exact input. Edit here + both suites force reconciliation.",
+  "payFloor": 350,
+  "jobs": [
+    {
+      "id": "job-low-expresscare",
+      "title": "Urgent Care Shift",
+      "specialty": "locum_em",
+      "state": "TX",
+      "type": "locum",
+      "rate_max": 200
+    },
+    {
+      "id": "job-top-rural-em",
+      "title": "Rural ER Single Coverage",
+      "specialty": "locum_em",
+      "state": "OK",
+      "type": "locum",
+      "rate_max": 465
+    },
+    {
+      "id": "job-perm-hospitalist",
+      "title": "Permanent Hospitalist",
+      "specialty": "hospitalist",
+      "state": "FL",
+      "type": "permanent",
+      "rate_max": 260
+    },
+    {
+      "id": "job-mid-scraped",
+      "title": "Emergency Medicine Locums",
+      "specialty": "locum_em",
+      "state": "GA",
+      "job_type": "Locums/Travel",
+      "physician_rate_usd": 390
+    },
+    {
+      "id": "job-day-rate",
+      "title": "ER Locums Day Rate",
+      "specialty": "locum_em",
+      "state": "NM",
+      "job_type": "Locums/Travel",
+      "comp_display": "$5,040/day",
+      "shift_hours": 12
+    },
+    {
+      "id": "job-no-rate",
+      "title": "Locum EM - rate on request",
+      "specialty": "locum_em",
+      "state": "AZ",
+      "type": "locum"
+    },
+    {
+      "id": "job-tie-a",
+      "title": "Locum EM Tie A",
+      "specialty": "locum_em",
+      "state": "NV",
+      "type": "locum",
+      "rate_per_hour": 400
+    },
+    {
+      "id": "job-tie-b",
+      "title": "Locum EM Tie B",
+      "specialty": "locum_em",
+      "state": "NV",
+      "type": "locum",
+      "rate_per_hour": 400
+    }
+  ],
+  "expectedRankedIds": [
+    "job-top-rural-em",
+    "job-day-rate",
+    "job-tie-a",
+    "job-tie-b",
+    "job-mid-scraped"
+  ],
+  "expectedExcluded": [
+    { "id": "job-low-expresscare", "reason": "below_floor" },
+    { "id": "job-perm-hospitalist", "reason": "not_locum" },
+    { "id": "job-no-rate", "reason": "no_rate" }
+  ],
+  "expectedRates": {
+    "job-top-rural-em": 465,
+    "job-day-rate": 420,
+    "job-tie-a": 400,
+    "job-tie-b": 400,
+    "job-mid-scraped": 390
+  }
+}
