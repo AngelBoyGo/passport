@@ -64,7 +64,9 @@ export async function runLocumJobSearchCycle(input: {
   } catch (err) {
     return { ok: false, reason: String(err instanceof Error ? err.message : err).slice(0, 200) };
   }
-  const resolvedId = candidateId || candidateName;
+  // Use the RESOLVED id Callora returned (a name resolves to exactly one id);
+  // never pass the raw name downstream to endpoints that key on id.
+  const resolvedId = search.candidate_id || candidateId || candidateName;
 
   const top = search.ranked[0];
   if (!top) {

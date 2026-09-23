@@ -99,6 +99,8 @@ export interface CalloraRankedJob {
 }
 
 export interface LocumSearchResult {
+  /** Resolved candidate id (Callora resolves a name to exactly one id). */
+  candidate_id: string;
   /** The BRAIN's own pay-ordered jobs — the authoritative list callers must use. */
   ranked: CalloraRankedJob[];
   /** Exactly what Callora served, for observability/drift inspection. */
@@ -159,6 +161,7 @@ export async function searchLocumJobs(input: {
   });
 
   return {
+    candidate_id: String(res.candidate_id ?? ""),
     ranked,
     served_ranked: served,
     served_order: servedOrder,
