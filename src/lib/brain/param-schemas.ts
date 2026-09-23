@@ -92,6 +92,13 @@ export const REQUEST_MONEY_INTENT_PARAMS = z
     }
   });
 
+export const RUN_LOCUM_SEARCH_PARAMS = z
+  .object({
+    candidate_id: z.string().min(1).max(ID_MAX),
+    pay_floor: z.number().positive().optional(),
+  })
+  .strict();
+
 /**
  * Strict param schema per allowlisted action. Unknown keys are rejected.
  * Every action MUST have an entry — enforced by the Record<BrainAction, ...> type.
@@ -109,6 +116,7 @@ export const ACTION_PARAM_SCHEMAS: Record<BrainAction, z.ZodTypeAny> = {
   SCALE_FLEET_UP: SCALE_FLEET_UP_PARAMS,
   RETIRE_AGENT: RETIRE_AGENT_PARAMS,
   REQUEST_MONEY_INTENT: REQUEST_MONEY_INTENT_PARAMS,
+  RUN_LOCUM_SEARCH: RUN_LOCUM_SEARCH_PARAMS,
 };
 
 /**

@@ -57,6 +57,7 @@ export const BRAIN_ACTIONS = [
   "SCALE_FLEET_UP",
   "RETIRE_AGENT",
   "REQUEST_MONEY_INTENT",
+  "RUN_LOCUM_SEARCH",
 ] as const;
 export type BrainAction = (typeof BRAIN_ACTIONS)[number];
 
@@ -221,6 +222,20 @@ async function defaultAct(action: BrainAction, params: Record<string, unknown>):
       return staged.ok
         ? `ok: staged intent_id=${staged.intentId} digest=${staged.digest.slice(0, 16)} (pending: NOT executed)`
         : `error: ${staged.reason}`;
+    }
+    case "RUN_LOCUM_SEARCH": {
+      // The fleet's first earner capability (A1): orchestrate Callora's engine.
+      // Guards live in the capability itself (halt, switch, configured).
+      const { runLocumJobSearchCycle } = await import("@/lib/fleet/locum-capability");
+      const r = await runLocumJobSearchCycle({
+        candidateId: String(params.candidate_id ?? ""),
+        payFloor: params.pay_floor != null ? Number(params.pay_floor) : undefined,
+      });
+      if (!r.ok) return `error: ${r.reason}`;
+      return (
+        `ok: ranked=${r.ranked_count ?? 0} top=${r.top_job ? `${r.top_job.job_id}@$${r.top_job.rate_usd_hourly}/hr` : "none"} ` +
+        `played=${r.played ? "yes" : "no"} queued=${r.queued ?? 0} drift=${r.drift ? "DRIFT" : "none"}`
+      );
     }
     default:
       return "error: unknown action";
