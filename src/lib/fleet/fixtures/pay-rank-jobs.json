@@ -73,11 +73,28 @@
       "state": "NV",
       "type": "locum",
       "rate_per_hour": 400
+    },
+    {
+      "id": "job-annual-rate",
+      "title": "Locum EM Annualized",
+      "specialty": "locum_em",
+      "state": "CO",
+      "type": "locum",
+      "comp_display": "$832,000/yr"
+    },
+    {
+      "id": "job-annual-low",
+      "title": "Non-locum annual comp (below floor hourly)",
+      "specialty": "locum_em",
+      "state": "CO",
+      "type": "locum",
+      "comp_display": "~$300,000/yr"
     }
   ],
   "expectedRankedIds": [
     "job-top-rural-em",
     "job-day-rate",
+    "job-annual-rate",
     "job-tie-a",
     "job-tie-b",
     "job-mid-scraped"
@@ -86,11 +103,13 @@
     { "id": "job-low-expresscare", "reason": "below_floor" },
     { "id": "job-perm-hospitalist", "reason": "not_locum" },
     { "id": "job-no-rate", "reason": "no_rate" },
-    { "id": "job-bill-rate-only", "reason": "no_rate" }
+    { "id": "job-bill-rate-only", "reason": "no_rate" },
+    { "id": "job-annual-low", "reason": "below_floor" }
   ],
   "expectedRates": {
     "job-top-rural-em": 465,
     "job-day-rate": 420,
+    "job-annual-rate": 400,
     "job-tie-a": 400,
     "job-tie-b": 400,
     "job-mid-scraped": 390

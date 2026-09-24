@@ -61,6 +61,13 @@ describe("brain mirror — edge parity", () => {
     // ...but an explicit physician rate still wins alongside a bill rate.
     expect(hourlyRate({ bill_rate_per_day: 6000, rate_per_hour: 410 })).toBe(410);
   });
+
+  it("converts annual/monthly/weekly comp to hourly (never treats a salary as hourly)", () => {
+    expect(hourlyRate({ comp_display: "$832,000/yr" })).toBe(400);
+    expect(hourlyRate({ comp_display: "~$300,000/yr" })).toBe(144);
+    expect(hourlyRate({ comp_display: "$16,000/month" })).toBe(92);
+    expect(hourlyRate({ comp_display: "$1,600/week" })).toBe(40);
+  });
 });
 
 describe("runtime order-agreement (the drift guard)", () => {

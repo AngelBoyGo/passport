@@ -34,8 +34,33 @@ export function parseCompString(s: unknown): number | null {
   return Number.isFinite(v) ? v : null;
 }
 
-function isPerDayText(s: unknown): boolean {
-  return typeof s === "string" && /day|daily|\/day|per\s*day/i.test(s);
+/**
+ * Time unit encoded in a free-text comp string.
+ * Returns 'hour' | 'day' | 'week' | 'month' | 'year' | null.
+ * Order matters: largest units first so "per year" isn't read as "per hour".
+ */
+export function unitOf(s: unknown): string | null {
+  if (typeof s !== "string") return null;
+  if (/\b(yearly|annual|annually)\b|\/\s*yr\b|\bper\s*year\b|\bper\s*annum\b/i.test(s)) return "year";
+  if (/\b(monthly)\b|\bper\s*month\b|\/\s*mo\b|\/\s*month\b/i.test(s)) return "month";
+  if (/\b(weekly)\b|\bper\s*week\b|\/\s*wk\b|\/\s*week\b/i.test(s)) return "week";
+  if (/\b(daily)\b|\bper\s*day\b|\/\s*day\b/i.test(s)) return "day";
+  if (/\b(hourly|hrs?|hours?)\b|\bper\s*hour\b|\/\s*hr\b|\/\s*hour\b|\ban hour\b/i.test(s)) return "hour";
+  return null;
+}
+
+const HOURS_PER_YEAR = 2080;
+const HOURS_PER_MONTH = 173;
+const HOURS_PER_WEEK = 40;
+
+function toHourly(amount: number, unit: string | null, shiftHours: number): number {
+  switch (unit) {
+    case "year": return amount / HOURS_PER_YEAR;
+    case "month": return amount / HOURS_PER_MONTH;
+    case "week": return amount / HOURS_PER_WEEK;
+    case "day": return amount / shiftHours;
+    default: return amount; // hour or unspecified
+  }
 }
 
 /**
@@ -55,20 +80,20 @@ export function hourlyRate(job: Record<string, unknown>): number | null {
     .find((v) => Number.isFinite(v) && (v as number) > 0) as number | undefined;
   if (explicit) return explicit;
 
-  const compText = parseCompString(job.comp_display);
-  if (compText && !isPerDayText(job.comp_display)) return compText;
-
+  // 2. Free-text comp_display — honor its time unit (year/month/week/day/hour).
   const shiftHours =
     typeof job.shift_hours === "number" && job.shift_hours > 0
       ? job.shift_hours
       : DEFAULT_SHIFT_HOURS;
-  const dailyRaw =
-    typeof job.day_rate === "number" && job.day_rate > 0
-      ? job.day_rate
-      : compText && isPerDayText(job.comp_display)
-        ? compText
-        : null;
-  if (dailyRaw) return Math.round(dailyRaw / shiftHours);
+  const compText = parseCompString(job.comp_display);
+  if (compText) {
+    return Math.round(toHourly(compText, unitOf(job.comp_display), shiftHours));
+  }
+
+  // 3. Explicit daily figures ÷ shift length.
+  if (typeof job.day_rate === "number" && job.day_rate > 0) {
+    return Math.round(job.day_rate / shiftHours);
+  }
   if (typeof job.rate_min === "number" && job.rate_type === "day") {
     return Math.round((job.rate_min as number) / shiftHours);
   }
