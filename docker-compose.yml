@@ -6,8 +6,6 @@ services:
     ports:
       - "3000:3000"
     env_file: .env.production
-    environment:
-      - DATABASE_URL=postgresql://passport:${POSTGRES_PASSWORD:-passport}@db:5432/passport
     depends_on:
       db:
         condition: service_healthy

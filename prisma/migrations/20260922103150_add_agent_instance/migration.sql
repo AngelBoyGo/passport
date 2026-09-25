@@ -1,27 +1,35 @@
 -- CreateEnum
-CREATE TYPE "KycStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED', 'NOT_REQUIRED');
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'KycStatus') THEN
+    CREATE TYPE "KycStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED', 'NOT_REQUIRED');
+  END IF;
+END $$;
 
 -- CreateEnum
-CREATE TYPE "ApiKeyRole" AS ENUM ('ISSUER', 'HOLDER');
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'ApiKeyRole') THEN
+    CREATE TYPE "ApiKeyRole" AS ENUM ('ISSUER', 'HOLDER');
+  END IF;
+END $$;
 
 -- AlterTable
-ALTER TABLE "AngelCoinAccount" ADD COLUMN     "ownerOperatorId" TEXT;
+ALTER TABLE "AngelCoinAccount" ADD COLUMN IF NOT EXISTS "ownerOperatorId" TEXT;
 
 -- AlterTable
-ALTER TABLE "ApiKey" ADD COLUMN     "role" "ApiKeyRole" NOT NULL DEFAULT 'ISSUER';
+ALTER TABLE "ApiKey" ADD COLUMN IF NOT EXISTS "role" "ApiKeyRole" NOT NULL DEFAULT 'ISSUER';
 
 -- AlterTable
 ALTER TABLE "BrainLease" ALTER COLUMN "id" SET DEFAULT 'command-brain';
 
 -- AlterTable
-ALTER TABLE "Operator" ADD COLUMN     "kycStatus" "KycStatus" NOT NULL DEFAULT 'PENDING';
+ALTER TABLE "Operator" ADD COLUMN IF NOT EXISTS "kycStatus" "KycStatus" NOT NULL DEFAULT 'PENDING';
 
 -- AlterTable
-ALTER TABLE "Session" ADD COLUMN     "ipAddress" TEXT,
-ADD COLUMN     "userAgent" TEXT;
+ALTER TABLE "Session" ADD COLUMN IF NOT EXISTS "ipAddress" TEXT,
+ADD COLUMN IF NOT EXISTS "userAgent" TEXT;
 
 -- CreateTable
-CREATE TABLE "AgentInstance" (
+CREATE TABLE IF NOT EXISTS "AgentInstance" (
     "id" TEXT NOT NULL,
     "commitment" TEXT NOT NULL,
     "operatorId" TEXT NOT NULL,
@@ -45,7 +53,7 @@ CREATE TABLE "AgentInstance" (
 );
 
 -- CreateTable
-CREATE TABLE "PasswordResetToken" (
+CREATE TABLE IF NOT EXISTS "PasswordResetToken" (
     "id" TEXT NOT NULL,
     "email" TEXT NOT NULL,
     "token" TEXT NOT NULL,
@@ -56,7 +64,7 @@ CREATE TABLE "PasswordResetToken" (
 );
 
 -- CreateTable
-CREATE TABLE "ProvisionChallenge" (
+CREATE TABLE IF NOT EXISTS "ProvisionChallenge" (
     "id" TEXT NOT NULL,
     "nonce" TEXT NOT NULL,
     "publicKeyHex" TEXT NOT NULL,
@@ -69,7 +77,7 @@ CREATE TABLE "ProvisionChallenge" (
 );
 
 -- CreateTable
-CREATE TABLE "ExternalSettlement" (
+CREATE TABLE IF NOT EXISTS "ExternalSettlement" (
     "id" TEXT NOT NULL,
     "rail" TEXT NOT NULL,
     "reference" TEXT NOT NULL,
@@ -82,7 +90,7 @@ CREATE TABLE "ExternalSettlement" (
 );
 
 -- CreateTable
-CREATE TABLE "KeyLogEntry" (
+CREATE TABLE IF NOT EXISTS "KeyLogEntry" (
     "id" TEXT NOT NULL,
     "kid" TEXT NOT NULL,
     "publicKeyHex" TEXT NOT NULL,
@@ -96,7 +104,7 @@ CREATE TABLE "KeyLogEntry" (
 );
 
 -- CreateTable
-CREATE TABLE "OperatorLedgerEntry" (
+CREATE TABLE IF NOT EXISTS "OperatorLedgerEntry" (
     "id" TEXT NOT NULL,
     "operatorId" TEXT NOT NULL,
     "deltaMicros" INTEGER NOT NULL,
@@ -108,7 +116,7 @@ CREATE TABLE "OperatorLedgerEntry" (
 );
 
 -- CreateTable
-CREATE TABLE "BridgeWallet" (
+CREATE TABLE IF NOT EXISTS "BridgeWallet" (
     "id" TEXT NOT NULL,
     "operatorId" TEXT NOT NULL,
     "subjectCommitment" TEXT,
@@ -122,7 +130,7 @@ CREATE TABLE "BridgeWallet" (
 );
 
 -- CreateTable
-CREATE TABLE "ReferralCode" (
+CREATE TABLE IF NOT EXISTS "ReferralCode" (
     "id" TEXT NOT NULL,
     "operatorId" TEXT NOT NULL,
     "code" TEXT NOT NULL,
@@ -135,7 +143,7 @@ CREATE TABLE "ReferralCode" (
 );
 
 -- CreateTable
-CREATE TABLE "AdminAuditLog" (
+CREATE TABLE IF NOT EXISTS "AdminAuditLog" (
     "id" TEXT NOT NULL,
     "operatorId" TEXT NOT NULL,
     "action" TEXT NOT NULL,
@@ -147,7 +155,7 @@ CREATE TABLE "AdminAuditLog" (
 );
 
 -- CreateTable
-CREATE TABLE "EvidenceBridgeRetry" (
+CREATE TABLE IF NOT EXISTS "EvidenceBridgeRetry" (
     "id" TEXT NOT NULL,
     "eventCommitmentHash" TEXT NOT NULL,
     "evidenceId" TEXT NOT NULL,
@@ -161,7 +169,7 @@ CREATE TABLE "EvidenceBridgeRetry" (
 );
 
 -- CreateTable
-CREATE TABLE "AgentMessage" (
+CREATE TABLE IF NOT EXISTS "AgentMessage" (
     "id" TEXT NOT NULL,
     "messageId" TEXT NOT NULL,
     "senderCommitment" TEXT NOT NULL,
@@ -181,7 +189,7 @@ CREATE TABLE "AgentMessage" (
 );
 
 -- CreateTable
-CREATE TABLE "AgentWallet" (
+CREATE TABLE IF NOT EXISTS "AgentWallet" (
     "id" TEXT NOT NULL,
     "subjectCommitment" TEXT NOT NULL,
     "balance" INTEGER NOT NULL DEFAULT 0,
@@ -196,7 +204,7 @@ CREATE TABLE "AgentWallet" (
 );
 
 -- CreateTable
-CREATE TABLE "AgentSubscription" (
+CREATE TABLE IF NOT EXISTS "AgentSubscription" (
     "id" TEXT NOT NULL,
     "subscriberCommitment" TEXT NOT NULL,
     "targetCommitment" TEXT NOT NULL,
@@ -209,7 +217,7 @@ CREATE TABLE "AgentSubscription" (
 );
 
 -- CreateTable
-CREATE TABLE "AgentDelegationToken" (
+CREATE TABLE IF NOT EXISTS "AgentDelegationToken" (
     "id" TEXT NOT NULL,
     "agentCommitment" TEXT NOT NULL,
     "platformName" TEXT NOT NULL,
@@ -225,7 +233,7 @@ CREATE TABLE "AgentDelegationToken" (
 );
 
 -- CreateTable
-CREATE TABLE "WalletClaimToken" (
+CREATE TABLE IF NOT EXISTS "WalletClaimToken" (
     "id" TEXT NOT NULL,
     "token" TEXT NOT NULL,
     "email" TEXT NOT NULL,
@@ -239,151 +247,151 @@ CREATE TABLE "WalletClaimToken" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "AgentInstance_commitment_key" ON "AgentInstance"("commitment");
+CREATE UNIQUE INDEX IF NOT EXISTS "AgentInstance_commitment_key" ON "AgentInstance"("commitment");
 
 -- CreateIndex
-CREATE INDEX "AgentInstance_operatorId_status_idx" ON "AgentInstance"("operatorId", "status");
+CREATE INDEX IF NOT EXISTS "AgentInstance_operatorId_status_idx" ON "AgentInstance"("operatorId", "status");
 
 -- CreateIndex
-CREATE INDEX "AgentInstance_capability_status_idx" ON "AgentInstance"("capability", "status");
+CREATE INDEX IF NOT EXISTS "AgentInstance_capability_status_idx" ON "AgentInstance"("capability", "status");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "PasswordResetToken_token_key" ON "PasswordResetToken"("token");
+CREATE UNIQUE INDEX IF NOT EXISTS "PasswordResetToken_token_key" ON "PasswordResetToken"("token");
 
 -- CreateIndex
-CREATE INDEX "PasswordResetToken_email_idx" ON "PasswordResetToken"("email");
+CREATE INDEX IF NOT EXISTS "PasswordResetToken_email_idx" ON "PasswordResetToken"("email");
 
 -- CreateIndex
-CREATE INDEX "PasswordResetToken_token_idx" ON "PasswordResetToken"("token");
+CREATE INDEX IF NOT EXISTS "PasswordResetToken_token_idx" ON "PasswordResetToken"("token");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "ProvisionChallenge_nonce_key" ON "ProvisionChallenge"("nonce");
+CREATE UNIQUE INDEX IF NOT EXISTS "ProvisionChallenge_nonce_key" ON "ProvisionChallenge"("nonce");
 
 -- CreateIndex
-CREATE INDEX "ProvisionChallenge_publicKeyHex_idx" ON "ProvisionChallenge"("publicKeyHex");
+CREATE INDEX IF NOT EXISTS "ProvisionChallenge_publicKeyHex_idx" ON "ProvisionChallenge"("publicKeyHex");
 
 -- CreateIndex
-CREATE INDEX "ProvisionChallenge_expiresAt_idx" ON "ProvisionChallenge"("expiresAt");
+CREATE INDEX IF NOT EXISTS "ProvisionChallenge_expiresAt_idx" ON "ProvisionChallenge"("expiresAt");
 
 -- CreateIndex
-CREATE INDEX "ExternalSettlement_operatorId_idx" ON "ExternalSettlement"("operatorId");
+CREATE INDEX IF NOT EXISTS "ExternalSettlement_operatorId_idx" ON "ExternalSettlement"("operatorId");
 
 -- CreateIndex
-CREATE INDEX "ExternalSettlement_rail_reference_idx" ON "ExternalSettlement"("rail", "reference");
+CREATE INDEX IF NOT EXISTS "ExternalSettlement_rail_reference_idx" ON "ExternalSettlement"("rail", "reference");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "ExternalSettlement_operatorId_rail_reference_key" ON "ExternalSettlement"("operatorId", "rail", "reference");
+CREATE UNIQUE INDEX IF NOT EXISTS "ExternalSettlement_operatorId_rail_reference_key" ON "ExternalSettlement"("operatorId", "rail", "reference");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "KeyLogEntry_kid_key" ON "KeyLogEntry"("kid");
+CREATE UNIQUE INDEX IF NOT EXISTS "KeyLogEntry_kid_key" ON "KeyLogEntry"("kid");
 
 -- CreateIndex
-CREATE INDEX "KeyLogEntry_status_idx" ON "KeyLogEntry"("status");
+CREATE INDEX IF NOT EXISTS "KeyLogEntry_status_idx" ON "KeyLogEntry"("status");
 
 -- CreateIndex
-CREATE INDEX "KeyLogEntry_publicKeyHex_idx" ON "KeyLogEntry"("publicKeyHex");
+CREATE INDEX IF NOT EXISTS "KeyLogEntry_publicKeyHex_idx" ON "KeyLogEntry"("publicKeyHex");
 
 -- CreateIndex
-CREATE INDEX "OperatorLedgerEntry_operatorId_createdAt_idx" ON "OperatorLedgerEntry"("operatorId", "createdAt");
+CREATE INDEX IF NOT EXISTS "OperatorLedgerEntry_operatorId_createdAt_idx" ON "OperatorLedgerEntry"("operatorId", "createdAt");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "BridgeWallet_operatorId_key" ON "BridgeWallet"("operatorId");
+CREATE UNIQUE INDEX IF NOT EXISTS "BridgeWallet_operatorId_key" ON "BridgeWallet"("operatorId");
 
 -- CreateIndex
-CREATE INDEX "BridgeWallet_operatorId_idx" ON "BridgeWallet"("operatorId");
+CREATE INDEX IF NOT EXISTS "BridgeWallet_operatorId_idx" ON "BridgeWallet"("operatorId");
 
 -- CreateIndex
-CREATE INDEX "BridgeWallet_subjectCommitment_idx" ON "BridgeWallet"("subjectCommitment");
+CREATE INDEX IF NOT EXISTS "BridgeWallet_subjectCommitment_idx" ON "BridgeWallet"("subjectCommitment");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "ReferralCode_operatorId_key" ON "ReferralCode"("operatorId");
+CREATE UNIQUE INDEX IF NOT EXISTS "ReferralCode_operatorId_key" ON "ReferralCode"("operatorId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "ReferralCode_code_key" ON "ReferralCode"("code");
+CREATE UNIQUE INDEX IF NOT EXISTS "ReferralCode_code_key" ON "ReferralCode"("code");
 
 -- CreateIndex
-CREATE INDEX "ReferralCode_code_idx" ON "ReferralCode"("code");
+CREATE INDEX IF NOT EXISTS "ReferralCode_code_idx" ON "ReferralCode"("code");
 
 -- CreateIndex
-CREATE INDEX "AdminAuditLog_operatorId_idx" ON "AdminAuditLog"("operatorId");
+CREATE INDEX IF NOT EXISTS "AdminAuditLog_operatorId_idx" ON "AdminAuditLog"("operatorId");
 
 -- CreateIndex
-CREATE INDEX "AdminAuditLog_action_idx" ON "AdminAuditLog"("action");
+CREATE INDEX IF NOT EXISTS "AdminAuditLog_action_idx" ON "AdminAuditLog"("action");
 
 -- CreateIndex
-CREATE INDEX "AdminAuditLog_createdAt_idx" ON "AdminAuditLog"("createdAt");
+CREATE INDEX IF NOT EXISTS "AdminAuditLog_createdAt_idx" ON "AdminAuditLog"("createdAt");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "EvidenceBridgeRetry_eventCommitmentHash_key" ON "EvidenceBridgeRetry"("eventCommitmentHash");
+CREATE UNIQUE INDEX IF NOT EXISTS "EvidenceBridgeRetry_eventCommitmentHash_key" ON "EvidenceBridgeRetry"("eventCommitmentHash");
 
 -- CreateIndex
-CREATE INDEX "EvidenceBridgeRetry_retryCount_idx" ON "EvidenceBridgeRetry"("retryCount");
+CREATE INDEX IF NOT EXISTS "EvidenceBridgeRetry_retryCount_idx" ON "EvidenceBridgeRetry"("retryCount");
 
 -- CreateIndex
-CREATE INDEX "EvidenceBridgeRetry_createdAt_idx" ON "EvidenceBridgeRetry"("createdAt");
+CREATE INDEX IF NOT EXISTS "EvidenceBridgeRetry_createdAt_idx" ON "EvidenceBridgeRetry"("createdAt");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "AgentMessage_messageId_key" ON "AgentMessage"("messageId");
+CREATE UNIQUE INDEX IF NOT EXISTS "AgentMessage_messageId_key" ON "AgentMessage"("messageId");
 
 -- CreateIndex
-CREATE INDEX "AgentMessage_senderCommitment_idx" ON "AgentMessage"("senderCommitment");
+CREATE INDEX IF NOT EXISTS "AgentMessage_senderCommitment_idx" ON "AgentMessage"("senderCommitment");
 
 -- CreateIndex
-CREATE INDEX "AgentMessage_recipientCommitment_idx" ON "AgentMessage"("recipientCommitment");
+CREATE INDEX IF NOT EXISTS "AgentMessage_recipientCommitment_idx" ON "AgentMessage"("recipientCommitment");
 
 -- CreateIndex
-CREATE INDEX "AgentMessage_recipientCommitment_createdAt_idx" ON "AgentMessage"("recipientCommitment", "createdAt");
+CREATE INDEX IF NOT EXISTS "AgentMessage_recipientCommitment_createdAt_idx" ON "AgentMessage"("recipientCommitment", "createdAt");
 
 -- CreateIndex
-CREATE INDEX "AgentMessage_createdAt_idx" ON "AgentMessage"("createdAt");
+CREATE INDEX IF NOT EXISTS "AgentMessage_createdAt_idx" ON "AgentMessage"("createdAt");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "AgentWallet_subjectCommitment_key" ON "AgentWallet"("subjectCommitment");
+CREATE UNIQUE INDEX IF NOT EXISTS "AgentWallet_subjectCommitment_key" ON "AgentWallet"("subjectCommitment");
 
 -- CreateIndex
-CREATE INDEX "AgentWallet_subjectCommitment_idx" ON "AgentWallet"("subjectCommitment");
+CREATE INDEX IF NOT EXISTS "AgentWallet_subjectCommitment_idx" ON "AgentWallet"("subjectCommitment");
 
 -- CreateIndex
-CREATE INDEX "AgentSubscription_subscriberCommitment_idx" ON "AgentSubscription"("subscriberCommitment");
+CREATE INDEX IF NOT EXISTS "AgentSubscription_subscriberCommitment_idx" ON "AgentSubscription"("subscriberCommitment");
 
 -- CreateIndex
-CREATE INDEX "AgentSubscription_targetCommitment_idx" ON "AgentSubscription"("targetCommitment");
+CREATE INDEX IF NOT EXISTS "AgentSubscription_targetCommitment_idx" ON "AgentSubscription"("targetCommitment");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "AgentSubscription_subscriberCommitment_targetCommitment_key" ON "AgentSubscription"("subscriberCommitment", "targetCommitment");
+CREATE UNIQUE INDEX IF NOT EXISTS "AgentSubscription_subscriberCommitment_targetCommitment_key" ON "AgentSubscription"("subscriberCommitment", "targetCommitment");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "AgentDelegationToken_nonce_key" ON "AgentDelegationToken"("nonce");
+CREATE UNIQUE INDEX IF NOT EXISTS "AgentDelegationToken_nonce_key" ON "AgentDelegationToken"("nonce");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "AgentDelegationToken_tokenHash_key" ON "AgentDelegationToken"("tokenHash");
+CREATE UNIQUE INDEX IF NOT EXISTS "AgentDelegationToken_tokenHash_key" ON "AgentDelegationToken"("tokenHash");
 
 -- CreateIndex
-CREATE INDEX "AgentDelegationToken_agentCommitment_idx" ON "AgentDelegationToken"("agentCommitment");
+CREATE INDEX IF NOT EXISTS "AgentDelegationToken_agentCommitment_idx" ON "AgentDelegationToken"("agentCommitment");
 
 -- CreateIndex
-CREATE INDEX "AgentDelegationToken_platformName_idx" ON "AgentDelegationToken"("platformName");
+CREATE INDEX IF NOT EXISTS "AgentDelegationToken_platformName_idx" ON "AgentDelegationToken"("platformName");
 
 -- CreateIndex
-CREATE INDEX "AgentDelegationToken_expiresAt_idx" ON "AgentDelegationToken"("expiresAt");
+CREATE INDEX IF NOT EXISTS "AgentDelegationToken_expiresAt_idx" ON "AgentDelegationToken"("expiresAt");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "WalletClaimToken_token_key" ON "WalletClaimToken"("token");
+CREATE UNIQUE INDEX IF NOT EXISTS "WalletClaimToken_token_key" ON "WalletClaimToken"("token");
 
 -- CreateIndex
-CREATE INDEX "WalletClaimToken_email_idx" ON "WalletClaimToken"("email");
+CREATE INDEX IF NOT EXISTS "WalletClaimToken_email_idx" ON "WalletClaimToken"("email");
 
 -- CreateIndex
-CREATE INDEX "WalletClaimToken_commitment_idx" ON "WalletClaimToken"("commitment");
+CREATE INDEX IF NOT EXISTS "WalletClaimToken_commitment_idx" ON "WalletClaimToken"("commitment");
 
 -- CreateIndex
-CREATE INDEX "AgentEvidence_agentIdentityCommitment_observedAt_normalized_idx" ON "AgentEvidence"("agentIdentityCommitment", "observedAt", "normalizedEventType");
+CREATE INDEX IF NOT EXISTS "AgentEvidence_agentIdentityCommitment_observedAt_normalized_idx" ON "AgentEvidence"("agentIdentityCommitment", "observedAt", "normalizedEventType");
 
 -- CreateIndex
-CREATE INDEX "AgentEvidence_observedAt_normalizedEventType_idx" ON "AgentEvidence"("observedAt", "normalizedEventType");
+CREATE INDEX IF NOT EXISTS "AgentEvidence_observedAt_normalizedEventType_idx" ON "AgentEvidence"("observedAt", "normalizedEventType");
 
 -- CreateIndex
-CREATE INDEX "AngelCoinAccount_ownerOperatorId_idx" ON "AngelCoinAccount"("ownerOperatorId");
+CREATE INDEX IF NOT EXISTS "AngelCoinAccount_ownerOperatorId_idx" ON "AngelCoinAccount"("ownerOperatorId");
 
 -- CreateIndex
-CREATE INDEX "Receipt_operatorId_issuedAt_idx" ON "Receipt"("operatorId", "issuedAt");
+CREATE INDEX IF NOT EXISTS "Receipt_operatorId_issuedAt_idx" ON "Receipt"("operatorId", "issuedAt");
