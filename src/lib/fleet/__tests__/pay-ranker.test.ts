@@ -5,6 +5,7 @@ import {
   isLocumJob,
   ORDER_VERSION,
   rankJobsByPay,
+  specialtiesMatch,
 } from "../pay-ranker";
 import fixture from "../fixtures/pay-rank-jobs.json";
 
@@ -47,6 +48,32 @@ describe("brain mirror — edge parity", () => {
     expect(isLocumJob({ job_type: "Locums/Travel" })).toBe(true);
     expect(isLocumJob({ type: "permanent" })).toBe(false);
     expect(isLocumJob({})).toBe(true);
+  });
+
+  it("hard specialty gate: EM candidate is never served Radiology, however well it pays", () => {
+    const emJob = { id: "em", type: "locum", specialty: "Emergency Medicine", rate_per_hour: 400 };
+    const radJob = { id: "rad", type: "locum", specialty: "Radiology", rate_per_hour: 520 };
+    const gate = (j: Record<string, unknown>) => specialtiesMatch("Emergency Medicine", j.specialty);
+    const result = rankJobsByPay({
+      jobs: [radJob, emJob],
+      payFloor: 350,
+      specialtyMatch: gate,
+    });
+    expect(result.ranked.map((r) => r.job.id)).toEqual(["em"]);
+    expect(result.excluded.map((e) => ({ id: e.job.id, reason: e.reason }))).toContainEqual({
+      id: "rad",
+      reason: "wrong_specialty",
+    });
+  });
+
+  it("specialty matching is tolerant: aliases and partial overlaps, unknown never gates", () => {
+    expect(specialtiesMatch("Emergency Medicine", "emergency-medicine")).toBe(true);
+    expect(specialtiesMatch("em", "Emergency Medicine")).toBe(true);
+    expect(specialtiesMatch("ER Med", "Emergency Medicine")).toBe(true);
+    expect(specialtiesMatch(null, "Radiology")).toBe(true);
+    expect(specialtiesMatch("Emergency Medicine", undefined)).toBe(true);
+    expect(specialtiesMatch("Emergency Medicine", "Radiology")).toBe(false);
+    expect(specialtiesMatch("Family Medicine", "Internal Medicine")).toBe(false);
   });
 
   it("null rate, never a phantom estimate", () => {

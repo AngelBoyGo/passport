@@ -38,6 +38,16 @@ export function locumCapabilityEnabled(): boolean {
 }
 
 /**
+ * The pilot candidate's specialty for the hard gate. The brain re-ranks the
+ * served payload independently; without a specialty filter it once queued
+ * $520/hr RADIOLOGY outreach for an EM physician. Unknown -> no gate (matches
+ * Callora: never silently drop a job we cannot read).
+ */
+function pilotSpecialty(): string | null {
+  return (process.env.PILOT_CANDIDATE_SPECIALTY || "").trim() || null;
+}
+
+/**
  * One capability cycle: search -> verify order -> play the top job.
  * Bounded: exactly ONE top job is queued per invocation.
  */
@@ -60,6 +70,7 @@ export async function runLocumJobSearchCycle(input: {
       ...(candidateName ? { candidateName } : {}),
       payFloor: input.payFloor,
       limit: 10,
+      specialty: pilotSpecialty(),
     });
   } catch (err) {
     return { ok: false, reason: String(err instanceof Error ? err.message : err).slice(0, 200) };

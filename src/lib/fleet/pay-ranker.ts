@@ -137,6 +137,37 @@ export function isLocumJob(job: Record<string, unknown>): boolean {
   return true; // absent = locum (matches employer create default)
 }
 
+/**
+ * Specialty aliases for the hard gate (mirror of Callora's match-score.js).
+ */
+const SPEC_ALIAS: Record<string, string> = {
+  em: "emergency medicine",
+  er: "emergency medicine",
+  "er med": "emergency medicine",
+  "em med": "emergency medicine",
+  emergency: "emergency medicine",
+};
+
+/** Normalized hard specialty compatibility (mirror of Callora's specialtiesMatch). */
+export function specialtiesMatch(
+  candidateSpecialty: unknown,
+  jobSpecialty: unknown
+): boolean {
+  const norm = (s: unknown) =>
+    String(s ?? "")
+      .toLowerCase()
+      .replace(/[^a-z]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  let cs = norm(candidateSpecialty);
+  let js = norm(jobSpecialty);
+  if (!cs || !js) return true; // unknown on either side — do not gate
+  cs = SPEC_ALIAS[cs] || cs;
+  js = SPEC_ALIAS[js] || js;
+  if (cs === js) return true;
+  return cs.includes(js) || js.includes(cs);
+}
+
 export interface RankedJob {
   job: Record<string, unknown>;
   rate: number;
@@ -153,6 +184,8 @@ export function rankJobsByPay(input: {
   jobs: Array<Record<string, unknown>>;
   payFloor?: number;
   matchScore?: (job: Record<string, unknown>) => number;
+  /** Hard gate: jobs failing it are excluded (reason "wrong_specialty"). */
+  specialtyMatch?: (job: Record<string, unknown>) => boolean;
 }): RankResult {
   const floorIn = Number(input.payFloor);
   const floor = Number.isFinite(floorIn) && floorIn > 0 ? floorIn : DEFAULT_PAY_FLOOR;
@@ -162,6 +195,10 @@ export function rankJobsByPay(input: {
   for (const job of input.jobs ?? []) {
     if (!isLocumJob(job)) {
       excluded.push({ job, reason: "not_locum" });
+      continue;
+    }
+    if (typeof input.specialtyMatch === "function" && !input.specialtyMatch(job)) {
+      excluded.push({ job, reason: "wrong_specialty" });
       continue;
     }
     const rate = hourlyRate(job);

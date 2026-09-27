@@ -25,6 +25,7 @@ import {
   jobIdOf,
   ORDER_VERSION,
   rankJobsByPay,
+  specialtiesMatch,
 } from "./pay-ranker";
 
 /** Read lazily: vitest/deploys may set env after module load. */
@@ -127,6 +128,8 @@ export async function searchLocumJobs(input: {
   candidateName?: string;
   payFloor?: number;
   limit?: number;
+  /** Candidate's specialty for the brain's mirrored hard gate. */
+  specialty?: string | null;
 }): Promise<LocumSearchResult> {
   const res = await callCallora("/api/fleet/locum-search", {
     ...(input.candidateId ? { candidate_id: input.candidateId } : {}),
@@ -142,10 +145,15 @@ export async function searchLocumJobs(input: {
     throw new Error(`order_version_mismatch:${servedVersion}`);
   }
 
-  // Re-rank the identical payload with the brain's own implementation.
+  // Re-rank the identical payload with the brain's own implementation,
+  // including the SAME hard specialty gate Callora applies (pay-first within
+  // the candidate's specialty only).
   const reRank = rankJobsByPay({
     jobs: served as unknown as Array<Record<string, unknown>>,
     payFloor: input.payFloor,
+    specialtyMatch: input.specialty
+      ? (job) => specialtiesMatch(input.specialty, job.specialty)
+      : undefined,
   });
   const byId = new Map(served.map((r) => [String(r.job_id), r]));
   const brainOrder = reRank.ranked.map((r) => jobIdOf(r.job));
