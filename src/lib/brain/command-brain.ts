@@ -85,6 +85,12 @@ export interface BrainDatapoints {
     halt: boolean;
     money_mint: boolean;
   };
+  locum_candidate?: {
+    name: string | null;
+    candidate_id: string | null;
+  };
+  /** Hours since the last RUN_LOCUM_SEARCH outcome (null = never run). */
+  locum_last_run_hours?: number | null;
 }
 
 /** Composite 0..1 health used for trend/learning. Penalties for under-collateralization,
@@ -124,12 +130,33 @@ export async function gatherDatapoints(now: Date): Promise<BrainDatapoints> {
 
   const economy = (economyRes?.health ?? {}) as { reserve_adequate?: boolean };
   const integ = integrity as { ok: boolean; issues: string[] };
+
+  const pilotName = (process.env.PILOT_CANDIDATE_NAME || '').trim();
+  const pilotId = (process.env.PILOT_CANDIDATE_ID || '').trim();
+  const locumCandidate = pilotName || pilotId ? { name: pilotName || null, candidate_id: pilotId || null } : undefined;
+
+  // Cadence signal: how long since the brain last ran the locum capability.
+  // Drives a periodic re-run (the market changes; a one-shot baseline is not
+  // an autonomous earner). Null = never run.
+  const lastLocum = await prisma.brainMemory
+    .findFirst({
+      where: { action: "RUN_LOCUM_SEARCH" },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true },
+    })
+    .catch(() => null);
+  const locumLastRunHours = lastLocum
+    ? Math.round(((now.getTime() - lastLocum.createdAt.getTime()) / 3_600_000) * 10) / 10
+    : null;
+
   return {
     economy: economyRes?.health ? { ...economyRes.health } : {},
     integrity: { ok: Boolean(integ.ok), issues: integ.issues ?? [] },
     rails: { enabled, quarantined },
     disputes_open: disputesOpen,
     ...(fleet ? { fleet } : {}),
+    ...(locumCandidate ? { locum_candidate: locumCandidate } : {}),
+    ...(locumLastRunHours != null ? { locum_last_run_hours: locumLastRunHours } : {}),
     health_score: computeHealthScore(
       { reserve_adequate: Boolean((economy as any).reserve_adequate) },
       { ok: Boolean(integ.ok) },
@@ -276,7 +303,9 @@ const SYSTEM_PROMPT =
   "demand no longer needs it (identity is retained; it can be rehydrated later). " +
   "RUN_LOCUM_SEARCH (candidate_id) drives the locum staffing capability: it pay-ranks open " +
   "locum roles, verifies the ranking, and queues outreach for the single highest-paying job. " +
-  "Use it when a physician candidate needs higher-paying locum work. " +
+  "If locum_candidate is present in the datapoints, run it when locum_last_run_hours is " +
+  "absent (never run) or >= 6 — the candidate has jobs at $350+/hr and the market moves. " +
+  "The candidate info (name + id) is in locum_candidate. " +
   "Prefer NOOP unless a datapoint clearly " +
   "warrants action (e.g. integrity issues -> TRIGGER_ATTESTATION; a broken rail -> QUARANTINE_RAIL; " +
   "stale discovery -> RUN_DISCOVERY; no recent self-research -> RUN_RESEARCH_SCAN; " +

@@ -53,6 +53,17 @@ describe("brain mirror — edge parity", () => {
     expect(hourlyRate({ title: "x" })).toBeNull();
   });
 
+  it("rejects implausible hourly rates (phantom annual / corrupt stored value)", () => {
+    // A stored hourly above the ceiling is a mis-parsed annual/day total, not
+    // real pay — it must drop out (no_rate) rather than top the order.
+    expect(hourlyRate({ physician_rate_usd: 350000 })).toBeNull();
+    expect(hourlyRate({ rate_per_hour: 300000 })).toBeNull();
+    expect(hourlyRate({ rate_max: 250000 })).toBeNull();
+    expect(hourlyRate({ comp_display: "$350,000/hr" })).toBeNull();
+    // A genuine (if high) hourly rate still ranks.
+    expect(hourlyRate({ physician_rate_usd: 1500 })).toBe(1500);
+  });
+
   it("bill_rate_per_day is NOT physician pay (parity with Callora)", () => {
     // Audit 2026-09-23: the brain used to treat the facility BILL rate as the
     // physician's rate — overstating earnings and diverging from Callora.

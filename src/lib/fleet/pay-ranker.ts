@@ -53,6 +53,20 @@ const HOURS_PER_YEAR = 2080;
 const HOURS_PER_MONTH = 173;
 const HOURS_PER_WEEK = 40;
 
+/**
+ * Upper plausibility ceiling for a physician hourly rate. A derived rate above
+ * this is a mis-parsed annual/day total or a corrupt stored value — never a
+ * real locum hourly — so it is treated as unratable (null) rather than ranked.
+ * Defense-in-depth: the scraper already caps ingestion, but legacy rows and
+ * mirror drift must not let a phantom price reach the top of the order.
+ */
+export const MAX_PLAUSIBLE_HOURLY = 2000;
+
+/** Pass through a rate only when it is a plausible hourly figure. */
+function plausible(rate: number): number | null {
+  return Number.isFinite(rate) && rate > 0 && rate <= MAX_PLAUSIBLE_HOURLY ? rate : null;
+}
+
 function toHourly(amount: number, unit: string | null, shiftHours: number): number {
   switch (unit) {
     case "year": return amount / HOURS_PER_YEAR;
@@ -78,7 +92,7 @@ export function hourlyRate(job: Record<string, unknown>): number | null {
   const explicit = [job.rate_per_hour, job.rate_max, job.physician_rate_usd]
     .map((v) => (typeof v === "number" ? v : parseCompString(v)))
     .find((v) => Number.isFinite(v) && (v as number) > 0) as number | undefined;
-  if (explicit) return explicit;
+  if (explicit) return plausible(explicit);
 
   // 2. Free-text comp_display — honor its time unit (year/month/week/day/hour).
   const shiftHours =
@@ -87,15 +101,15 @@ export function hourlyRate(job: Record<string, unknown>): number | null {
       : DEFAULT_SHIFT_HOURS;
   const compText = parseCompString(job.comp_display);
   if (compText) {
-    return Math.round(toHourly(compText, unitOf(job.comp_display), shiftHours));
+    return plausible(Math.round(toHourly(compText, unitOf(job.comp_display), shiftHours)));
   }
 
   // 3. Explicit daily figures ÷ shift length.
   if (typeof job.day_rate === "number" && job.day_rate > 0) {
-    return Math.round(job.day_rate / shiftHours);
+    return plausible(Math.round(job.day_rate / shiftHours));
   }
   if (typeof job.rate_min === "number" && job.rate_type === "day") {
-    return Math.round((job.rate_min as number) / shiftHours);
+    return plausible(Math.round((job.rate_min as number) / shiftHours));
   }
 
   return null;

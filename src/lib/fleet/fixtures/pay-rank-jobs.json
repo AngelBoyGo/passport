@@ -89,6 +89,14 @@
       "state": "CO",
       "type": "locum",
       "comp_display": "~$300,000/yr"
+    },
+    {
+      "id": "job-phantom-rate",
+      "title": "Locum EM - corrupt stored hourly (annual mislabeled)",
+      "specialty": "locum_em",
+      "state": "CO",
+      "type": "locum",
+      "physician_rate_usd": 350000
     }
   ],
   "expectedRankedIds": [
@@ -104,7 +112,8 @@
     { "id": "job-perm-hospitalist", "reason": "not_locum" },
     { "id": "job-no-rate", "reason": "no_rate" },
     { "id": "job-bill-rate-only", "reason": "no_rate" },
-    { "id": "job-annual-low", "reason": "below_floor" }
+    { "id": "job-annual-low", "reason": "below_floor" },
+    { "id": "job-phantom-rate", "reason": "no_rate" }
   ],
   "expectedRates": {
     "job-top-rural-em": 465,
