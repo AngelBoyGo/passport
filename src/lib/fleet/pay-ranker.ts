@@ -62,9 +62,15 @@ const HOURS_PER_WEEK = 40;
  */
 export const MAX_PLAUSIBLE_HOURLY = 2000;
 
+/** Effective ceiling: RATE_MAX_PLAUSIBLE_HOURLY override, else the default. */
+function effectiveMaxHourly(): number {
+  const n = Number(process.env.RATE_MAX_PLAUSIBLE_HOURLY);
+  return Number.isFinite(n) && n > 0 ? n : MAX_PLAUSIBLE_HOURLY;
+}
+
 /** Pass through a rate only when it is a plausible hourly figure. */
 function plausible(rate: number): number | null {
-  return Number.isFinite(rate) && rate > 0 && rate <= MAX_PLAUSIBLE_HOURLY ? rate : null;
+  return Number.isFinite(rate) && rate > 0 && rate <= effectiveMaxHourly() ? rate : null;
 }
 
 function toHourly(amount: number, unit: string | null, shiftHours: number): number {
