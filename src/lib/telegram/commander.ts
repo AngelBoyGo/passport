@@ -77,6 +77,7 @@ export function parseCommand(text: string | undefined): ParsedCommand | null {
 export const COMMANDER_HELP = [
   "*Passport Commander* — commands",
   "`/status` — brain health, fleet counts, halt state",
+  "`/watch` — check every earning system (Callora, Medora, Marketplace, Passport)",
   "`/fleet` — roster summary (active/stopped, earned)",
   "`/brain` — run one autonomous Command Brain cycle now",
   "`/brain <ACTION>` — force a specific action (e.g. `/brain RUN_LOCUM_SEARCH`)",

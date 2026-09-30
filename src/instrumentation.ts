@@ -11,5 +11,7 @@ export async function register() {
     startBrainScheduler();
     const { startRevenueRunner } = await import("@/lib/scheduler/revenue-runner");
     startRevenueRunner();
+    const { startFleetWatchScheduler } = await import("@/lib/scheduler/fleet-watch-scheduler");
+    startFleetWatchScheduler();
   }
 }

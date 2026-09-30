@@ -79,6 +79,24 @@ async function handleCommand(command: string, args: string[], from: string): Pro
     case "actions":
       return "*Forceable actions:*\n" + BRAIN_ACTIONS.map((a) => `\`${a}\``).join(", ");
 
+    case "watch": {
+      const { watchAll, renderFleetWatch } = await import("@/lib/commander/watch");
+      const snap = await watchAll();
+      // Optional: record the snapshot as telemetry so the brain sees subsystem
+      // health history, not just the last Telegram poke.
+      await prisma.brainMemory
+        .create({
+          data: {
+            kind: "OBSERVATION",
+            summary: `fleet-watch overall=${snap.overall}`,
+            data: snap as unknown as object,
+            createdAt: new Date(),
+          },
+        })
+        .catch(() => null);
+      return renderFleetWatch(snap);
+    }
+
     case "status": {
       const [fleet, lastCycle] = await Promise.all([
         getFleetStatus(),
