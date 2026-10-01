@@ -60,7 +60,7 @@ describe("agent-wallet transfer spend policy", () => {
     mocks.walletUpdate.mockResolvedValue({});
     mocks.walletUpsert.mockResolvedValue({});
     mocks.transaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
-      fn({ agentWallet: { update: vi.fn(), upsert: vi.fn() } })
+      fn({ agentWallet: { update: vi.fn(), upsert: vi.fn() }, $executeRaw: vi.fn().mockResolvedValue(1) })
     );
   });
 
