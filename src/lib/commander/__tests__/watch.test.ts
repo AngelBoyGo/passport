@@ -55,6 +55,18 @@ describe("probeMarketplace", () => {
     expect(r.status).toBe("up");
     expect((r.detail as { queues?: unknown }).queues).toBeTruthy();
   });
+
+  it("falls back to /api/livez (Metis has no /api/health)", async () => {
+    process.env.MARKETPLACE_BASE_URL = "https://market.test";
+    // Only livez is healthy; /api/health would 404 as it does on Metis.
+    global.fetch = vi.fn(async (url: string) => {
+      if (url.includes("/api/livez")) return { ok: true, status: 200, json: async () => ({ status: "ok" }) } as Response;
+      return { ok: false, status: 404, json: async () => ({}) } as Response;
+    }) as unknown as typeof fetch;
+    const r = await probeMarketplace();
+    expect(r.status).toBe("up");
+    expect((r.detail as { health?: { path?: string } }).health?.path).toBe("/api/livez");
+  });
 });
 
 describe("watchAll + renderFleetWatch", () => {

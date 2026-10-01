@@ -97,6 +97,11 @@ async function handleCommand(command: string, args: string[], from: string): Pro
       return renderFleetWatch(snap);
     }
 
+    case "market": {
+      const { renderMarketplace } = await import("@/lib/commander/watch");
+      return await renderMarketplace();
+    }
+
     case "status": {
       const [fleet, lastCycle] = await Promise.all([
         getFleetStatus(),

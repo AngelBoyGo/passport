@@ -78,6 +78,7 @@ export const COMMANDER_HELP = [
   "*Passport Commander* — commands",
   "`/status` — brain health, fleet counts, halt state",
   "`/watch` — check every earning system (Callora, Medora, Marketplace, Passport)",
+  "`/market` — the Marketplace (Metis) job/fleet/escrow digest",
   "`/fleet` — roster summary (active/stopped, earned)",
   "`/brain` — run one autonomous Command Brain cycle now",
   "`/brain <ACTION>` — force a specific action (e.g. `/brain RUN_LOCUM_SEARCH`)",

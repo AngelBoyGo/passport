@@ -91,6 +91,13 @@ export interface BrainDatapoints {
   };
   /** Hours since the last RUN_LOCUM_SEARCH outcome (null = never run). */
   locum_last_run_hours?: number | null;
+  /** Marketplace (Metis) earning line — separate repo, probed over HTTP. */
+  marketplace?: {
+    status: string;
+    agent_routes?: number;
+    human_routes?: number;
+    hybrid_routes?: number;
+  };
 }
 
 /** Composite 0..1 health used for trend/learning. Penalties for under-collateralization,
@@ -108,7 +115,7 @@ export function computeHealthScore(
 }
 
 export async function gatherDatapoints(now: Date): Promise<BrainDatapoints> {
-  const [economyRes, integrity, enabled, quarantined, disputesOpen, fleet] = await Promise.all([
+  const [economyRes, integrity, enabled, quarantined, disputesOpen, fleet, marketplace] = await Promise.all([
     buildEconomyHealth(now).catch(() => null),
     runIntegrityCheck().catch(() => ({ ok: false, issues: ["integrity read failed"] })),
     prisma.railSpec.count({ where: { state: "ENABLED" } }).catch(() => 0),
@@ -124,6 +131,19 @@ export async function gatherDatapoints(now: Date): Promise<BrainDatapoints> {
         cap_max: s.cap,
         halt: s.halt ?? false,
         money_mint: s.moneyMintEnabled,
+      }))
+      .catch(() => null),
+    // Marketplace (Metis) — a separate repo/earning line. Best-effort: an
+    // outage yields null and simply omits the datapoint.
+    import("@/lib/commander/watch")
+      .then(({ probeMarketplace }) => probeMarketplace().then((m) => {
+        const q = (m.detail as { queues?: { counts?: Record<string, number> } }).queues;
+        return {
+          status: m.status,
+          agent_routes: q?.counts?.["agent-only"],
+          hybrid_routes: q?.counts?.hybrid,
+          human_routes: q?.counts?.["human-only"],
+        };
       }))
       .catch(() => null),
   ]);
@@ -155,6 +175,7 @@ export async function gatherDatapoints(now: Date): Promise<BrainDatapoints> {
     rails: { enabled, quarantined },
     disputes_open: disputesOpen,
     ...(fleet ? { fleet } : {}),
+    ...(marketplace ? { marketplace } : {}),
     ...(locumCandidate ? { locum_candidate: locumCandidate } : {}),
     ...(locumLastRunHours != null ? { locum_last_run_hours: locumLastRunHours } : {}),
     health_score: computeHealthScore(
