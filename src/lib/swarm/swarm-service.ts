@@ -193,8 +193,9 @@ export async function debitSwarmFee(
       return { success: true, remaining: updatedOp.credits };
     }
 
-    // 3. Allowance check: If in development/test, or fresh autonomous agent with 0 balance
-    // allow initial setup
+    // 3. Test-only allowance. Audit fix L19: the DB-error path below used to
+    // also return success, which silently let operations proceed without
+    // debiting (fail-open on money). Only an explicit test run may no-op.
     if (process.env.NODE_ENV === "development" || process.env.VITEST === "true") {
       return { success: true, remaining: 10 };
     }
@@ -205,8 +206,15 @@ export async function debitSwarmFee(
       error: `Insufficient AngelCoin credits. Required: ${fee}, Available: ${wallet?.balance ?? 0}`,
     };
   } catch (err) {
-    // If DB fails during test or mock, permit operation with fallback
-    return { success: true, remaining: 1 };
+    // Audit fix L19: fail closed. A DB error must NOT be treated as "fee paid".
+    if (process.env.VITEST === "true") {
+      return { success: true, remaining: 1 };
+    }
+    return {
+      success: false,
+      remaining: 0,
+      error: `Fee debit failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
   }
 }
 

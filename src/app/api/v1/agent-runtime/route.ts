@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
         status: "active" as const,
         earnedTotal: wallet?.earnedTotal ?? 0,
         spentTotal: wallet?.spentTotal ?? 0,
-        uptimeHours: Math.floor(wallet?.earnedTotal ?? 0 / 10), // Rough estimate
+        uptimeHours: Math.floor((wallet?.earnedTotal ?? 0) / 10), // Rough estimate
       };
     })
   );

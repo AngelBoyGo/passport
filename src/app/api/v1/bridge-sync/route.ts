@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { authenticateApiKey } from "@/lib/operator";
 import { checkInMemoryRateLimit, clientIpFromRequest } from "@/lib/rateLimit";
+import { computeBalances } from "@/lib/angelcoin/balances";
 import { AngelCoinEntryType, AngelCoinCreditState } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -120,13 +121,16 @@ async function syncWalletToLedger(commitment: string) {
     });
   }
 
-  // Compute the current ledger balance
+  // Compute the current LEDGER balance. Audit fix M9: the previous raw
+  // `sum(amount)` ADDED SPEND amounts instead of subtracting them (journal
+  // amounts are positive magnitudes), so the "balance" was wrong and the
+  // reconciliation wrote bogus ADJUSTMENTs. Use the canonical reducer.
   const entries = await prisma.angelCoinJournalEntry.findMany({
     where: { accountId: account.id },
     orderBy: { createdAt: "asc" },
   });
 
-  const ledgerBalance = entries.reduce((sum, e) => sum + e.amount, 0);
+  const ledgerBalance = computeBalances(entries).availableBalance;
   const walletBalance = wallet.balance;
   const delta = walletBalance - ledgerBalance;
 
@@ -183,18 +187,28 @@ async function syncLedgerToWallet(commitment: string) {
     orderBy: { createdAt: "asc" },
   });
 
-  const ledgerBalance = entries.reduce((sum, e) => sum + e.amount, 0);
+  // Audit fix M9: canonical reducer (not a raw amount sum).
+  const ledgerBalance = computeBalances(entries).availableBalance;
+
+  // Audit fix M9: adjust the wallet by the DELTA rather than force-setting it
+  // to the ledger value (which could clobber a legitimately higher wallet
+  // balance en masse across a full sync).
+  const existing = await prisma.agentWallet.findUnique({
+    where: { subjectCommitment: commitment },
+  });
+  const target = Math.max(0, ledgerBalance);
+  const delta = target - (existing?.balance ?? 0);
 
   const wallet = await prisma.agentWallet.upsert({
     where: { subjectCommitment: commitment },
     create: {
       subjectCommitment: commitment,
-      balance: Math.max(0, ledgerBalance),
-      earnedTotal: Math.max(0, ledgerBalance),
+      balance: target,
+      earnedTotal: target,
       lastActivityAt: new Date(),
     },
     update: {
-      balance: Math.max(0, ledgerBalance),
+      balance: { increment: delta },
       lastActivityAt: new Date(),
     },
   });
@@ -203,6 +217,7 @@ async function syncLedgerToWallet(commitment: string) {
     subject_commitment: commitment,
     synced: true,
     ledger_balance: ledgerBalance,
+    adjustment: delta,
     wallet_balance: wallet.balance,
   };
 }

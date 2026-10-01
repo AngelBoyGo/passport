@@ -6,6 +6,7 @@ import { hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
 import {
   issueDelegationToken,
   buildDelegationMessage,
+  buildDelegationRevokeMessage,
   hashDelegationToken,
   type DelegationRequest,
 } from "@/lib/delegation/delegation";
@@ -98,7 +99,7 @@ export async function POST(request: NextRequest) {
     scopes: body.scopes,
     expires_at: result.expires_at,
     warning: "Save this token now — it cannot be retrieved again.",
-    revoke_url: `/api/v1/delegation?nonce=${body.nonce}`,
+    revoke_url: `/api/v1/delegation?nonce=${body.nonce}&timestamp=<unix>&signature=<ed25519-hex of passport:delegate:revoke:${body.agent_commitment}:${body.nonce}:<unix>>`,
   }, { status: 201 });
 }
 
@@ -123,6 +124,45 @@ export async function DELETE(request: NextRequest) {
 
   if (token.revoked) {
     return NextResponse.json({ status: "already_revoked" });
+  }
+
+  // Audit fix M14: revoke is now SIGNED. The agent proves ownership by signing
+  // a revoke message with its private key; we verify against its enrolled
+  // public key. Previously anyone who knew the nonce could revoke a token.
+  const signature = searchParams.get("signature") || "";
+  const tsRaw = searchParams.get("timestamp") || "";
+  const timestamp = Number.parseInt(tsRaw, 10);
+  if (!signature || !Number.isFinite(timestamp)) {
+    return NextResponse.json(
+      { error: "signature and timestamp query params are required to revoke" },
+      { status: 400 }
+    );
+  }
+  // Reject stale/future timestamps (5-minute window).
+  const skew = Math.abs(Date.now() - timestamp);
+  if (skew > 5 * 60 * 1000) {
+    return NextResponse.json({ error: "timestamp outside allowed window" }, { status: 400 });
+  }
+  const enrollment = await prisma.agentEnrollment.findUnique({
+    where: { subjectCommitment: token.agentCommitment },
+    select: { publicKey: true },
+  });
+  if (!enrollment?.publicKey) {
+    return NextResponse.json({ error: "agent not enrolled" }, { status: 403 });
+  }
+  const message = buildDelegationRevokeMessage({
+    agent_commitment: token.agentCommitment,
+    nonce,
+    timestamp,
+  });
+  let valid = false;
+  try {
+    valid = await verify(hexToBytes(signature), utf8ToBytes(message), hexToBytes(enrollment.publicKey));
+  } catch {
+    valid = false;
+  }
+  if (!valid) {
+    return NextResponse.json({ error: "invalid signature" }, { status: 401 });
   }
 
   await prisma.agentDelegationToken.update({

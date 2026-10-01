@@ -88,6 +88,23 @@ export function buildDelegationMessage(params: {
 }
 
 /**
+ * Message an agent signs to REVOKE a delegation token (audit fix M14).
+ * Without this, anyone holding a nonce could revoke another agent's token.
+ */
+export function buildDelegationRevokeMessage(params: {
+  agent_commitment: string;
+  nonce: string;
+  timestamp: number;
+}): string {
+  return [
+    "passport:delegate:revoke",
+    params.agent_commitment,
+    params.nonce,
+    String(params.timestamp),
+  ].join(":");
+}
+
+/**
  * Issues a delegation token after verifying the agent's signature.
  */
 export async function issueDelegationToken(

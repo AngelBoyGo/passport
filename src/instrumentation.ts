@@ -4,6 +4,20 @@
  */
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
+    // Audit fix M11: fail fast on missing required production config. This was
+    // defined (validateEnv) but never called, so a deploy missing
+    // SIGNING_PRIVATE_KEY/SESSION_SECRET booted silently and degraded.
+    try {
+      const { validateEnv } = await import("@/lib/config/env");
+      validateEnv();
+    } catch (err) {
+      console.error(
+        "[env] startup validation failed:",
+        err instanceof Error ? err.message : String(err)
+      );
+      // In production, refuse to start with missing required config.
+      if (process.env.NODE_ENV === "production") throw err;
+    }
     // Dynamic import to avoid pulling node-cron into edge runtime
     const { startScheduler } = await import("@/lib/scheduler/node-cron");
     startScheduler();
