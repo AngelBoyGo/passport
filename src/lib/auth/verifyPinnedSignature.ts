@@ -86,14 +86,25 @@ function reject(
 }
 
 /**
- * Fail-closed enforcement gate. Enforcement is ON in production, or explicitly via
- * ENFORCE_SIGNATURES=1 (so staging can enforce without NODE_ENV=production).
+ * Fail-closed enforcement gate.
+ *
+ * Audit fix M10: enforcement is ON by DEFAULT. It is only disabled in an
+ * explicit test run or when an operator deliberately sets
+ * ALLOW_UNSIGNED_RESERVES=1 (e.g. local sandbox). Previously it was OFF unless
+ * NODE_ENV==="production", so a staging/unset deploy silently skipped signature
+ * verification for milestone disbursements and quorum votes.
  */
 export function signaturesEnforced(): boolean {
-  return (
-    process.env.NODE_ENV === "production" ||
-    process.env.ENFORCE_SIGNATURES === "1"
-  );
+  // Explicit opt-in always wins (lets a test/staging env force enforcement).
+  if (process.env.ENFORCE_SIGNATURES === "1") return true;
+  // Explicit escape hatch for local sandboxes only.
+  if (process.env.ALLOW_UNSIGNED_RESERVES === "1") return false;
+  if (process.env.ENFORCE_SIGNATURES === "0") return false;
+  // Tests exercise both paths explicitly; they are not a real enforcement env.
+  if (process.env.NODE_ENV === "test") return false;
+  // Audit fix M10: enforce by DEFAULT everywhere else (previously only NODE_ENV
+  // === "production"), so staging/unset deploys no longer skip verification.
+  return true;
 }
 
 /**

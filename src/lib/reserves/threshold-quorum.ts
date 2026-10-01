@@ -45,9 +45,14 @@ export function getSovereignStateKey(countryCode: string): string {
   if (envKey && /^[0-9a-f]{64}$/i.test(envKey)) {
     return envKey.toLowerCase();
   }
-  // Fail closed in production: never fall back to the public benchmark keys there.
-  if (process.env.NODE_ENV === "production") return "";
-  return SOVEREIGN_STATE_BENCHMARK_KEYS[code] || "";
+  // Audit fix M10: the public benchmark keys are only acceptable in an explicit
+  // test run — never merely because NODE_ENV isn't exactly "production"
+  // (staging/unset deploys were accepting quorum votes signed with keys that
+  // are checked into source).
+  if (process.env.NODE_ENV === "test") {
+    return SOVEREIGN_STATE_BENCHMARK_KEYS[code] || "";
+  }
+  return "";
 }
 
 export interface CreateProposalInput {
