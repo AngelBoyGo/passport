@@ -87,7 +87,10 @@ export async function probeMedora(): Promise<SubsystemReport> {
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), PROBE_TIMEOUT_MS);
-    const r = await fetch(`${url}/api/medical/pipeline/status`, {
+    // The real Medora pipeline counts live on /api/medical/analytics?pipeline=1
+    // (there is no /api/medical/pipeline/status route — asserting one existed
+    // was a cross-env false assumption that pinned Medora to "degraded").
+    const r = await fetch(`${url}/api/medical/analytics?pipeline=1`, {
       signal: ctrl.signal,
       headers: { accept: "application/json", "x-internal-cron": secret },
     }).catch(() => null);
