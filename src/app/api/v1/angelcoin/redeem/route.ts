@@ -108,7 +108,10 @@ export async function POST(request: NextRequest) {
 
   let remainingBalance = 0;
 
-  // Atomic debit with in-transaction balance re-check to prevent double-spend
+  // Atomic debit with an in-transaction rank guard to prevent double-spend.
+  // Audit fix H6: a plain read-then-write inside the tx is NOT enough — two
+  // concurrent redemptions can both read the same balance. The guarded
+  // UPDATE ... WHERE (balance - staked) >= amount is atomic.
   try {
     await prisma.$transaction(async (tx) => {
       const wallet = await tx.agentWallet.findUnique({
@@ -119,19 +122,17 @@ export async function POST(request: NextRequest) {
         throw new Error("No wallet found for this agent");
       }
 
-      const available = computeAvailableBalance(wallet);
-      if (available < anglAmount) {
+      const debited = await tx.$executeRaw`
+        UPDATE "AgentWallet"
+        SET balance = balance - ${anglAmount},
+            "spentTotal" = "spentTotal" + ${anglAmount},
+            "lastActivityAt" = now()
+        WHERE "subjectCommitment" = ${commitment}
+          AND (balance - staked) >= ${anglAmount}
+      `;
+      if (debited === 0) {
         throw new Error("Insufficient available balance");
       }
-
-      await tx.agentWallet.update({
-        where: { subjectCommitment: commitment },
-        data: {
-          balance: { decrement: anglAmount },
-          spentTotal: { increment: anglAmount },
-          lastActivityAt: new Date(),
-        },
-      });
 
       await tx.operatorLedgerEntry.create({
         data: {
@@ -149,7 +150,7 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      remainingBalance = available - anglAmount;
+      remainingBalance = computeAvailableBalance(wallet) - anglAmount;
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);

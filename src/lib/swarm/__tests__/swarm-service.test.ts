@@ -199,6 +199,8 @@ describe("Swarm Service - Cryptographic & Storage Logic", () => {
       createdAt: new Date(),
     };
 
+    vi.spyOn(prisma.swarmThreatReport, "findFirst").mockResolvedValueOnce(null as any);
+    vi.spyOn(prisma.swarmThreatReport, "count").mockResolvedValueOnce(0 as any);
     vi.spyOn(prisma.swarmThreatReport, "create").mockResolvedValueOnce(threatMock as any);
     vi.spyOn(prisma.swarmThreatReport, "findMany").mockResolvedValueOnce([threatMock as any]);
 

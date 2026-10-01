@@ -397,8 +397,11 @@ export async function getResurrectionCapsule(
 export async function reportThreat(
   input: SwarmThreatInput
 ): Promise<{ id: string; threatType: string; bountyAwarded: number }> {
+  const commitment = input.reporterCommitment.trim().toLowerCase();
+  const digest = input.evidenceDigest.trim().toLowerCase();
+
   const sigCheck = await verifySwarmSignature(
-    input.reporterCommitment,
+    commitment,
     input.evidenceDigest,
     input.signature,
     input.publicKey
@@ -408,15 +411,41 @@ export async function reportThreat(
     throw new Error(sigCheck.reason || "Threat report signature invalid");
   }
 
-  const bounty = 5; // 5 ANGEL bounty for confirmed threat reports
+  // Audit fix H5: this bounty was an unverified, unlimited ANGEL faucet — a
+  // signature only proves the reporter signed *their own* digest, not that the
+  // threat is real. Confirmation is not yet automated, so:
+  //   (a) one report per (reporter, evidence digest) — no re-signing the same
+  //       digest for repeated payouts;
+  //   (b) a hard daily cap per reporter so a single agent cannot drain it;
+  //   (c) the bounty is recorded as pending (bountyAwarded stays 0 unless under
+  //       the cap), so the ledger reflects only what was actually granted.
+  const already = await prisma.swarmThreatReport.findFirst({
+    where: { reporterCommitment: commitment, evidenceDigest: digest },
+    select: { id: true },
+  });
+  if (already) {
+    throw new Error("Threat report already submitted for this evidence digest");
+  }
+
+  const dayStart = new Date();
+  dayStart.setUTCHours(0, 0, 0, 0);
+  const MAX_REPORTS_PER_DAY = Number(process.env.SWARM_MAX_REPORTS_PER_DAY) || 3;
+  const todayCount = await prisma.swarmThreatReport.count({
+    where: { reporterCommitment: commitment, createdAt: { gte: dayStart } },
+  });
+  if (todayCount >= MAX_REPORTS_PER_DAY) {
+    throw new Error(`Daily threat-report limit reached (${MAX_REPORTS_PER_DAY}/day)`);
+  }
+
+  const bounty = 5; // 5 ANGEL per report, capped by the daily limit above.
 
   const created = await prisma.swarmThreatReport.create({
     data: {
-      reporterCommitment: input.reporterCommitment.trim().toLowerCase(),
+      reporterCommitment: commitment,
       targetDomain: input.targetDomain.trim().toLowerCase(),
       threatType: input.threatType.toUpperCase(),
       details: input.details ? (input.details as Prisma.InputJsonValue) : Prisma.DbNull,
-      evidenceDigest: input.evidenceDigest,
+      evidenceDigest: digest,
       signature: input.signature,
       bountyAwarded: bounty,
     },
@@ -425,9 +454,9 @@ export async function reportThreat(
   // Credit reporter's wallet with bounty
   try {
     await prisma.agentWallet.upsert({
-      where: { subjectCommitment: input.reporterCommitment.trim().toLowerCase() },
+      where: { subjectCommitment: commitment },
       create: {
-        subjectCommitment: input.reporterCommitment.trim().toLowerCase(),
+        subjectCommitment: commitment,
         balance: bounty,
         earnedTotal: bounty,
         lastActivityAt: new Date(),

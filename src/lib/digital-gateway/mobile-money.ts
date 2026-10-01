@@ -88,10 +88,21 @@ export async function settleMobileMoneyOnramp(
 
   // HMAC verification. Provider callbacks always verify; an internal (already
   // authenticated USSD/agent-API) settlement skips provider HMAC.
+  //
+  // SECURITY (audit fix C2): this previously accepted an invalid signature
+  // whenever NODE_ENV !== "production", and getProviderSecret() handed back a
+  // predictable default — so a forged callback could mint ANGEL. Now we fail
+  // closed everywhere except an explicit test run, and refuse to settle at all
+  // when no secret is configured.
   if (!input.internal) {
     const secret = input.secret ?? getProviderSecret(provider.name);
+    if (!secret) {
+      throw new Error(
+        `No signing secret configured for ${provider.name} callbacks (set MOBILE_MONEY_SECRET or MOBILE_MONEY_SECRET_${provider.name.toUpperCase()})`
+      );
+    }
     const verified = await provider.verifyCallbackSignature(input.payload, secret);
-    if (!verified && process.env.NODE_ENV === "production") {
+    if (!verified && process.env.NODE_ENV !== "test") {
       throw new Error(`Invalid ${provider.name} callback signature`);
     }
   }

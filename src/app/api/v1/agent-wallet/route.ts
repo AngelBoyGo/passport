@@ -166,31 +166,47 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      await prisma.$transaction(async (tx) => {
-        await tx.agentWallet.update({
-          where: { subjectCommitment: commitment },
-          data: { balance: { decrement: body.amount }, spentTotal: { increment: body.amount }, lastActivityAt: new Date() },
-        });
+      // Audit fix H6: the decrement is now an ATOMIC guarded update. The old
+      // read-then-write let two concurrent transfers each pass the balance
+      // check and both decrement, driving the wallet negative. The guard
+      // `balance - staked >= amount` mirrors computeAvailableBalance exactly.
+      const moved = await prisma.$transaction(async (tx) => {
+        const debited = await tx.$executeRaw`
+          UPDATE "AgentWallet"
+          SET balance = balance - ${body.amount},
+              "spentTotal" = "spentTotal" + ${body.amount},
+              "lastActivityAt" = now()
+          WHERE "subjectCommitment" = ${commitment}
+            AND (balance - staked) >= ${body.amount}
+        `;
+        if (debited === 0) return false;
         await tx.agentWallet.upsert({
           where: { subjectCommitment: target },
           create: { subjectCommitment: target, balance: body.amount, earnedTotal: body.amount, lastActivityAt: new Date() },
           update: { balance: { increment: body.amount }, earnedTotal: { increment: body.amount }, lastActivityAt: new Date() },
         });
+        return true;
       });
+      if (!moved) {
+        return NextResponse.json({ error: "Insufficient available balance" }, { status: 402 });
+      }
 
       break;
     }
 
     case "stake": {
-      const wallet = await prisma.agentWallet.findUnique({ where: { subjectCommitment: commitment } });
-      if (!wallet || computeAvailableBalance(wallet) < body.amount) {
+      // Audit fix H6: atomic guarded stake — available balance cannot be
+      // over-committed by concurrent requests.
+      const staked = await prisma.$executeRaw`
+        UPDATE "AgentWallet"
+        SET staked = staked + ${body.amount},
+            "lastActivityAt" = now()
+        WHERE "subjectCommitment" = ${commitment}
+          AND (balance - staked) >= ${body.amount}
+      `;
+      if (staked === 0) {
         return NextResponse.json({ error: "Insufficient available balance" }, { status: 402 });
       }
-
-      await prisma.agentWallet.update({
-        where: { subjectCommitment: commitment },
-        data: { staked: { increment: body.amount }, lastActivityAt: new Date() },
-      });
 
       break;
     }

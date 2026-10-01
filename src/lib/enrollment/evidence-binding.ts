@@ -24,6 +24,17 @@ import {
 
 export type EnrollmentStatusLabel = "ENROLLED" | "UNENROLLED";
 
+/**
+ * Whether the ISSUER service-auth bypass (skip agent Ed25519 verification) is
+ * active. SECURITY (audit fix H7): this is FORCED OFF in production — a
+ * misconfigured EVIDENCE_SERVICE_AUTH_BYPASS must never be able to disable all
+ * evidence verification on a live system.
+ */
+function serviceAuthBypassEnabled(): boolean {
+  if (process.env.NODE_ENV === "production") return false;
+  return process.env.EVIDENCE_SERVICE_AUTH_BYPASS === "true";
+}
+
 export type IngestEnrolledEvidenceInput = {
   subjectCommitment: string;
   sourceType: SourceType;
@@ -85,8 +96,10 @@ export async function ingestEnrolledEvidence(
     );
   }
   if (typeof input.signature !== "string" || input.signature.length === 0) {
-    // Allow empty signature only when service-auth bypass is enabled
-    if (process.env.EVIDENCE_SERVICE_AUTH_BYPASS !== "true") {
+    // Allow empty signature only when service-auth bypass is enabled — never in
+    // production (audit fix H7: a misconfigured bypass flag must not be able to
+    // disable all evidence verification on a live system).
+    if (!serviceAuthBypassEnabled()) {
       throw new InvalidEnrollmentInputError("signature is required");
     }
   } else if (input.signature.length !== 128) {
@@ -117,7 +130,7 @@ export async function ingestEnrolledEvidence(
   // Service-auth bypass: when the ISSUER key is used (platform posting on
   // behalf of an agent), skip agent-level Ed25519 verification. The platform
   // vouches for the work via its own authenticated API key.
-  const serviceAuthBypass = process.env.EVIDENCE_SERVICE_AUTH_BYPASS === "true";
+  const serviceAuthBypass = serviceAuthBypassEnabled();
   if (!serviceAuthBypass && input.signature) {
     const valid = await verifyPayloadSignature(
       enrollment.publicKey,

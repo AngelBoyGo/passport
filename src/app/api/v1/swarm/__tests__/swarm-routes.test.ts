@@ -192,6 +192,8 @@ describe("Swarm API Routes", () => {
       const evidence = "cf_waf_block_rule_987";
       const signature = bytesToHex(sign(utf8ToBytes(evidence), hexToBytes(testPrivKeyHex)));
 
+      vi.spyOn(prisma.swarmThreatReport, "findFirst").mockResolvedValueOnce(null as any);
+      vi.spyOn(prisma.swarmThreatReport, "count").mockResolvedValueOnce(0 as any);
       vi.spyOn(prisma.swarmThreatReport, "create").mockResolvedValueOnce({
         id: "rep_1",
         reporterCommitment: testCommitment,

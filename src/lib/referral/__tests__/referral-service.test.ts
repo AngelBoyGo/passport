@@ -1,10 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- test mocks use partial Prisma rows and mock objects */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { findUniqueMock, createMock, updateMock, operatorUpdateMock } = vi.hoisted(() => ({
+const { findUniqueMock, createMock, updateMock, updateManyMock, operatorUpdateMock } = vi.hoisted(() => ({
   findUniqueMock: vi.fn(),
   createMock: vi.fn(),
   updateMock: vi.fn(),
+  updateManyMock: vi.fn(),
   operatorUpdateMock: vi.fn(),
 }));
 
@@ -14,6 +15,7 @@ vi.mock("@/lib/db", () => ({
       findUnique: findUniqueMock,
       create: createMock,
       update: vi.fn((args: any) => updateMock(args)),
+      updateMany: vi.fn((args: any) => updateManyMock(args)),
     },
     operator: {
       update: vi.fn((args: any) => operatorUpdateMock(args)),
@@ -39,6 +41,8 @@ beforeEach(() => {
     if (findUniqueImpl) return findUniqueImpl(args);
     return null;
   });
+  // Default: the atomic cap guard succeeds (one row claimed).
+  updateManyMock.mockResolvedValue({ count: 1 });
 });
 
 describe("generateReferralCode", () => {
@@ -63,18 +67,45 @@ describe("generateReferralCode", () => {
 });
 
 describe("redeemReferralCode", () => {
-  it("returns null for unknown code", async () => {
+  it("returns not_found for unknown code", async () => {
     findUniqueImpl = () => null;
-    const result = await redeemReferralCode("unknown");
-    expect(result).toBeNull();
+    const result = await redeemReferralCode("unknown", "op_redeemer");
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe("not_found");
   });
 
-  it("returns bonus credits for valid code", async () => {
+  it("returns bonus credits for a valid code redeemed by another operator", async () => {
     findUniqueImpl = () => ({ id: "r_1", operatorId: "op_referrer", bonusCredits: 50, totalUsed: 0 });
-    const result = await redeemReferralCode("valid123");
-    expect(result).not.toBeNull();
-    expect(result!.bonusCredits).toBe(50);
-    expect(result!.operatorId).toBe("op_referrer");
+    const result = await redeemReferralCode("valid123", "op_redeemer");
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.bonusCredits).toBe(50);
+      expect(result.operatorId).toBe("op_referrer");
+    }
+  });
+
+  it("rejects self-referral (audit fix H4)", async () => {
+    findUniqueImpl = () => ({ id: "r_1", operatorId: "op_self", bonusCredits: 50, totalUsed: 0 });
+    const result = await redeemReferralCode("mycode", "op_self");
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe("self_referral");
+    expect(operatorUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects when the code is at its lifetime cap", async () => {
+    findUniqueImpl = () => ({ id: "r_1", operatorId: "op_referrer", bonusCredits: 50, totalUsed: 999 });
+    const result = await redeemReferralCode("hot", "op_redeemer");
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe("capped");
+  });
+
+  it("rejects when the atomic cap guard loses the race", async () => {
+    findUniqueImpl = () => ({ id: "r_1", operatorId: "op_referrer", bonusCredits: 50, totalUsed: 0 });
+    updateManyMock.mockResolvedValue({ count: 0 });
+    const result = await redeemReferralCode("race", "op_redeemer");
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe("capped");
+    expect(operatorUpdateMock).not.toHaveBeenCalled();
   });
 });
 

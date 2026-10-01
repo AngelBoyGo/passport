@@ -68,13 +68,20 @@ export function verifyStandardHook(
 }
 
 /**
- * Resolves a provider secret from the environment or a test-injectable in-memory
- * fallback. Never logs the secret.
+ * Resolves a provider secret from the environment.
+ *
+ * SECURITY (audit fix C2): this used to return the predictable literal
+ * `dev-secret-<provider>` when no secret was configured, which combined with a
+ * NODE_ENV-gated signature check let anyone forge a mobile-money callback and
+ * mint ANGEL. Outside an explicit test run we now return null so callers fail
+ * closed; the deterministic dev secret is only produced when NODE_ENV is
+ * "test" (vitest sets this automatically).
  */
-export function getProviderSecret(provider: string): string {
+export function getProviderSecret(provider: string): string | null {
   const envHex = process.env[`MOBILE_MONEY_SECRET_${provider.toUpperCase()}`]?.trim();
   if (envHex) return envHex;
   const fallback = process.env.MOBILE_MONEY_SECRET?.trim();
   if (fallback) return fallback;
-  return `dev-secret-${provider}`;
+  if (process.env.NODE_ENV === "test") return `dev-secret-${provider}`;
+  return null;
 }

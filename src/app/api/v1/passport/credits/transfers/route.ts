@@ -5,6 +5,7 @@ import {
   assertCanTransferFrom,
   getOrCreateAccount,
 } from "@/lib/angelcoin/ledger-service";
+import { prisma } from "@/lib/db";
 import {
   transferCreditsBodySchema,
   zodValidationErrorResponse,
@@ -14,8 +15,13 @@ import { isExecutiveAdmin } from "@/lib/admin/admin-auth";
 
 /**
  * POST /api/v1/passport/credits/transfers — peer/task credit transfer.
- * H5 fix: a caller may only transfer FROM an account it owns (ownerOperatorId
- * set when the operator first created/claimed it) or as an executive admin.
+ *
+ * Loop 80 fix: a caller may transfer FROM an account it provably owns. The
+ * ownership proof is an `Agent` row binding the caller's operatorId to the
+ * commitment. A still-null-owner (unclaimed) ledger account can ONLY be claimed
+ * by an operator that owns that commitment — otherwise an attacker could claim
+ * any funded-but-unclaimed account and drain it (the previous order claimed
+ * first, then gated, which the gate always passed).
  */
 export async function POST(request: NextRequest) {
   const operator = await authenticateApiKey(request.headers.get("authorization"));
@@ -37,17 +43,29 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  const admin = isExecutiveAdmin(operator);
   try {
-    // H5 fix: claim ownership FIRST so a fresh/legacy (null-owner) account is
-    // bound to the calling operator before the ownership gate runs. Without
-    // this, a legitimate first-time sender could never transfer (the old order
-    // gated before claiming, making peer transfers effectively dead).
+    // Ownership gate BEFORE any claim. Admins bypass.
+    if (!admin) {
+      const ownsCommitment = await prisma.agent.findFirst({
+        where: { operatorId: operator.id, agentId: parsed.data.from_commitment },
+        select: { id: true },
+      });
+      if (!ownsCommitment) {
+        return NextResponse.json(
+          { error: "Forbidden: source commitment is not owned by the authenticated operator" },
+          { status: 403 }
+        );
+      }
+    }
+
+    // Only now may we bind a fresh/legacy (null-owner) account to this operator.
     await getOrCreateAccount(parsed.data.from_commitment, operator.id);
 
     const canTransfer = await assertCanTransferFrom(
       operator.id,
       parsed.data.from_commitment,
-      isExecutiveAdmin(operator)
+      admin
     );
     if (!canTransfer) {
       return NextResponse.json(
