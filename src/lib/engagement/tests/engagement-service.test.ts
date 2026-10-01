@@ -115,10 +115,12 @@ describe("createEngagement", () => {
     });
 
     expect(requireEnrolledMock).toHaveBeenCalledTimes(2);
+    // Audit fix M8: the hirer locks the payout AND the 2% protocol fee (500 ->
+    // fee 10 -> locked 510).
     expect(lockCreditsMock).toHaveBeenCalledWith(
       HIRER,
-      500,
-      JSON.stringify({ task_id: TASK_ID, phase: "hire" })
+      510,
+      JSON.stringify({ task_id: TASK_ID, phase: "hire", protocol_fee: 10 })
     );
     expect(result.status).toBe("HELD");
     expect(result.taskId).toBe(TASK_ID);
@@ -206,7 +208,8 @@ describe("acceptEngagement", () => {
       HIRER,
       WORKER,
       500,
-      JSON.stringify({ task_id: TASK_ID, phase: "accept_payout" })
+      JSON.stringify({ task_id: TASK_ID, phase: "accept_payout" }),
+      10
     );
     expect(result.engagement.status).toBe("PAID");
     expect(result.receipt_id).toBe("rcpt_1");

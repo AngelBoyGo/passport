@@ -15,7 +15,7 @@ import {
   EvidenceMismatchError,
   EvidenceRequiredError,
 } from "@/lib/engagement/errors";
-import { collectProtocolFee, calculateProtocolFee } from "@/lib/revenue/protocol-fees";
+import { calculateProtocolFee } from "@/lib/revenue/protocol-fees";
 
 export type EngagementRecord = {
   taskId: string;
@@ -84,19 +84,14 @@ export async function createEngagement(input: {
   await requireEnrolled(input.hirerCommitment);
   await requireEnrolled(input.workerCommitment);
 
+  // Audit fix M8: lock the payout AND the protocol fee up front, so the fee is
+  // a real transfer out of escrow on release (never minted from nothing).
+  const { fee } = calculateProtocolFee(input.amount);
   const lock = await lockCredits(
     input.hirerCommitment,
-    input.amount,
-    JSON.stringify({ task_id: taskId, phase: "hire" })
+    input.amount + fee,
+    JSON.stringify({ task_id: taskId, phase: "hire", protocol_fee: fee })
   );
-
-  // Protocol fee: 2% of engagement amount → protocol treasury
-  const { fee } = calculateProtocolFee(input.amount);
-  if (fee > 0) {
-    await collectProtocolFee(input.amount, taskId).catch(() => {
-      // Non-fatal: fee collection failure shouldn't block the engagement
-    });
-  }
 
   const row = await prisma.engagement.create({
     data: {
@@ -222,11 +217,15 @@ export async function acceptEngagement(
     throw new EvidenceRequiredError(normalizedTaskId);
   }
 
+  // Audit fix M8: route the protocol fee out of escrow on release, in the same
+  // atomic transaction as the worker payout. The fee was locked at creation.
+  const { fee } = calculateProtocolFee(row.amount);
   const payout = await releaseEscrowToWorker(
     row.hirerCommitment,
     row.workerCommitment,
     row.amount,
-    JSON.stringify({ task_id: normalizedTaskId, phase: "accept_payout" })
+    JSON.stringify({ task_id: normalizedTaskId, phase: "accept_payout" }),
+    fee
   );
 
   // D1-D4: OPTIONAL on-chain settlement. The internal custodial payout above

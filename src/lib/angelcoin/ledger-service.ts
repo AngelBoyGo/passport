@@ -18,6 +18,7 @@ import {
   InvalidAngelCoinAmountError,
   InvalidUnlockAmountError,
 } from "@/lib/angelcoin/errors";
+import { PROTOCOL_TREASURY_COMMITMENT } from "@/lib/revenue/protocol-fees";
 
 export type PrismaTx = Omit<
   typeof prisma,
@@ -303,42 +304,57 @@ export async function lockCredits(
   amount: number,
   metadata?: string
 ) {
+  // Audit fix H6 (escrow): read-then-append inside a row-locked transaction so
+  // two concurrent locks cannot both pass the available-balance check and
+  // oversubscribe the account.
   const account = await getOrCreateAccount(subjectCommitment);
-  const entries = await loadJournalEntries(account.id);
-  const current = computeBalances(entries);
-  if (current.availableBalance < amount) {
-    throw new InsufficientAngelCoinFundsError();
-  }
+  return prisma.$transaction(async (tx) => {
+    await lockAccountForUpdate(tx, account.id);
+    const entries = await loadJournalEntries(account.id, tx);
+    const current = computeBalances(entries);
+    if (current.availableBalance < amount) {
+      throw new InsufficientAngelCoinFundsError();
+    }
 
-  const entry = await appendEntry(
-    prisma,
-    account.id,
-    AngelCoinEntryType.LOCK,
-    amount,
-    { metadata }
-  );
-  const updatedEntries = await loadJournalEntries(account.id);
-  return {
-    account,
-    entry,
-    balances: computeBalances(updatedEntries),
-  };
+    const entry = await appendEntry(
+      tx,
+      account.id,
+      AngelCoinEntryType.LOCK,
+      amount,
+      { metadata }
+    );
+    const updatedEntries = await loadJournalEntries(account.id, tx);
+    return {
+      account,
+      entry,
+      balances: computeBalances(updatedEntries),
+    };
+  });
 }
 
 /**
- * Releases locked escrow to a worker in one atomic transaction.
- * Hard gate: locked balance must cover amount before UNLOCK + SPEND + TASK_PAYMENT.
+ * Releases locked escrow to a worker in one atomic transaction, optionally
+ * routing a protocol fee to the treasury.
+ *
+ * Audit fix M8: the protocol fee is now a real TRANSFER out of the hirer's
+ * escrow (SPEND sender -> TASK_PAYMENT treasury), not a minted ADJUSTMENT. The
+ * hirer must have locked `amount + fee`; the hard gate below enforces that, so
+ * the fee can never be created from nothing.
  */
 export async function releaseEscrowToWorker(
   hirerCommitment: string,
   workerCommitment: string,
   amount: number,
-  metadata?: string
+  metadata?: string,
+  fee: number = 0
 ) {
   assertValidSubjectCommitment(hirerCommitment);
   assertValidSubjectCommitment(workerCommitment);
   if (amount <= 0) {
     throw new InvalidAngelCoinAmountError();
+  }
+  if (fee < 0 || !Number.isFinite(fee)) {
+    throw new InvalidAngelCoinAmountError("fee must be a non-negative number");
   }
   if (hirerCommitment === workerCommitment) {
     throw new InvalidAngelCoinAmountError(
@@ -347,6 +363,8 @@ export async function releaseEscrowToWorker(
   }
 
   await assertEnrollmentIfRequired(hirerCommitment);
+
+  const totalToRelease = amount + fee;
 
   return prisma.$transaction(async (tx) => {
     const sender = await tx.angelCoinAccount.upsert({
@@ -359,14 +377,23 @@ export async function releaseEscrowToWorker(
       create: { subjectCommitment: workerCommitment },
       update: {},
     });
+    // Treasury only needed when a fee is present.
+    const treasury = fee > 0
+      ? await tx.angelCoinAccount.upsert({
+          where: { subjectCommitment: PROTOCOL_TREASURY_COMMITMENT },
+          create: { subjectCommitment: PROTOCOL_TREASURY_COMMITMENT, creditState: AngelCoinCreditState.ACTIVE },
+          update: {},
+        })
+      : null;
 
     await lockAccountForUpdate(tx, sender.id);
 
     const senderEntries = await loadJournalEntries(sender.id, tx);
     const senderBalances = computeBalances(senderEntries);
-    if (senderBalances.lockedBalance < amount) {
+    // Hard gate: the locked escrow must cover BOTH the payout and the fee.
+    if (senderBalances.lockedBalance < totalToRelease) {
       throw new InsufficientAngelCoinFundsError(
-        "Insufficient locked escrow balance"
+        "Insufficient locked escrow balance to cover payout + protocol fee"
       );
     }
 
@@ -374,13 +401,13 @@ export async function releaseEscrowToWorker(
       tx,
       sender.id,
       AngelCoinEntryType.UNLOCK,
-      amount,
+      totalToRelease,
       { metadata }
     );
 
     const afterUnlockEntries = await loadJournalEntries(sender.id, tx);
     const afterUnlockBalances = computeBalances(afterUnlockEntries);
-    if (afterUnlockBalances.availableBalance < amount) {
+    if (afterUnlockBalances.availableBalance < totalToRelease) {
       throw new InsufficientAngelCoinFundsError();
     }
 
@@ -399,13 +426,41 @@ export async function releaseEscrowToWorker(
       { counterpartyCommitment: hirerCommitment, metadata }
     );
 
+    let feeSpendEntry = null;
+    let feePaymentEntry = null;
+    if (fee > 0 && treasury) {
+      // Fee is a transfer to the treasury — the SPEND debits the hirer,
+      // TASK_PAYMENT credits the treasury. No ADJUSTMENT/mint. The treasury is
+      // a system account (not a 64-hex commitment), so it is recorded in
+      // metadata rather than as a counterpartyCommitment.
+      feeSpendEntry = await appendEntry(
+        tx,
+        sender.id,
+        AngelCoinEntryType.SPEND,
+        fee,
+        { metadata: JSON.stringify({ source: "protocol_fee", treasury: PROTOCOL_TREASURY_COMMITMENT, ...(metadata ? { parent: metadata } : {}) }) }
+      );
+      feePaymentEntry = await appendEntry(
+        tx,
+        treasury.id,
+        AngelCoinEntryType.TASK_PAYMENT,
+        fee,
+        { counterpartyCommitment: hirerCommitment,
+          metadata: JSON.stringify({ source: "protocol_fee" }) }
+      );
+    }
+
     const finalSenderEntries = await loadJournalEntries(sender.id, tx);
     return {
       sender,
       receiver,
+      treasury,
       unlockEntry,
       spendEntry,
       paymentEntry,
+      feeSpendEntry,
+      feePaymentEntry,
+      fee,
       balances: computeBalances(finalSenderEntries),
     };
   });

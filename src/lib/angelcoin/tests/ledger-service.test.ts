@@ -135,7 +135,7 @@ beforeEach(() => {
 
     const tx = {
       $queryRaw: queryRawMock,
-      angelCoinJournalEntry: { create: createEntryMock },
+      angelCoinJournalEntry: { create: createEntryMock, findMany: findManyMock },
       angelCoinAccount: {
         findUnique: vi.fn(async (args: { where: { subjectCommitment: string } }) => {
           for (const acct of accounts.values()) {

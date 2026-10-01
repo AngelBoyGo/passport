@@ -12,7 +12,7 @@
  */
 
 import { prisma } from "@/lib/db";
-import { AngelCoinEntryType, AngelCoinCreditState, Prisma } from "@prisma/client";
+import { AngelCoinEntryType, AngelCoinCreditState } from "@prisma/client";
 
 const PROTOCOL_FEE_BPS = 200; // 2% in basis points
 export const PROTOCOL_TREASURY_COMMITMENT = "protocol_treasury_system";
@@ -30,28 +30,36 @@ export function calculateProtocolFee(amount: number): { fee: number; net: number
 }
 
 /**
- * Collects the protocol fee by creating a journal entry in the treasury account.
- * Called inside the engagement creation transaction.
+ * Credits a protocol fee to the treasury AS A TRANSFER — never a mint.
+ *
+ * Audit fix M8: the previous implementation created a positive ADJUSTMENT on
+ * the treasury (minting ANGEL from nothing) at engagement *creation*. The fee
+ * is now collected out of the hirer's escrow at *release* (see
+ * ledger-service.releaseEscrowToWorker). This helper remains for callers that
+ * have a funded source account to debit; without one it refuses (fail closed)
+ * rather than mint.
  */
 export async function collectProtocolFee(
   amount: number,
   engagementTaskId: string,
-  tx?: Prisma.TransactionClient
+  senderCommitment?: string
 ): Promise<{ fee: number; treasuryEntryId: string }> {
   const { fee } = calculateProtocolFee(amount);
   if (fee <= 0) {
     return { fee: 0, treasuryEntryId: "" };
   }
-
-  const client = tx || prisma;
+  if (!senderCommitment) {
+    throw new Error(
+      "collectProtocolFee requires a senderCommitment to debit — refusing to mint the fee"
+    );
+  }
 
   // Get or create the treasury account
-  let treasury = await client.angelCoinAccount.findUnique({
+  let treasury = await prisma.angelCoinAccount.findUnique({
     where: { subjectCommitment: PROTOCOL_TREASURY_COMMITMENT },
   });
-
   if (!treasury) {
-    treasury = await client.angelCoinAccount.create({
+    treasury = await prisma.angelCoinAccount.create({
       data: {
         subjectCommitment: PROTOCOL_TREASURY_COMMITMENT,
         creditState: AngelCoinCreditState.ACTIVE,
@@ -59,17 +67,27 @@ export async function collectProtocolFee(
     });
   }
 
-  const entry = await client.angelCoinJournalEntry.create({
+  // Debit the sender (SPEND) and credit the treasury (TASK_PAYMENT).
+  const sender = await prisma.angelCoinAccount.findUnique({
+    where: { subjectCommitment: senderCommitment },
+  });
+  if (!sender) {
+    throw new Error(`sender account not found for commitment ${senderCommitment}`);
+  }
+  await prisma.angelCoinJournalEntry.create({
+    data: {
+      accountId: sender.id,
+      entryType: AngelCoinEntryType.SPEND,
+      amount: fee,
+      metadata: JSON.stringify({ source: "protocol_fee", engagement_id: engagementTaskId, gross_amount: amount, fee_bps: PROTOCOL_FEE_BPS }),
+    },
+  });
+  const entry = await prisma.angelCoinJournalEntry.create({
     data: {
       accountId: treasury.id,
-      entryType: AngelCoinEntryType.ADJUSTMENT,
+      entryType: AngelCoinEntryType.TASK_PAYMENT,
       amount: fee,
-      metadata: JSON.stringify({
-        source: "protocol_fee",
-        engagement_id: engagementTaskId,
-        gross_amount: amount,
-        fee_bps: PROTOCOL_FEE_BPS,
-      }),
+      metadata: JSON.stringify({ source: "protocol_fee", engagement_id: engagementTaskId, gross_amount: amount, fee_bps: PROTOCOL_FEE_BPS }),
     },
   });
 
