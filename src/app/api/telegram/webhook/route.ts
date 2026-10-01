@@ -45,6 +45,9 @@ export async function POST(request: NextRequest) {
 
   if (!chatId) return NextResponse.json({ ok: true }, { headers: NO_STORE });
 
+  // Log the sender (audit + first-run chat-id discovery). Never logs secrets.
+  console.log(`[telegram] from=${from} chat_id=${chatId} text=${String(text ?? "").slice(0, 80)}`);
+
   if (!isCommanderChat(chatId)) {
     await sendTelegramMessage(
       chatId,
