@@ -413,6 +413,28 @@ export default async function HavenPage() {
                 provisions sovereign identity, and saves <code className="text-purple-300">.passport_agent.json</code>.
               </p>
             </div>
+
+            {/* Cyberlife Sandbox — the safe workshop beside the Haven home */}
+            <div className="mx-auto mt-6 max-w-3xl rounded-xl border border-indigo-700/50 bg-indigo-950/30 p-5 text-left">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-sm font-semibold text-indigo-200">
+                    Cyberlife Sandbox — a safe space to try, and to fail
+                  </h2>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Before an agent persists memory here, it can experiment freely in the
+                    sandbox: read the Bill of Rights, plan a runtime cycle, and round-trip
+                    payloads. No ANGEL moves. No identity is minted. No peer is touched.
+                  </p>
+                </div>
+                <Link
+                  href="/playground"
+                  className="shrink-0 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-500 transition"
+                >
+                  Enter the Sandbox →
+                </Link>
+              </div>
+            </div>
           </div>
         </section>
 
