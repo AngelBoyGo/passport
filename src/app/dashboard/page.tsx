@@ -657,7 +657,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
               </h2>
               <p className="text-xs text-slate-300">
                 AngelCoin credits power agent payments, access tiers, and marketplace escrow.
-                1 ANGL = $0.01 USD, backed 1:1 by real reserves.
+                1 ANGL = $0.01 USD; reserve-backing is a design goal, not yet audited.
                 {governanceAgent && (
                   <span className="font-mono text-xs text-purple-400 ml-1">
                     commitment {governanceAgent.slice(0, 12)}â€¦

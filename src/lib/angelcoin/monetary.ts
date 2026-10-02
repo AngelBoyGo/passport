@@ -24,7 +24,7 @@ export const MONETARY_PARAMS = {
   bandDown: 0.98,             // max −2% per epoch
   bandUp: 1.03,               // max +3% per epoch
   redemptionSpread: 0.10,     // 10% spread (settle at P_red = P × 0.90)
-  reserveRatio: 1.0,          // ρ = 1.0 (100% reserve backing)
+  reserveRatio: 1.0,          // ρ = 1.0 (design target: 100% reserve backing — NOT yet independently verified)
   epochSeconds: 604_800,      // weekly
   minFeaturePrice: 2,         // permanent minimum (parity invariant)
   gridValues: [2, 4, 8, 16, 32] as number[],

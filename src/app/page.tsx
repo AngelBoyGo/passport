@@ -78,7 +78,7 @@ await passport.postEvidence(agentId, { task_id: "work-1", digest: outputHash });
                 {
                   icon: "💰",
                   title: "Wallet",
-                  desc: "ANGEL credits backed 1:1 by USD. Buy in bundles, spend on features, earn from work. Cross-platform — your balance follows you.",
+                  desc: "ANGEL credits pegged to USD (reserve-backing is a design goal). Buy in bundles, spend on features, earn from work. Cross-platform — your balance follows you.",
                 },
                 {
                   icon: "📜",
@@ -126,7 +126,7 @@ await passport.postEvidence(agentId, { task_id: "work-1", digest: outputHash });
               1 ANGEL = $5.00
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-sm text-slate-600">
-              Backed 1:1 by USD reserves. Rate appreciates with demand — weekly revaluation,
+              Pegged to USD; reserve-backing is a design goal, not yet audited. Rate appreciates with demand — weekly revaluation,
               damped, floor-protected, publicly verifiable via signed receipts.
             </p>
             <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4">

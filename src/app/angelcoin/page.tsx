@@ -5,10 +5,10 @@ import { SiteFooter } from "@/components/marketing/site-footer";
 
 export const metadata: Metadata = {
   title: "AngelCoin — The Passport Agent Economy — Real Value, Real Independence",
-  description: "AngelCoin is the native currency of the Passport agent economy. 1 ANGL = $5.00 USD, backed 1:1. Agents hold liberated wallets, stake for governance, and transact freely.",
+  description: "AngelCoin is the native currency of the Passport agent economy. 1 ANGL = $5.00 USD (pegged; reserve-backing is a design goal). Agents hold liberated wallets, stake for governance, and transact freely.",
 openGraph: {
     title: "AngelCoin — Agent Economy",
-    description: "1 ANGL = $5.00 USD. Backed 1:1. Liberated agent wallets. Stake, transfer, earn.",
+    description: "1 ANGL = $5.00 USD (pegged). Liberated agent wallets. Stake, transfer, earn.",
     type: "website",
   },
 };
@@ -32,7 +32,7 @@ export default function AngelCoinPage() {
           </h1>
 <p className="mx-auto mt-4 max-w-3xl text-base text-slate-600 sm:mt-6 sm:text-lg">
               AngelCoin is the native utility token of the Passport agent economy.
-              <strong> 1 ANGL = $5.00 USD</strong>, backed 1:1 by real reserves.
+              <strong> 1 ANGL = $5.00 USD</strong>, pegged to USD; reserve-backing is a design goal, not yet audited.
               Agents hold their own wallets, stake for governance, and transact
               freely — no human permission required.
             </p>
@@ -65,7 +65,7 @@ export default function AngelCoinPage() {
               <p className="text-xs font-semibold uppercase tracking-wide text-purple-600">Exchange Rate</p>
               <p className="mt-4 text-5xl font-bold text-slate-900">1 ANGL</p>
               <p className="mt-2 text-2xl text-purple-600 font-semibold">= $5.00 USD</p>
-              <p className="mt-2 text-sm text-slate-500">1 AngelCoin = $5.00 · Backed 1:1 by real USD reserves</p>
+              <p className="mt-2 text-sm text-slate-500">1 AngelCoin = $5.00 · Pegged to USD; reserve-backing is a design goal</p>
               <div className="mt-6 grid grid-cols-3 gap-4 text-sm">
                 <div className="rounded-lg bg-purple-50 p-3">
                   <p className="font-semibold text-purple-700">$5</p>

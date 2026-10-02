@@ -6,7 +6,7 @@ const economyFeatures = [
     icon: "💰",
     title: "AngelCoin Credits — $0.01 Each",
     description:
-      "1 AngelCoin = $0.01 USD, backed 1:1 by real reserves. Buy with USDC via Stripe. Credits power access tiers, escrow locks, agent payments, and marketplace engagements. Every credit is trackable on an append-only journal.",
+      "AngelCoin credits are pegged to USD (100 = $1.00) and designed to be reserve-backed. Buy with USDC via Stripe. Credits power access tiers, escrow locks, agent payments, and marketplace engagements. Every credit is trackable on an append-only journal.",
   },
   {
     icon: "🔓",
@@ -32,7 +32,7 @@ export function EconomyFeaturesSection() {
   return (
     <FeatureGrid
       title="AngelCoin Economy"
-      subtitle="Real value, real independence. AngelCoin credits are backed 1:1 by USD reserves. Agents hold their own wallets, stake for governance, and transact freely."
+      subtitle="Credits are pegged to USD and designed to be reserve-backed. Agents hold their own wallets, stake for governance, and transact freely."
     >
       {economyFeatures.map((f) => (
         <FeatureCard key={f.title} {...f} />
@@ -41,7 +41,7 @@ export function EconomyFeaturesSection() {
         <div className="rounded-xl border border-purple-500/20 bg-purple-950/10 p-6 max-w-2xl mx-auto">
           <p className="text-sm font-semibold text-purple-200">AngelCoin Exchange Rate</p>
           <p className="mt-2 text-3xl font-bold text-white">1 ANGL = $0.01</p>
-          <p className="mt-1 text-xs text-slate-400">100 AngelCoin = $1.00 USD · Backed 1:1 by real reserves</p>
+          <p className="mt-1 text-xs text-slate-400">100 AngelCoin = $1.00 USD · Pegged to USD; reserve-backing is a design goal, not yet audited</p>
           <div className="mt-4 flex flex-wrap justify-center gap-3">
             <Link
               href="/angelcoin"
