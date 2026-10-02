@@ -1041,5 +1041,27 @@ committed test (or doc) — not an opinion.
 
 Remaining from the 30-day plan: **T3** (concierge MVP — needs a real buyer), **T9** (legal reviews — needs counsel), **T10** (capsule restore drill). These require external inputs, not more code.
 
+---
+
+## F. Remediation batch (executed) — code fixes
+
+In the order run. All test-driven; all suites green.
+
+| Fix | IDs | What changed | Evidence |
+|---|---|---|---|
+| Sale-gate hardening | F-007 | `audit()` now requires `sellable` **AND** `rubric.score >= SALE_RUBRIC_MIN (0.70)` for verdict `pass`. Low-quality work can no longer be sold. | `AngelMarketPlace/backend/tests/test_loop81_quality_gate.py` 5/5; loop75 regression 27/27 |
+| Reputation Sybil cap | F-002 | `computeReputationScore` accepts `distinctCounterparties` + `fiatBackedUsd`; tier is capped by `maxTierForDiversity`. `verify` route computes distinct engagement counterparties + `agentRevenue`. Self-deal ring capped at **Bronze**. | `passport/src/lib/reputation/__tests__/sybil-farming.test.ts` 5/5 (29 in suite) |
+| Revenue attribution | F-014/F-079 | `computeAttribution` takes a revenue series; a money-earning action is **POSITIVE** even when health is flat. `evaluateRecentOutcomes` fetches `agentRevenue` (defensive). | `passport/src/lib/brain/__tests__/revenue-attribution-gap.test.ts` 5/5 (82 in brain suite) |
+| Greenfield: swarm memory untrusted | F-042 | (earlier batch) `querySwarmMemory` → `signed:true, verified:false, trust:"untrusted"`. | `injection-redteam.test.ts` 4/4 |
+| Consent for autonomous calls | F-005 | (earlier batch) `gateAutonomous()` requires explicit consent; bypass never honored for autonomous. | `calloraMedora/tests/audit-consent-dnc.test.js` 8/8 |
+| Claims honesty | F-001/F-016/F-057 | "backed 1:1 by real reserves" corrected to "pegged; reserve-backing is a design goal, not yet audited" on 5 public surfaces. | `SEHEL_CLAIMS_REGISTER.md` |
+| Capsule restore drill | F-041 | Integrity + expiry verified; documents the key-loss gap (no escrow/shard recovery). | `passport/src/lib/swarm/__tests__/capsule-restore-drill.test.ts` 4/4 |
+| Concierge harness | F-006/F-089 | `backend/scripts/concierge_mvp.py` — dry-run by default; records `needs_buyer`; explicit demand gate. | `AngelMarketPlace/backend/tests/test_loop82_concierge_mvp.py` 3/3 |
+
+**Verification totals:** Passport **308 tests** across the touched areas (33 files) green + clean `tsc`; Marketplace **27 tests** green. All committed; Passport deployed and health-checked.
+
+**Still external-input only:** T9 legal reviews (custody, ANGEL classification, RTR enforceability, finder-fee licensing, sanctuary AUP).
+
+
 
 
