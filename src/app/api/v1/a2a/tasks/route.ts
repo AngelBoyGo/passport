@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { authenticateApiKey } from "@/lib/operator";
 import { createEngagement } from "@/lib/engagement/engagement-service";
+import { callerOwnsHirer } from "@/lib/engagement/hirer-authz";
 
 export const dynamic = "force-dynamic";
 
@@ -85,6 +86,11 @@ export async function POST(request: NextRequest) {
         }
         if (!Number.isInteger(amount) || amount <= 0) {
           return jsonRpcError(id, -32602, "Invalid params: amount must be a positive integer");
+        }
+
+        // Audit fix C1: participant-bound escrow — the caller must own the hirer.
+        if (!(await callerOwnsHirer(operator, hirerCommitment))) {
+          return jsonRpcError(id, -32003, "Forbidden: only the hirer may lock escrow for this commitment", 403);
         }
 
         try {

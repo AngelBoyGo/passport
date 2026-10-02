@@ -26,7 +26,7 @@ echo "Agents: $AGENTS"
 
 # Get the ISSUER key hash to find the API key
 # We'll use the Callora ISSUER key directly
-ISSUER="pp_ent_39bc2cfce209c7d7d1b0f25593ab29677096156a2bbac676c71e148b57090fd4"
+ISSUER="${PASSPORT_ISSUER_KEY:?set PASSPORT_ISSUER_KEY}"
 
 i=1
 for COMMITMENT in $AGENTS; do

@@ -27,7 +27,7 @@ sed -i "s|../node_modules/@noble/hashes/sha2.js|@noble/hashes/sha2.js|g" /app/ac
 sed -i "s|../node_modules/@noble/hashes/utils.js|@noble/hashes/utils.js|g" /app/activate-agents-v2.js
 '
 
-docker exec -e PASSPORT_ISSUER_KEY=pp_ent_39bc2cfce209c7d7d1b0f25593ab29677096156a2bbac676c71e148b57090fd4 \
+docker exec -e PASSPORT_ISSUER_KEY=${PASSPORT_ISSUER_KEY:?set PASSPORT_ISSUER_KEY} \
   -w /app \
   passport_app_1 \
   node /app/activate-agents-v2.js

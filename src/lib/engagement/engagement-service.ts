@@ -298,16 +298,27 @@ export async function cancelEngagement(taskId: string): Promise<EngagementRecord
     );
   }
 
-  await unlockCredits(
-    row.hirerCommitment,
-    row.amount,
-    JSON.stringify({ task_id: normalizedTaskId, phase: "cancel" })
-  );
-
-  const updated = await prisma.engagement.update({
-    where: { taskId: normalizedTaskId },
+  // Audit fix (M4): atomically claim the cancel so two concurrent cancels /
+  // timeout-releases cannot both unlock. Only the winner proceeds.
+  const claimed = await prisma.engagement.updateMany({
+    where: { taskId: normalizedTaskId, status: EngagementStatus.HELD },
     data: { status: EngagementStatus.CANCELLED },
   });
+  if (claimed.count === 0) {
+    const current = await prisma.engagement.findUnique({ where: { taskId: normalizedTaskId } });
+    return toEngagementRecord(current ?? row);
+  }
 
-  return toEngagementRecord(updated);
+  // Audit fix (M1): M8 locks `amount + fee`, so the refund must release BOTH,
+  // otherwise the protocol fee's LOCK is stranded forever and the hirer's
+  // available balance drifts down on every cancellation.
+  const { fee } = calculateProtocolFee(row.amount);
+  await unlockCredits(
+    row.hirerCommitment,
+    row.amount + fee,
+    JSON.stringify({ task_id: normalizedTaskId, phase: "cancel", protocol_fee_refunded: fee })
+  );
+
+  const updated = await prisma.engagement.findUnique({ where: { taskId: normalizedTaskId } });
+  return toEngagementRecord(updated ?? row);
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit, clientIpFromRequest, rateLimitResponse } from "@/lib/rateLimit";
+import { authenticateApiKey } from "@/lib/operator";
 import { processOreIntake } from "@/lib/reserves/artisanal-sourcing";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +18,13 @@ export const dynamic = "force-dynamic";
  *   payout_rate_percent?: number (default 95.0)
  */
 export async function POST(request: NextRequest) {
+  // Audit fix H2: this endpoint mints ANGEL (via the miner wallet credit) and
+  // was completely unauthenticated. Require an ISSUER key.
+  const operator = await authenticateApiKey(request.headers.get("authorization"));
+  if (!operator || operator.apiKeyRole === "HOLDER") {
+    return NextResponse.json({ error: "Unauthorized: ISSUER key required" }, { status: 401 });
+  }
+
   const ip = clientIpFromRequest(request.headers);
   const rate = await checkRateLimit(`reserves:artisanal:intake:${ip}`, 60, 60_000);
   if (!rate.allowed) {

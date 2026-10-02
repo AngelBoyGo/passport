@@ -14,7 +14,7 @@
 
 import { prisma } from "@/lib/db";
 import { canonicalJson, sha256Hex } from "@/lib/receipt/canonical";
-import { verifyPinnedSignature } from "@/lib/auth/verifyPinnedSignature";
+import { verifyPinnedSignature, signaturesEnforced } from "@/lib/auth/verifyPinnedSignature";
 import { getCommoditySpotPrices, computeLotValueUsd } from "@/lib/reserves/commodity-oracle";
 
 const COMMITMENT_RE = /^[0-9a-f]{64}$/i;
@@ -243,7 +243,9 @@ export async function verifyCheckpointPassage(input: VerifyCheckpointInput) {
     checkpoint.inspectorPublicKey
   );
 
-  if (process.env.NODE_ENV === "production") {
+  // Audit fix M3: use the fail-closed, default-on gate (not a bare NODE_ENV
+  // check, which silently skipped verification in staging/unset envs).
+  if (signaturesEnforced()) {
     if (!escortSignatureValid) {
       throw new Error("Invalid escort officer Ed25519 checkpoint signature");
     }

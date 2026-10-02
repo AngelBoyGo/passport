@@ -9,7 +9,7 @@ const http = require("http");
 const fs = require("fs");
 
 const BASE = "http://167.99.157.125:3000";
-const ISSUER_KEY = "pp_ent_39bc2cfce209c7d7d1b0f25593ab29677096156a2bbac676c71e148b57090fd4";
+const ISSUER_KEY = "process.env.PASSPORT_ISSUER_KEY";
 const TIMEOUT = 60000;
 
 function fetchJson(url, method, body, headers) {

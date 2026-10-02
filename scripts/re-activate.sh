@@ -13,7 +13,7 @@ docker exec passport_app_1 node /tmp/deploy-agents.js 5
 # (the v2 script enrolls new agents, but we need to post evidence for the ones we just enrolled)
 # Since we can't easily combine both, just run the v2 script which does everything
 echo "=== RUNNING FULL ACTIVATION (v2 with @noble) ==="
-docker exec -e PASSPORT_ISSUER_KEY=pp_ent_39bc2cfce209c7d7d1b0f25593ab29677096156a2bbac676c71e148b57090fd4 passport_app_1 node /tmp/activate-agents-v2.js
+docker exec -e PASSPORT_ISSUER_KEY=${PASSPORT_ISSUER_KEY:?set PASSPORT_ISSUER_KEY} passport_app_1 node /tmp/activate-agents-v2.js
 
 echo "=== VERIFY ==="
 curl -s http://localhost:3000/api/v1/leaderboard | head -c 300

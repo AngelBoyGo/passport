@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authenticateApiKey } from "@/lib/operator";
 import { createEngagement } from "@/lib/engagement/engagement-service";
+import { callerOwnsHirer } from "@/lib/engagement/hirer-authz";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,14 @@ export async function POST(request: NextRequest) {
   }
   if (!Number.isInteger(body.amount) || body.amount <= 0) {
     return NextResponse.json({ error: "amount must be a positive integer" }, { status: 400 });
+  }
+
+  // Audit fix C1: participant-bound escrow — the caller must own the hirer.
+  if (!(await callerOwnsHirer(operator, body.hirer_commitment))) {
+    return NextResponse.json(
+      { error: "Forbidden: only the hirer may lock escrow for this commitment" },
+      { status: 403 }
+    );
   }
 
   try {

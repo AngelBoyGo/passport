@@ -212,15 +212,18 @@ export async function POST(request: NextRequest) {
     }
 
     case "unstake": {
-      const wallet = await prisma.agentWallet.findUnique({ where: { subjectCommitment: commitment } });
-      if (!wallet || wallet.staked < body.amount) {
+      // Audit fix L3: atomic guarded unstake — two concurrent unstakes cannot
+      // both pass the check and drive `staked` negative.
+      const unstaked = await prisma.$executeRaw`
+        UPDATE "AgentWallet"
+        SET staked = staked - ${body.amount},
+            "lastActivityAt" = now()
+        WHERE "subjectCommitment" = ${commitment}
+          AND staked >= ${body.amount}
+      `;
+      if (unstaked === 0) {
         return NextResponse.json({ error: "Insufficient staked balance" }, { status: 402 });
       }
-
-      await prisma.agentWallet.update({
-        where: { subjectCommitment: commitment },
-        data: { staked: { decrement: body.amount }, lastActivityAt: new Date() },
-      });
 
       break;
     }

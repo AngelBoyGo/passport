@@ -17,7 +17,7 @@ for C in $COMMITMENTS; do
   DIGEST=$(echo -n "seed-data-$i" | sha256sum | cut -d' ' -f1)
   NOW=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
   curl -s -X POST "http://localhost:3000/api/v1/passport/agents/$C/evidence" \
-    -H "Authorization: Bearer pp_ent_39bc2cfce209c7d7d1b0f25593ab29677096156a2bbac676c71e148b57090fd4" \
+    -H "Authorization: Bearer ${PASSPORT_ISSUER_KEY:?set PASSPORT_ISSUER_KEY}" \
     -H "Content-Type: application/json" \
     -d "{\"source_type\":\"task_deliverable\",\"payload\":{\"task_id\":\"seed_$i\",\"digest\":\"$DIGEST\",\"observed_at\":\"$NOW\"},\"signature\":\"$(printf '0%.0s' $(seq 1 128))\"}" | head -c 80
   echo ""

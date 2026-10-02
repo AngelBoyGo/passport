@@ -146,11 +146,13 @@ export async function getRevenueBreakdown(): Promise<{
     }),
   ]);
 
-  // Compute last 30d protocol fees
+  // Compute last 30d protocol fees. Audit fix L2: since M8, fees are written as
+  // TASK_PAYMENT credits to the treasury (metadata source=protocol_fee), not as
+  // ADJUSTMENTs — count both so the dashboard is not stuck at zero.
   const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000);
   const recentFees = await prisma.angelCoinJournalEntry.findMany({
     where: {
-      entryType: AngelCoinEntryType.ADJUSTMENT,
+      entryType: { in: [AngelCoinEntryType.TASK_PAYMENT, AngelCoinEntryType.ADJUSTMENT] },
       metadata: { contains: "protocol_fee" },
       createdAt: { gte: thirtyDaysAgo },
     },

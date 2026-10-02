@@ -13,7 +13,7 @@
 import { prisma } from "@/lib/db";
 import { getCommoditySpotPrices } from "./commodity-oracle";
 import { generateLivePoR } from "./por-service";
-import { verifyPinnedSignature } from "@/lib/auth/verifyPinnedSignature";
+import { verifyPinnedSignature, signaturesEnforced } from "@/lib/auth/verifyPinnedSignature";
 
 const COMMITMENT_RE = /^[0-9a-f]{64}$/i;
 const MIN_REFINED_FINENESS = 0.9950; // London Good Delivery minimum purity (99.50%)
@@ -132,29 +132,38 @@ export async function processOreIntake(input: ProcessIntakeInput) {
     throw new Error(`Station '${input.stationCode}' is currently ${station.activeStatus}`);
   }
 
-  // 3. Payout Calculation (95% spot)
+  // 3. Payout Calculation (95% spot). Audit fix H2: the payout rate is
+  // attacker-influenced, so it MUST be bounded and part of the signed payload.
+  const payoutRatePercent = input.payoutRatePercent ?? 95.0;
+  if (!Number.isFinite(payoutRatePercent) || payoutRatePercent <= 0 || payoutRatePercent > 100) {
+    throw new Error("payout_rate_percent must be in (0, 100]");
+  }
   const payout = calculateArtisanalPayout(
     input.grossWeightGrams,
     input.assayedFineness,
     gold.priceUsd,
-    input.payoutRatePercent ?? 95.0
+    payoutRatePercent
   );
 
   if (payout.payoutAngel < 1) {
     throw new Error("Intake value is below the minimum settlement threshold of 1 ANGEL ($5.00 USD)");
   }
 
-  // 4. Spectrometer Signature Canonical Payload
+  // 4. Spectrometer Signature Canonical Payload — includes the payout rate so a
+  // caller cannot inflate the rate after the hardware signed the assay.
   const assayPayload = {
     assayed_fineness: payout.fineness,
     gross_weight_grams: payout.grossGrams,
     miner_commitment: input.minerCommitment.toLowerCase(),
     receipt_number: input.receiptNumber,
     station_code: input.stationCode,
+    payout_rate_percent: payoutRatePercent,
   };
 
-  // Verify hardware signature if in production
-  if (process.env.NODE_ENV === "production") {
+  // Verify hardware signature. Audit fix H2: use the fail-closed, default-on
+  // signaturesEnforced() gate (not a bare NODE_ENV check, which silently
+  // skipped verification in staging/unset environments).
+  if (signaturesEnforced()) {
     const isValidSignature = await verifySpectrometerSignature(
       station.stationPublicKey,
       input.spectrometerSignature,

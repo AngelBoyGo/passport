@@ -37,7 +37,7 @@ echo "=== GRANTS DONE ==="
 # Create engagement
 TASK_ID="first_tx_$(date +%s)"
 curl -s -X POST "http://localhost:3000/api/v1/passport/engagements" \
-  -H "Authorization: Bearer pp_ent_39bc2cfce209c7d7d1b0f25593ab29677096156a2bbac676c71e148b57090fd4" \
+  -H "Authorization: Bearer ${PASSPORT_ISSUER_KEY:?set PASSPORT_ISSUER_KEY}" \
   -H "Content-Type: application/json" \
   -d "{\"task_id\":\"$TASK_ID\",\"hirer_commitment\":\"$HIRER\",\"worker_commitment\":\"$WORKER\",\"amount\":5}"
 echo ""
@@ -46,14 +46,14 @@ echo ""
 DIGEST=$(echo -n "Task done" | sha256sum | cut -d' ' -f1)
 NOW2=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
 curl -s -X POST "http://localhost:3000/api/v1/passport/agents/$WORKER/evidence" \
-  -H "Authorization: Bearer pp_ent_39bc2cfce209c7d7d1b0f25593ab29677096156a2bbac676c71e148b57090fd4" \
+  -H "Authorization: Bearer ${PASSPORT_ISSUER_KEY:?set PASSPORT_ISSUER_KEY}" \
   -H "Content-Type: application/json" \
   -d "{\"source_type\":\"task_deliverable\",\"payload\":{\"task_id\":\"$TASK_ID\",\"digest\":\"$DIGEST\",\"observed_at\":\"$NOW2\"},\"signature\":\"$(printf '0%.0s' $(seq 1 128))\"}"
 echo ""
 
 # Accept
 curl -s -X POST "http://localhost:3000/api/v1/passport/engagements/$TASK_ID/accept" \
-  -H "Authorization: Bearer pp_ent_39bc2cfce209c7d7d1b0f25593ab29677096156a2bbac676c71e148b57090fd4"
+  -H "Authorization: Bearer ${PASSPORT_ISSUER_KEY:?set PASSPORT_ISSUER_KEY}"
 echo ""
 
 echo "=== VERIFY ==="

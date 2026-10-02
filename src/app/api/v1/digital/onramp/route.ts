@@ -77,6 +77,27 @@ export async function POST(request: NextRequest) {
     paid.targetCommitment || collectorWalletCommitment(paymentReference);
   const destinationCommitment = targetCommitment || sourceCommitment;
 
+  // Audit fix M2: prevent settlement redirect (IDOR). The settled ANGEL belongs
+  // to the settlement's designated recipient. If the settlement names a target,
+  // the destination MUST be it; otherwise the caller must provably own the
+  // destination commitment (an Agent row). Without this, any key-holder who
+  // knows/guesses a payment_reference could redirect the credited ANGEL.
+  if (destinationCommitment !== sourceCommitment) {
+    const isDesignated = Boolean(paid.targetCommitment) && destinationCommitment === paid.targetCommitment;
+    if (!isDesignated) {
+      const ownsDestination = await prisma.agent.findFirst({
+        where: { operatorId: operator.id, agentId: destinationCommitment },
+        select: { id: true },
+      });
+      if (!ownsDestination) {
+        return NextResponse.json(
+          { error: "Forbidden: destination commitment is not the settlement recipient and is not owned by the caller" },
+          { status: 403, headers: { ...NO_STORE, ...CORS } }
+        );
+      }
+    }
+  }
+
   try {
     // Idempotent transfer: the ANGEL already exists from the provider callback. Move it from
     // the collector wallet to the target wallet exactly once per (payment_reference).
