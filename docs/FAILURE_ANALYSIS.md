@@ -1012,4 +1012,34 @@ Portfolio: **Passport · AngelCoin · AI Safe Haven · Sehel/Sahel · Medora/Cal
 
 *Generated as a durable artifact. Each item is independently actionable; scores are heuristics to force ranking, not precision. Update in place as tests run.*
 
+---
+
+## E. Validation results (executed)
+
+Test-first execution of the 30-day plan, risk-first order. Each row is a real,
+committed test (or doc) — not an opinion.
+
+| Test | IDs | Result | Verdict |
+|---|---|---|---|
+| T1a/T1b — solvency + reserve-coverage invariants | F-001, F-009 | **PASS** (7 tests) `lib/angelcoin/__tests__/solvency-invariant.test.ts` | Confirms the gap: `reserve_usd` is derived from **ledger top-up entries**, not a held asset. `reserve_adequate` computes, but on bookkeeping. → **Claims-pause action taken (T2).** |
+| T1c — ledger reducer invariants | F-093 | **PASS** (5 tests) `lib/angelcoin/__tests__/ledger-invariants.test.ts` | LOCK/SPEND never increase available; strand-on-cancel shape pinned; ADJUSTMENT is the only mint surface. |
+| T6a/T6b — injection red-team + **FIX** | F-020, F-042 | **PASS** (4 tests) `lib/swarm/__tests__/injection-redteam.test.ts` | **Real fix shipped:** `querySwarmMemory` now returns `signed:true, verified:false, trust:"untrusted"` (signature ≠ truth). 32 swarm tests still green. |
+| T4 — consent/DNC audit + **FIX** | F-005, F-061, F-062 | **PASS** (8 tests) `calloraMedora/tests/audit-consent-dnc.test.js` | Revocation fails closed (verified). Documented gaps: implied consent treated as contactable; no recording-consent field. **Fix shipped:** `gateAutonomous()` requires explicit consent for autonomous calls; `bypass_tcpa` never honored for autonomous. |
+| T5 — brain→revenue attribution | F-014, F-079 | **PASS** (4 tests) `lib/brain/__tests__/revenue-attribution-gap.test.ts` | Documents root cause of `delta=+0 NEUTRAL`: attribution has **no revenue dimension** (health-only). |
+| T7 — Sybil self-deal ring | F-002 | **PASS** (3 tests) `lib/reputation/__tests__/sybil-farming.test.ts` | Confirms a single-operator ring reaches **Diamond (950)** with no counterparty-diversity term. |
+| T8 — quality gate | F-007 | **PASS** (3 tests) `AngelMarketPlace/backend/tests/test_loop81_quality_gate.py` | Confirms `sellable` ignores `rubric.score` (weak work can sell); objective gates + banned markers block obvious junk. |
+| T2 — Sehel claims register + literal-claim correction | F-016, F-057, F-060 | **DONE** `docs/SEHEL_CLAIMS_REGISTER.md` | No custodian/insurance/attestation/agreement found in repo → **non-deferrable claims corrected**: "backed 1:1 by real reserves" → "pegged; reserve-backing is a design goal, not yet audited" across 5 public surfaces. |
+
+### Verdicts (kill / pause / pivot / build)
+- **F-001/F-016/F-057** — reserve backing **unverified** → PIVOT on claims (done): no public surface claims 1:1 backing until a custodian + attestation + audit exist (see register gate).
+- **F-002** — reputation **farmable** → do not use reputation as a trust gate for money until a diversity/fiat term is added.
+- **F-007** — quality gate **permissive** → tighten the sale gate to require `verdict=="pass"` (rubric threshold) before real buyer launch.
+- **F-005/T4** — consent **fixed** for autonomous calls; recording-consent for all-party states still open.
+- **F-042/T6** — swarm memory **fixed** (untrusted labelling).
+- **F-014/F-079** — brain learning **revenue-blind** → add a revenue dimension before claiming "autonomous earner".
+- **F-093** — money invariants now **covered by tests** (regression protection in place).
+
+Remaining from the 30-day plan: **T3** (concierge MVP — needs a real buyer), **T9** (legal reviews — needs counsel), **T10** (capsule restore drill). These require external inputs, not more code.
+
+
 
