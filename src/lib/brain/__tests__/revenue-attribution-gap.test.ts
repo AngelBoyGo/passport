@@ -32,24 +32,32 @@ const OUT = (cycleId: string, action: string, result: string, at: number): Attri
   createdAt: new Date(at),
 });
 
-describe("F-014 · attribution has no revenue dimension (tracked gap)", () => {
-  it("DOCUMENTS THE GAP: a money-earning action with flat health is NEUTRAL", () => {
-    // baseline health 1.0 -> action succeeds -> post health 1.0 (revenue not
-    // represented as health). rowsDesc is newest-first.
+describe("F-014 · attribution now has a revenue dimension (FIXED)", () => {
+  it("a money-earning action with flat health is POSITIVE (revenue-attributed)", () => {
     const rows: AttributionMemoryRow[] = [
       OBS("post", 1.0, 3000),
       OUT("c1", "RUN_LOCUM_SEARCH", "ok", 2000),
       OBS("c1", 1.0, 1000),
     ];
-    const a = computeAttribution(rows, new Set());
+    // $400 of externally-verified revenue lands inside the window.
+    const revenue = [{ usd: 400, at: new Date(2500) }];
+    const a = computeAttribution(rows, new Set(), revenue);
     expect(a).not.toBeNull();
     expect(a!.action).toBe("RUN_LOCUM_SEARCH");
-    expect(a!.delta).toBe(0);
+    expect(a!.delta).toBe(0);              // health flat
+    expect(a!.revenue_delta_usd).toBe(400); // revenue captured
+    expect(a!.result).toBe("POSITIVE");     // earned => POSITIVE, not NEUTRAL
+  });
+
+  it("no revenue + flat health is still NEUTRAL", () => {
+    const rows: AttributionMemoryRow[] = [
+      OBS("post", 1.0, 3000),
+      OUT("c1b", "RUN_LOCUM_SEARCH", "ok", 2000),
+      OBS("c1b", 1.0, 1000),
+    ];
+    const a = computeAttribution(rows, new Set(), []);
+    expect(a!.revenue_delta_usd).toBe(0);
     expect(a!.result).toBe("NEUTRAL");
-    // REMEDIATION (F-014/F-079): attribution should also carry a revenue delta
-    // (or the brain's action-result should include realized revenue) so an
-    // earning action is not scored NEUTRAL.
-    expect(Object.keys(a!)).not.toContain("revenue_delta");
   });
 
   it("a health-improving action is POSITIVE (existing invariant holds)", () => {
@@ -58,7 +66,7 @@ describe("F-014 · attribution has no revenue dimension (tracked gap)", () => {
       OUT("c2", "RUN_TICK", "ok", 2000),
       OBS("c2", 0.8, 1000),
     ];
-    const a = computeAttribution(rows, new Set());
+    const a = computeAttribution(rows, new Set(), []);
     expect(a!.result).toBe("POSITIVE");
     expect(a!.delta).toBeCloseTo(0.2, 3);
   });
@@ -69,7 +77,7 @@ describe("F-014 · attribution has no revenue dimension (tracked gap)", () => {
       OUT("c3", "NOOP", "ok", 2000),
       OBS("c3", 0.8, 1000),
     ];
-    expect(computeAttribution(rows, new Set())).toBeNull();
+    expect(computeAttribution(rows, new Set(), [])).toBeNull();
   });
 
   it("already-evaluated cycles are not re-attributed (no double-count)", () => {
@@ -78,6 +86,6 @@ describe("F-014 · attribution has no revenue dimension (tracked gap)", () => {
       OUT("c4", "RUN_TICK", "ok", 2000),
       OBS("c4", 0.8, 1000),
     ];
-    expect(computeAttribution(rows, new Set(["c4"]))).toBeNull();
+    expect(computeAttribution(rows, new Set(["c4"]), [])).toBeNull();
   });
 });

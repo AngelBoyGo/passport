@@ -57,6 +57,13 @@ export interface AttributionResult {
   confounders: string[];
   /** Minutes between the action and the post observation. */
   window_minutes: number;
+  /**
+   * F-014/F-079: externally-verified revenue (USD) recognised in the window.
+   * A positive revenue delta marks the action POSITIVE even when the health
+   * score is flat — previously a money-earning action scored NEUTRAL because
+   * attribution was health-only.
+   */
+  revenue_delta_usd?: number;
 }
 
 function isEvaluableAction(action: string | null): action is string {
@@ -70,7 +77,8 @@ function isEvaluableAction(action: string | null): action is string {
  */
 export function computeAttribution(
   rowsDesc: AttributionMemoryRow[],
-  evaluatedCycleIds: ReadonlySet<string> = new Set()
+  evaluatedCycleIds: ReadonlySet<string> = new Set(),
+  revenueEvents: { usd: number; at: Date }[] = []
 ): AttributionResult | null {
   // Try newest first, but skip incomplete/orphaned candidates so one malformed
   // row cannot permanently block attribution of older valid actions.
@@ -123,8 +131,20 @@ export function computeAttribution(
     }
 
     const delta = Math.round((postHealth - baseline.healthScore) * 1000) / 1000;
+    // F-014/F-079: revenue recognised inside [baseline, post] is a first-class
+    // signal — a money-earning action is POSITIVE even if health stayed flat.
+    const revenueDeltaUsd = Math.round(
+      revenueEvents
+        .filter(
+          (r) =>
+            r.at.getTime() >= baseline!.createdAt.getTime() &&
+            r.at.getTime() <= post.createdAt.getTime()
+        )
+        .reduce((s, r) => s + (r.usd || 0), 0) * 100
+    ) / 100;
+    const earned = revenueDeltaUsd > 0;
     const result =
-      delta > ATTRIBUTION_SIGNIFICANCE_BAND
+      earned || delta > ATTRIBUTION_SIGNIFICANCE_BAND
         ? "POSITIVE"
         : delta < -ATTRIBUTION_SIGNIFICANCE_BAND
           ? "NEGATIVE"
@@ -145,6 +165,7 @@ export function computeAttribution(
       confidence,
       confounders,
       window_minutes: windowMinutes,
+      revenue_delta_usd: revenueDeltaUsd,
     };
   }
 
@@ -185,9 +206,23 @@ export async function evaluateRecentOutcomes(): Promise<AttributionResult | null
       priorEvaluations.map((e) => e.cycleId).filter((id): id is string => Boolean(id))
     );
 
+    // F-014/F-079: fetch externally-verified revenue so it can be attributed.
+    // Defensive: a missing table/mock must never break attribution.
+    let revenueEvents: { usd: number; at: Date }[] = [];
+    try {
+      const rows = await prisma.agentRevenue?.findMany({
+        select: { grossUsdCents: true, createdAt: true },
+        take: 5000,
+      });
+      revenueEvents = (rows ?? []).map((r) => ({ usd: (r.grossUsdCents || 0) / 100, at: r.createdAt }));
+    } catch {
+      revenueEvents = [];
+    }
+
     const attribution = computeAttribution(
       rowsDesc as AttributionMemoryRow[],
-      evaluatedCycleIds
+      evaluatedCycleIds,
+      revenueEvents
     );
     if (!attribution) return null;
 
