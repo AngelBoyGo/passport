@@ -49,6 +49,42 @@ export interface ReputationInput {
   successRate30d: number | null;
   trajectory7d: "UP" | "FLAT" | "DOWN";
   isEnrolled: boolean;
+  /**
+   * F-002 (Sybil resistance): number of DISTINCT counterparties the evidence
+   * came from. Optional for backward-compat; when provided, the tier is capped
+   * so a self-dealing ring cannot reach the upper tiers on raw volume alone.
+   */
+  distinctCounterparties?: number;
+  /** F-002: USD of externally-verified (fiat-cleared) revenue. Optional. */
+  fiatBackedUsd?: number;
+}
+
+/**
+ * F-002: minimum diversity/fiat needed to qualify for the upper tiers.
+ * A single-operator self-deal ring has ~1 counterparty and $0 fiat, so it is
+ * capped at Gold regardless of raw volume.
+ */
+export const DIVERSITY_MIN = {
+  silver: { counterparties: 2, fiatUsd: 0 },
+  gold: { counterparties: 5, fiatUsd: 100 },
+  platinum: { counterparties: 10, fiatUsd: 1000 },
+  diamond: { counterparties: 20, fiatUsd: 5000 },
+} as const;
+
+/** F-002: highest tier the given diversity/fiat qualifies for (pure). */
+export function maxTierForDiversity(
+  distinctCounterparties: number,
+  fiatBackedUsd: number
+): ReputationTier {
+  let best: ReputationTier = "bronze";
+  for (const t of TIER_ORDER) {
+    if (t === "bronze") { best = "bronze"; continue; }
+    const req = DIVERSITY_MIN[t as Exclude<ReputationTier, "bronze">];
+    if (distinctCounterparties >= req.counterparties && fiatBackedUsd >= req.fiatUsd) {
+      best = t;
+    }
+  }
+  return best;
 }
 
 export interface ReputationResult {
@@ -58,6 +94,8 @@ export interface ReputationResult {
   tierColor: string;
   nextTier: ReputationTier | null;
   scoreToNextTier: number;
+  /** F-002: true when the tier was capped by weak counterparty diversity. */
+  sybilCapped?: boolean;
   breakdown: {
     evidence: number;
     enrollment: number;
@@ -81,9 +119,25 @@ export function computeReputationScore(input: ReputationInput): ReputationResult
   const raw = evidence + enrollment + successRate + trajectory + artifact - correctionPenalty - failurePenalty;
   const score = Math.max(0, Math.min(1000, Math.round(raw)));
 
-  const tier = resolveTier(score);
+  // F-002: when diversity/fiat inputs are supplied, cap the tier so a
+  // self-dealing ring cannot reach the upper tiers on raw volume alone.
+  let tier = resolveTier(score);
+  let sybilCapped = false;
+  if (
+    typeof input.distinctCounterparties === "number" ||
+    typeof input.fiatBackedUsd === "number"
+  ) {
+    const allowed = maxTierForDiversity(
+      input.distinctCounterparties ?? 0,
+      input.fiatBackedUsd ?? 0
+    );
+    if (TIER_ORDER.indexOf(tier) > TIER_ORDER.indexOf(allowed)) {
+      tier = allowed;
+      sybilCapped = true;
+    }
+  }
   const nextTier = getNextTier(tier);
-  const scoreToNextTier = nextTier ? TIER_THRESHOLDS[nextTier] - score : 0;
+  const scoreToNextTier = nextTier ? Math.max(0, TIER_THRESHOLDS[nextTier] - score) : 0;
 
   return {
     score,
@@ -92,6 +146,7 @@ export function computeReputationScore(input: ReputationInput): ReputationResult
     tierColor: TIER_COLORS[tier],
     nextTier,
     scoreToNextTier,
+    sybilCapped,
     breakdown: {
       evidence: Math.round(evidence),
       enrollment,

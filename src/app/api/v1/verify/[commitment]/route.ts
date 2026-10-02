@@ -74,6 +74,26 @@ export async function GET(
   const recent7dSuccesses = recent7d.filter((e) => e.normalizedEventType === "AGENT_ARTIFACT_CREATED" || e.normalizedEventType === "VALIDATION_OBSERVED").length;
   const trajectory7d = recent7dFailures > recent7dSuccesses ? "DOWN" as const : recent7d.length > 3 ? "UP" as const : "FLAT" as const;
 
+  // F-002: Sybil-resistance inputs — distinct counterparties and externally
+  // verified (fiat-cleared) revenue. Caps the tier so a self-deal ring cannot
+  // reach the upper tiers on raw volume alone.
+  const [engagements, revenueRows] = await Promise.all([
+    prisma.engagement.findMany({
+      where: { OR: [{ hirerCommitment: hash }, { workerCommitment: hash }] },
+      select: { hirerCommitment: true, workerCommitment: true },
+      take: 2000,
+    }),
+    prisma.agentRevenue
+      .findMany({ where: { agentCommitment: hash }, select: { grossUsdCents: true }, take: 5000 })
+      .catch(() => [] as { grossUsdCents: number }[]),
+  ]);
+  const counterparties = new Set<string>();
+  for (const e of engagements) {
+    const other = e.hirerCommitment === hash ? e.workerCommitment : e.hirerCommitment;
+    if (other && other !== hash) counterparties.add(other);
+  }
+  const fiatBackedUsd = revenueRows.reduce((s, r) => s + (r.grossUsdCents ?? 0) / 100, 0);
+
   const rep = computeReputationScore({
     evidenceCount,
     artifactCount: artifactTypes.size,
@@ -82,6 +102,8 @@ export async function GET(
     successRate30d,
     trajectory7d,
     isEnrolled: enrollStatus === "ENROLLED",
+    distinctCounterparties: counterparties.size,
+    fiatBackedUsd,
   });
 
   // Last 10 receipts
