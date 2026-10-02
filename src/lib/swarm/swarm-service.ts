@@ -26,7 +26,13 @@ export interface SwarmMemoryRecord {
   merkleRoot: string | null;
   feeDeducted: number;
   createdAt: string;
+  /** Signature validated at write time (authorship), NOT content truth. */
+  signed?: boolean;
+  /** LEGACY: on the write path this meant "signature valid"; on reads it must
+   *  NOT be treated as content trust. Prefer `trust`. */
   verified: boolean;
+  /** F-042: reader-facing trust label. Shared memory is always "untrusted". */
+  trust?: "untrusted";
 }
 
 export interface SaveCapsuleInput {
@@ -310,7 +316,12 @@ export async function querySwarmMemory(filter: {
     merkleRoot: r.merkleRoot,
     feeDeducted: r.feeDeducted,
     createdAt: r.createdAt.toISOString(),
-    verified: true,
+    // Audit fix F-042: a valid signature proves the WRITER authored the payload,
+    // not that the CONTENT is true/safe. Expose the honest signal so readers do
+    // not treat shared memory as trusted instructions (prompt-injection vector).
+    signed: true,
+    verified: false,
+    trust: "untrusted" as const,
   }));
 }
 
