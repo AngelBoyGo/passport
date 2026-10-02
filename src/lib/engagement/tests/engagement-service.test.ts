@@ -9,6 +9,7 @@ const {
   engagementFindUniqueMock,
   engagementCreateMock,
   engagementUpdateMock,
+  engagementUpdateManyMock,
   evidenceFindFirstMock,
   requireEnrolledMock,
   lockCreditsMock,
@@ -20,6 +21,7 @@ const {
   engagementFindUniqueMock: vi.fn(),
   engagementCreateMock: vi.fn(),
   engagementUpdateMock: vi.fn(),
+  engagementUpdateManyMock: vi.fn(),
   evidenceFindFirstMock: vi.fn(),
   requireEnrolledMock: vi.fn(),
   lockCreditsMock: vi.fn(),
@@ -35,6 +37,7 @@ vi.mock("@/lib/db", () => ({
       findUnique: engagementFindUniqueMock,
       create: engagementCreateMock,
       update: engagementUpdateMock,
+      updateMany: engagementUpdateManyMock,
     },
     agentEvidence: {
       findFirst: evidenceFindFirstMock,
@@ -255,19 +258,19 @@ describe("acceptEngagement", () => {
 });
 
 describe("cancelEngagement", () => {
-  it("unlocks held funds and cancels engagement", async () => {
-    engagementFindUniqueMock.mockResolvedValue(heldEngagement());
-    engagementUpdateMock.mockResolvedValue({
-      ...heldEngagement(),
-      status: EngagementStatus.CANCELLED,
-    });
+  it("unlocks held funds (payout + fee) and cancels engagement", async () => {
+    engagementFindUniqueMock
+      .mockResolvedValueOnce(heldEngagement())
+      .mockResolvedValue({ ...heldEngagement(), status: EngagementStatus.CANCELLED });
+    engagementUpdateManyMock.mockResolvedValue({ count: 1 });
 
     const result = await cancelEngagement(TASK_ID);
 
+    // Audit fix M1: refund amount + the locked 2% fee (500 + 10).
     expect(unlockCreditsMock).toHaveBeenCalledWith(
       HIRER,
-      500,
-      JSON.stringify({ task_id: TASK_ID, phase: "cancel" })
+      510,
+      JSON.stringify({ task_id: TASK_ID, phase: "cancel", protocol_fee_refunded: 10 })
     );
     expect(result.status).toBe("CANCELLED");
   });
