@@ -1062,6 +1062,42 @@ In the order run. All test-driven; all suites green.
 
 **Still external-input only:** T9 legal reviews (custody, ANGEL classification, RTR enforceability, finder-fee licensing, sanctuary AUP).
 
+---
+
+## G. Strategic capability added — "Sign in with Passport" (Agent Identity / OIDC)
+
+Responding to the agent-ID market (Entra Agent ID is tenant-only; AgentID by
+AgentMail is open-web email identity). We did NOT adopt either product — we
+ported the four defining properties onto Passport's existing enrollment + owner
+model, giving Passport the **cross-organizational** position neither vendor
+occupies.
+
+| Property | Passport implementation |
+|---|---|
+| 1 · Stable subject | `sub` = `subject_commitment` |
+| 2 · Agent-held credential | agent signs a per-login transaction (Ed25519) |
+| 3 · Verify without trusting the agent | `/.well-known/jwks.json` (EdDSA/Ed25519) |
+| 4 · Accountable human | `owner_email`/`owner_name`, disclosed to registered clients only |
+
+**Shipped:** `lib/agent-identity/oidc.ts` (+ RP verifier), `.well-known/openid-configuration`,
+`.well-known/jwks.json`, `/api/v1/agent-identity/{authorize,token,userinfo}`,
+discovery links in `ai-service.json`, `docs/AGENT_IDENTITY_OIDC.md`. 7 unit +
+12 suite tests green.
+
+**Strategic value / failure-hypothesis linkage:**
+- Counters **F-002** (identity Sybil) by making the accountable owner a first-class,
+  verifiable claim — apps can rate-limit/revoke a *specific agent* without
+  touching the human, and *count how many agents one owner runs*.
+- Counters **F-029** (reputation not meaningful externally) — the portable issuer
+  is the distribution channel that lets external apps consume Passport identity.
+- New dependency to watch: **F-017** — the issuer now depends on
+  `SIGNING_PRIVATE_KEY`; a rotation must keep the JWKS `kid` overlap stable or
+  every signed-in session breaks. (Flagged for the prod-hardening phase.)
+
+**Business framing:** every app that adopts "Sign in with Passport" becomes a
+funnel into reputation, AngelCoin, and the Marketplace — the agent that just
+signed in is one hop from doing paid work.
+
 
 
 
