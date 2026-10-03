@@ -41,7 +41,7 @@ describe("F-041 · capsule integrity + restore drill", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     findUniqueMock.mockResolvedValue(null);
-    upsertMock.mockImplementation(async (args: any) => ({
+    upsertMock.mockImplementation(async (args: { create?: { version?: number; expiresAt?: Date }; update?: { version?: number; expiresAt?: Date } }) => ({
       id: "cap_1",
       version: args.create?.version ?? args.update?.version ?? 1,
       expiresAt: (args.create?.expiresAt ?? args.update?.expiresAt) || new Date(Date.now() + 1e9),

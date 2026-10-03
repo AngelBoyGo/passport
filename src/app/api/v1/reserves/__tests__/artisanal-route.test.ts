@@ -5,9 +5,9 @@ import { GET as getStations } from "../artisanal/stations/route";
 import { POST as postBridge } from "../artisanal/bridge/route";
 import * as artisanalSourcing from "@/lib/reserves/artisanal-sourcing";
 
-// Bridge now requires an ISSUER key (creates investment-grade reserve records).
-vi.mock("@/lib/auth/authorize", () => ({
-  requireIssuer: vi.fn(async () => ({ ok: true, operatorId: "op_issuer" })),
+// Intake and bridge require an ISSUER key (both mint ANGEL / create reserve records).
+vi.mock("@/lib/operator", () => ({
+  authenticateApiKey: vi.fn(async () => ({ id: "op_issuer", apiKeyRole: "ISSUER" })),
 }));
 
 describe("Artisanal Sourcing API Endpoints", () => {

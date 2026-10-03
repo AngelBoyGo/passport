@@ -20,7 +20,7 @@ const { prismaMock } = vi.hoisted(() => ({
 
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 
-describe("GET /api/v1/agents â€” Agent Discovery", () => {
+describe("GET /api/v1/agents — Agent Discovery", () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
   it("returns empty list when no agents exist", async () => {

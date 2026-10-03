@@ -21,7 +21,7 @@ import {
 } from "@/lib/bridge/client";
 import { applyBridgeDeposit, burnAndPayout } from "@/lib/bridge/ledger";
 
-describe("Bridge (Open Issuance) adapter â€” test bank A", () => {
+describe("Bridge (Open Issuance) adapter — test bank A", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.BRIDGE_CLIENT_ID = "test_client";

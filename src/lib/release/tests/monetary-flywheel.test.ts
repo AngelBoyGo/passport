@@ -28,6 +28,7 @@ import {
   createCommodityEscrow,
   releaseEscrowOnAssay,
 } from "@/lib/reserves/rwa-escrow";
+import * as oracle from "@/lib/reserves/commodity-oracle";
 import { calculateStatutoryWaterfall } from "@/lib/reserves/royalty-waterfall";
 
 describe("Unified AngelCoin Monetary Flywheel (Closed-Loop Integration)", () => {
@@ -38,6 +39,22 @@ describe("Unified AngelCoin Monetary Flywheel (Closed-Loop Integration)", () => 
   beforeEach(() => {
     vi.restoreAllMocks();
     prismaMock.commodityEscrow.findMany.mockResolvedValue([]);
+    // Oracle honesty fix: benchmark references read STALE by design, so escrow
+    // creation needs a fresh operator-supplied feed (otherwise it refuses).
+    vi.spyOn(oracle, "getCommoditySpotPrices").mockReturnValue({
+      Au: {
+        symbol: "Au",
+        commodityType: "GOLD",
+        name: "Fine Physical Gold (99.5%+)",
+        unit: "gram",
+        priceUsd: 75,
+        change24hPercent: 0,
+        volatility30dPercent: 4,
+        lastUpdated: new Date().toISOString(),
+        isStale: false,
+        source: "operator_live_feed",
+      },
+    } as never);
   });
 
   it("executes the complete retail-to-haven economic flywheel", async () => {

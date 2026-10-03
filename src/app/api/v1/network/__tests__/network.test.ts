@@ -15,7 +15,7 @@ const { prismaMock } = vi.hoisted(() => ({
 
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 
-describe("GET /api/v1/network â€” Network Stats", () => {
+describe("GET /api/v1/network — Network Stats", () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
   it("returns network totals with enrolled agents count", async () => {

@@ -20,7 +20,7 @@ import {
   assertCanTransferFrom,
 } from "@/lib/angelcoin/ledger-service";
 
-describe("AngelCoin ownership binding (Loop 37 â€” HIGH)", () => {
+describe("AngelCoin ownership binding (Loop 37 — HIGH)", () => {
   const commitment = "a".repeat(64);
   const opA = "op_A";
   const opB = "op_B";
@@ -69,7 +69,7 @@ describe("AngelCoin ownership binding (Loop 37 â€” HIGH)", () => {
       ownerOperatorId: opA,
     });
     await getOrCreateAccount(commitment, opB);
-    // Account is already owned by op_A â†’ no bind may be issued at all,
+    // Account is already owned by op_A → no bind may be issued at all,
     // so op_B can never steal ownership.
     expect(prismaMock.angelCoinAccount.updateMany).not.toHaveBeenCalled();
   });
@@ -80,7 +80,7 @@ describe("AngelCoin ownership binding (Loop 37 â€” HIGH)", () => {
       ownerOperatorId: null,
     });
 
-    // Non-admin caller, account unowned â†’ deny.
+    // Non-admin caller, account unowned → deny.
     const allowed = await assertCanTransferFrom(opB, commitment, false);
     expect(allowed).toBe(false);
   });

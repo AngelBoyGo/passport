@@ -71,6 +71,7 @@ describe("Protocol Integrations", () => {
 
   describe("A2A Protocol (JSON-RPC 2.0 over HTTP)", () => {
     it("handles tasks/send JSON-RPC method", async () => {
+      prismaMock.agent.findFirst.mockResolvedValue({ id: "agent_row" }); // caller owns the hirer (C1 gate)
       prismaMock.engagement.create.mockResolvedValue({
         taskId: "a2a-task-001",
         hirerCommitment: "a".repeat(64),
@@ -201,6 +202,7 @@ describe("Protocol Integrations", () => {
 
   describe("ACP Protocol (Agent Communication Protocol)", () => {
     it("creates an ACP task via REST", async () => {
+      prismaMock.agent.findFirst.mockResolvedValue({ id: "agent_row" }); // caller owns the hirer (C1 gate)
       prismaMock.engagement.create.mockResolvedValue({
         taskId: "acp-task-100",
         hirerCommitment: "a".repeat(64),

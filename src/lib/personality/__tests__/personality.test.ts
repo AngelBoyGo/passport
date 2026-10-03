@@ -1,5 +1,5 @@
-﻿/**
- * Phase 3 Â· Personality layer â€” failure-first suite.
+/**
+ * Phase 3 · Personality layer — failure-first suite.
  *
  * Personality is canonical in the Passport ID layer. Mutation rules (locked
  * decision from the empire planning session):

@@ -35,6 +35,8 @@ const APPROVED_VERIFY_CALL_SITES: Record<string, string> = {
   "src/app/api/v1/a2a/hire/route.ts": "A2A hire signature; raw bytes signing over hash digest, not compatible with helper's utf-8 mode",
   "src/app/api/v1/delegation/route.ts": "delegation grant signature; raw message bytes, helper uses utf-8",
   "src/app/api/v1/messages/route.ts": "agent message signature; signed over hex-to-bytes digest, incompatible with utf-8 helper",
+  "src/lib/agent-identity/oidc.ts": "OIDC id_token verification; key is the issuer's own JWKS key (standard OIDC trust model, not a self-embedded agent key)",
+  "src/lib/agent-identity/verify-token.ts": "relying-party OIDC verifier; fetches the issuer JWKS and checks the EdDSA signature (standard OIDC trust model)",
 };
 
 function findTsFiles(dir: string, out: string[] = []): string[] {

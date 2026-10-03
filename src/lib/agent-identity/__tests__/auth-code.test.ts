@@ -7,9 +7,9 @@ function fakeDb() {
   return {
     rows,
     collection: () => ({
-      async updateOne(q: any, u: any) { rows[q.key] = { value: u.$set.value }; return {}; },
-      async findOne(q: any) { return rows[q.key] ?? null; },
-      async deleteOne(q: any) { const had = Boolean(rows[q.key]); delete rows[q.key]; return { deletedCount: had ? 1 : 0 }; },
+      async updateOne(q: { key: string }, u: { $set: { value: unknown } }) { rows[q.key] = { value: u.$set.value }; return {}; },
+      async findOne(q: { key: string }) { return rows[q.key] ?? null; },
+      async deleteOne(q: { key: string }) { const had = Boolean(rows[q.key]); delete rows[q.key]; return { deletedCount: had ? 1 : 0 }; },
     }),
   };
 }

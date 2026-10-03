@@ -8,8 +8,8 @@ function fakeDb() {
   return {
     rows,
     collection: () => ({
-      async updateOne(q: any, u: any) { rows[q.key] = { value: u.$set.value }; return {}; },
-      async findOne(q: any) { return rows[q.key] ?? null; },
+      async updateOne(q: { key: string }, u: { $set: { value: unknown } }) { rows[q.key] = { value: u.$set.value }; return {}; },
+      async findOne(q: { key: string }) { return rows[q.key] ?? null; },
     }),
   };
 }
