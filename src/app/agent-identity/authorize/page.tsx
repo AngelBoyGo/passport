@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
@@ -98,7 +98,9 @@ function ConsentInner() {
 export default function AgentAuthorizePage() {
   return (
     <main className="mx-auto max-w-lg px-6 py-16">
-      <ConsentInner />
+      <Suspense fallback={<p className="text-sm text-slate-500">Loading…</p>}>
+        <ConsentInner />
+      </Suspense>
     </main>
   );
 }
