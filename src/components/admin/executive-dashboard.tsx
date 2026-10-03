@@ -18,16 +18,21 @@ const number = new Intl.NumberFormat("en-US");
 
 export function ExecutiveDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
-  const [tab, setTab] = useState<AdminTabId>(() => {
-    if (typeof window !== "undefined") {
-      const p = new URLSearchParams(window.location.search).get("tab");
-      if (p && ADMIN_TABS.some((t) => t.id === p)) {
-        return p as AdminTabId;
-      }
-    }
-    return "command-center";
-  });
+  const [tab, setTab] = useState<AdminTabId>("command-center");
   const [error, setError] = useState("");
+
+  // Read ?tab= AFTER mount. A useState initializer that reads window.location
+  // runs once during hydration and misses the URL when /admin/economy redirects
+  // to /admin?tab=economy (the query is applied by the router after the first
+  // render), so the redirected nav landed on command-center instead of economy.
+  // Reading in an effect is reactive to the redirect and to back/forward.
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search).get("tab");
+    if (p && ADMIN_TABS.some((t) => t.id === p)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- sync tab from URL
+      setTab(p as AdminTabId);
+    }
+  }, []);
   const [copilotMessage, setCopilotMessage] = useState("Ask about the current operating picture.");
 
   const selectTab = useCallback((id: AdminTabId) => {
