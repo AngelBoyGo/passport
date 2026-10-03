@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401, headers: NO_STORE });
   }
 
-  let body: { agent_commitment?: string; audience?: string; requested_scopes?: string[] };
+  let body: { agent_commitment?: string; audience?: string; requested_scopes?: string[]; code_challenge?: string; code_challenge_method?: string };
   try {
     body = await request.json();
   } catch {
@@ -37,6 +37,11 @@ export async function POST(request: NextRequest) {
   const agentCommitment = String(body.agent_commitment || "").trim().toLowerCase();
   const audience = String(body.audience || "").trim();
   const scopes = Array.isArray(body.requested_scopes) ? body.requested_scopes : ["owner_email"];
+  const codeChallenge = body.code_challenge ? String(body.code_challenge).trim() : null;
+  const codeChallengeMethod = body.code_challenge_method ? String(body.code_challenge_method).trim() : null;
+  if (codeChallengeMethod && codeChallengeMethod !== "S256") {
+    return NextResponse.json({ error: "unsupported_code_challenge_method" }, { status: 400, headers: NO_STORE });
+  }
   if (!agentCommitment || !audience) {
     return NextResponse.json({ error: "agent_commitment and audience required" }, { status: 400, headers: NO_STORE });
   }
@@ -69,6 +74,8 @@ export async function POST(request: NextRequest) {
     owner_email: operator.email ?? null,
     owner_name: operator.email ? operator.email.split("@")[0] : null,
     created_at: Math.floor(Date.now() / 1000),
+    code_challenge: codeChallenge,
+    code_challenge_method: codeChallenge ? (codeChallengeMethod || "S256") : null,
   });
 
   return NextResponse.json({ code, expires_in: 120 }, { headers: NO_STORE });

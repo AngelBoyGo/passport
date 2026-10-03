@@ -83,7 +83,11 @@ export function buildDiscoveryDocument () {
     id_token_signing_alg_values_supported: ["EdDSA"],
     scopes_supported: ["openid", "owner_email"],
     claims_supported: ["sub", "iss", "aud", "exp", "iat", "jti", "owner_email", "owner_name"],
-    grant_types_supported: ["urn:ietf:params:oauth:grant-type:jwt-bearer"],
+    grant_types_supported: ["urn:ietf:params:oauth:grant-type:jwt-bearer", "authorization_code"],
+    code_challenge_methods_supported: ["S256"],
+    revocation_endpoint: `${iss}/api/v1/agent-identity/revoke`,
+    token_exchange_endpoint: `${iss}/api/v1/agent-identity/token-exchange`,
+    userinfo_signing_alg_values_supported: ["EdDSA"],
   };
 }
 
@@ -159,6 +163,20 @@ export interface AuthCodeRecord {
   owner_email: string | null;
   owner_name: string | null;
   created_at: number; // unix seconds
+  /** PKCE S256 challenge (RFC 7636). When set, the token exchange MUST present
+   *  a matching code_verifier. Optional for backward-compat with SPA-less flows. */
+  code_challenge?: string | null;
+  code_challenge_method?: string | null;
+}
+
+/** PKCE S256 verification (RFC 7636 §4.6). */
+export function verifyPkceS256 (verifier: string, challenge: string): boolean {
+  if (!verifier || !challenge) return false;
+  // base64url(sha256(verifier)) === challenge
+  const digest = sha256Hex(verifier); // hex
+  const b64 = Buffer.from(digest, "hex").toString("base64")
+    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return b64 === challenge;
 }
 
 function codeKey (code: string): string {
@@ -197,4 +215,40 @@ export async function consumeAuthCode (
   await db.collection("platform_settings").deleteOne({ key });
   if (Math.floor(Date.now() / 1000) - rec.created_at > AUTH_CODE_TTL_SECONDS) return null;
   return rec;
+}
+
+/**
+ * Revocation — kill ONE agent's sign-ins without touching the owner.
+ * We record `revoked_before` (unix seconds) per subject; any id_token whose
+ * `iat` predates it is rejected. Revoking an agent therefore never locks out
+ * the human or their other agents.
+ */
+const REVOKE_PREFIX = "agentid:revoked:";
+
+export async function setRevoked (
+  db: { collection: (n: string) => { updateOne: (q: unknown, u: unknown, o?: unknown) => Promise<unknown> } },
+  subjectCommitment: string,
+  at: number = Math.floor(Date.now() / 1000)
+): Promise<void> {
+  await db.collection("platform_settings").updateOne(
+    { key: REVOKE_PREFIX + subjectCommitment },
+    { $set: { key: REVOKE_PREFIX + subjectCommitment, value: at, updated_at: new Date() } },
+    { upsert: true }
+  );
+}
+
+export async function getRevokedBefore (
+  db: { collection: (n: string) => { findOne: (q: unknown) => Promise<unknown> } },
+  subjectCommitment: string
+): Promise<number | null> {
+  const doc = (await db.collection("platform_settings").findOne({ key: REVOKE_PREFIX + subjectCommitment })) as
+    | { value?: number }
+    | null;
+  return typeof doc?.value === "number" ? doc.value : null;
+}
+
+/** True when a token issued at `iat` is covered by a revocation. */
+export function isRevoked (iat: number | undefined, revokedBefore: number | null): boolean {
+  if (typeof iat !== "number" || typeof revokedBefore !== "number") return false;
+  return iat < revokedBefore;
 }

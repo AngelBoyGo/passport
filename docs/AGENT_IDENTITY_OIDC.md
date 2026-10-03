@@ -60,6 +60,48 @@ Add Passport as a custom OIDC provider in Clerk / Supabase / Auth0 / Better Auth
 Open clients (no `owner_email` scope) receive the token **without** owner claims —
 never a token with the claim silently missing.
 
+## Delegated access (RFC 8693 token exchange)
+
+An operator exchanges its API key for a token representing one of **its** agents
+acting on its behalf — the Enterprise wedge:
+
+```
+POST /api/v1/agent-identity/token-exchange   (Bearer operator API key)
+{ agent_commitment, audience, requested_scopes? }
+-> { id_token, act: { sub: <operator_id> }, ... }
+```
+
+## Revocation (kill one agent, not the owner)
+
+```
+POST /api/v1/agent-identity/revoke   (owner API key or session)
+{ agent_commitment }
+```
+
+Revoking records a `revoked_before` watermark for that subject; every id_token
+issued before it is rejected by `/verify` and `/userinfo`, while the owner and
+all their other agents are untouched.
+
+## Verify an agent (server-side / MCP)
+
+```
+POST /api/v1/agent-identity/verify   { id_token, audience? }
+```
+
+Exposed as the MCP tool **`passport_verify_agent`** so an app — or another
+agent — can confirm *who* is behind an agent before acting.
+
+## PKCE
+
+The browser/owner-approved flow supports **PKCE S256**: pass `code_challenge` +
+`code_challenge_method=S256` to the consent endpoint and `code_verifier` to the
+token endpoint. A code bound to a challenge cannot be redeemed without it.
+
+## Discovery aliases
+
+- `/.well-known/openid-configuration` (OIDC)
+- `/.well-known/oauth-authorization-server` (RFC 8414 alias)
+
 ## Relying-party verification (drop-in)
 
 ```ts

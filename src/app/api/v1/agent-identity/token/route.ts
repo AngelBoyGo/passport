@@ -5,6 +5,10 @@ import { sha256Hex } from "@/lib/receipt/canonical";
 import {
   mintAgentIdToken,
   AGENT_IDENTITY_ISSUER,
+  consumeAuthCode,
+  verifyPkceS256,
+  getRevokedBefore,
+  isRevoked,
 } from "@/lib/agent-identity/oidc";
 
 export const dynamic = "force-dynamic";
@@ -13,23 +17,25 @@ const NO_STORE = { "Cache-Control": "no-store, max-age=0" };
 /**
  * POST /api/v1/agent-identity/token
  *
- * "Sign in with Passport" token endpoint. An ENROLLED agent proves possession
- * of its Ed25519 key by signing a per-login transaction binding the target
- * audience, then receives an EdDSA id_token whose `sub` is its stable
- * subject_commitment and — for REGISTERED clients only — whose `owner_email`/
- * `owner_name` identify the accountable human.
+ * "Sign in with Passport" token endpoint. Two grant shapes:
  *
- * Body: { agent_commitment, audience, nonce, signature }
- *   signature = agent's Ed25519 signature over sha256Hex(`${audience}|${nonce}`)
+ *  A. HEADLESS (agent-held key): { agent_commitment, audience, nonce, signature }
+ *     The agent proves possession of its Ed25519 key over a per-login
+ *     transaction.
  *
- * Security (per audit discipline):
- *  - the nonce must be fresh (enrollment challenge window) — no replay;
- *  - ownership claims are disclosed only to registered audiences;
- *  - a `requested_scopes` containing `owner_email` marks the client registered;
- *    otherwise the token is minted WITHOUT owner claims (never silently partial).
+ *  B. OWNER-APPROVED (browser hand-off): { grant_type: "authorization_code",
+ *     code, audience }
+ *     The owner approved the sign-in in the browser; the single-use code was
+ *     minted by /api/v1/agent-identity/authorize/consent.
+ *
+ * Both mint the same EdDSA id_token: `sub` = stable subject, and — for
+ * registered clients only — accountable-owner claims.
  */
 export async function POST(request: NextRequest) {
   let body: {
+    grant_type?: string;
+    code?: string;
+    code_verifier?: string;
     agent_commitment?: string;
     audience?: string;
     nonce?: string;
@@ -42,8 +48,50 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "invalid_json" }, { status: 400, headers: NO_STORE });
   }
 
-  const commitment = String(body.agent_commitment || "").trim().toLowerCase();
   const audience = String(body.audience || "").trim();
+
+  // ---- Grant B: owner-approved authorization code ----
+  if (body.grant_type === "authorization_code" || body.code) {
+    const code = String(body.code || "").trim();
+    if (!code) {
+      return NextResponse.json({ error: "code_required" }, { status: 400, headers: NO_STORE });
+    }
+    const rec = await consumeAuthCode(prisma as never, code).catch(() => null);
+    if (!rec) {
+      return NextResponse.json({ error: "invalid_or_expired_code" }, { status: 400, headers: NO_STORE });
+    }
+    // PKCE S256 (RFC 7636): if the code was bound to a challenge, the exchange
+    // MUST present the matching verifier — prevents auth-code interception.
+    if (rec.code_challenge) {
+      const verifier = String(body.code_verifier || "").trim();
+      if (!verifyPkceS256(verifier, rec.code_challenge)) {
+        return NextResponse.json({ error: "pkce_verification_failed" }, { status: 400, headers: NO_STORE });
+      }
+    }
+    if (audience && audience !== rec.audience) {
+      return NextResponse.json({ error: "audience_mismatch" }, { status: 400, headers: NO_STORE });
+    }
+    // Revocation: a revoked agent cannot obtain new tokens.
+    const revokedBefore = await getRevokedBefore(prisma as never, rec.agent_commitment).catch(() => null);
+    if (isRevoked(Math.floor(Date.now() / 1000) - 1, revokedBefore)) {
+      return NextResponse.json({ error: "agent_revoked" }, { status: 403, headers: NO_STORE });
+    }
+    const includeOwner = rec.scopes.includes("owner_email");
+    const { id_token, expires_in } = await mintAgentIdToken({
+      subjectCommitment: rec.agent_commitment,
+      audience: rec.audience,
+      ownerEmail: includeOwner ? rec.owner_email : undefined,
+      ownerName: includeOwner ? rec.owner_name : undefined,
+      includeOwnerClaims: includeOwner,
+    });
+    return NextResponse.json(
+      { id_token, token_type: "Bearer", expires_in, issuer: AGENT_IDENTITY_ISSUER, scopes: ["openid", ...(includeOwner ? ["owner_email"] : [])] },
+      { headers: NO_STORE }
+    );
+  }
+
+  // ---- Grant A: headless agent signature ----
+  const commitment = String(body.agent_commitment || "").trim().toLowerCase();
   const nonce = String(body.nonce || "").trim();
   const signature = String(body.signature || "").trim();
   if (!commitment || !audience || !nonce || !signature) {
@@ -59,6 +107,12 @@ export async function POST(request: NextRequest) {
   });
   if (!enrollment || enrollment.status !== "ISSUED") {
     return NextResponse.json({ error: "agent_not_enrolled" }, { status: 403, headers: NO_STORE });
+  }
+
+  // Revocation: a revoked agent cannot obtain new tokens.
+  const revokedBefore2 = await getRevokedBefore(prisma as never, commitment).catch(() => null);
+  if (isRevoked(Math.floor(Date.now() / 1000) - 1, revokedBefore2)) {
+    return NextResponse.json({ error: "agent_revoked" }, { status: 403, headers: NO_STORE });
   }
 
   // 1. Verify the agent's own credential (property 2) over the login transaction.

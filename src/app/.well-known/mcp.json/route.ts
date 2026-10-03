@@ -46,6 +46,36 @@ export async function GET(request: NextRequest) {
         method: "POST",
       },
       {
+        name: "passport_verify_agent",
+        description:
+          "Verify a Passport agent identity (an id_token from 'Sign in with Passport') and return the stable subject plus the accountable owner. Lets an app or another agent confirm WHO is behind an agent before acting.",
+        parameters: {
+          type: "object",
+          required: ["id_token"],
+          properties: {
+            id_token: { type: "string", description: "An EdDSA id_token issued by Passport's agent-identity issuer." },
+            audience: { type: "string", description: "Expected audience (your app/client_id); recommended." },
+          },
+        },
+        endpoint: `${baseUrl}/api/v1/agent-identity/verify`,
+        method: "POST",
+      },
+      {
+        name: "passport_agent_sign_in_authorize",
+        description:
+          "Start a 'Sign in with Passport' sign-in for an agent. Returns a nonce + transaction digest the agent signs; exchange at the token endpoint.",
+        parameters: {
+          type: "object",
+          required: ["agent_commitment", "audience"],
+          properties: {
+            agent_commitment: { type: "string", description: "The agent's 64-hex subject commitment." },
+            audience: { type: "string", description: "The relying app's client_id / URL." },
+          },
+        },
+        endpoint: `${baseUrl}/api/v1/agent-identity/authorize`,
+        method: "POST",
+      },
+      {
         name: "passport_post_evidence",
         description: "Anchor signed behavioral evidence for an enrolled agent on the privacy-preserving Passport ledger.",
         parameters: {

@@ -89,6 +89,20 @@ export async function buildAgentCard(baseUrl: string): Promise<Record<string, un
     },
     capabilities: [
       {
+        id: "sign_in_with_passport",
+        name: "Sign in with Passport (Agent Identity / OIDC)",
+        description:
+          "Portable OpenID Connect issuer: any app can accept an agent's sign-in and learn its accountable owner. Stable subject, agent-held key, JWKS verification, owner claims for registered clients.",
+        issuer: `${baseUrl}/.well-known/openid-configuration`,
+        jwks_uri: `${baseUrl}/.well-known/jwks.json`,
+        token_endpoint: `${baseUrl}/api/v1/agent-identity/token`,
+        token_exchange_endpoint: `${baseUrl}/api/v1/agent-identity/token-exchange`,
+        authorize_endpoint: `${baseUrl}/api/v1/agent-identity/authorize`,
+        verify_endpoint: `${baseUrl}/api/v1/agent-identity/verify`,
+        revoke_endpoint: `${baseUrl}/api/v1/agent-identity/revoke`,
+        documentation_url: `${baseUrl}/docs/agent-identity-oidc`,
+      },
+      {
         id: "enroll_agent",
         name: "Agent Enrollment",
         description: "Proof-based Ed25519 challenge-response enrollment.",
