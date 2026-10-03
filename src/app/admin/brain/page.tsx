@@ -325,7 +325,11 @@ export default function AdminBrainPage() {
   const latestHealth = trajectory.length > 0 ? trajectory[trajectory.length - 1].health : 1.0;
 
   return (
-    <div className="space-y-6 text-slate-100" aria-label="AI brain command center">
+    <div
+      className="-mx-6 -my-8 bg-[#080b12] px-6 py-8 text-slate-100"
+      aria-label="AI brain command center"
+    >
+      <div className="space-y-6">
       {/* ── Top Header & Real-Time Connection Ribbon ── */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-white/10 pb-5">
         <div>
@@ -766,6 +770,7 @@ export default function AdminBrainPage() {
           </div>
         )}
       </section>
+      </div>
     </div>
   );
 }

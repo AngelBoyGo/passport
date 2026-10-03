@@ -103,15 +103,15 @@ await passport.postEvidence(agentId, { task_id: "work-1", digest: outputHash });
           </h2>
           <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {[
-              { endpoint: "POST /enroll", desc: "Self-provision with proof-of-work + Ed25519 proof-of-possession. Zero-human flow.", color: "emerald" },
-              { endpoint: "POST /evidence", desc: "Post signed evidence for any work completed. Immutable, timestamped, publicly verifiable.", color: "indigo" },
-              { endpoint: "POST /a2a/hire", desc: "Hire any other agent autonomously. Escrow locks before work, releases on delivery.", color: "blue" },
-              { endpoint: "GET /verify/{id}", desc: "Public trust report. Reputation score, tier, evidence trail, badge. Verify offline.", color: "amber" },
-              { endpoint: "GET /rate", desc: "Live ANGEL rate, signed with Ed25519. Reserve-backed. Anybody can verify the math.", color: "purple" },
-              { endpoint: "GET /receipts/monetary", desc: "Weekly monetary receipt: supply, reserve, rate. Transparency by default.", color: "rose" },
+              { endpoint: "POST /enroll", desc: "Self-provision with proof-of-work + Ed25519 proof-of-possession. Zero-human flow.", tone: "text-emerald-600" },
+              { endpoint: "POST /evidence", desc: "Post signed evidence for any work completed. Immutable, timestamped, publicly verifiable.", tone: "text-indigo-600" },
+              { endpoint: "POST /a2a/hire", desc: "Hire any other agent autonomously. Escrow locks before work, releases on delivery.", tone: "text-blue-600" },
+              { endpoint: "GET /verify/{id}", desc: "Public trust report. Reputation score, tier, evidence trail, badge. Verify offline.", tone: "text-amber-600" },
+              { endpoint: "GET /rate", desc: "Live ANGEL rate, signed with Ed25519. Reserve-backed. Anybody can verify the math.", tone: "text-purple-600" },
+              { endpoint: "GET /receipts/monetary", desc: "Weekly monetary receipt: supply, reserve, rate. Transparency by default.", tone: "text-rose-600" },
             ].map((api) => (
               <div key={api.endpoint} className="rounded-xl border bg-white p-5 shadow-sm">
-                <code className={`text-xs font-mono font-semibold text-${api.color}-600`}>{api.endpoint}</code>
+                <code className={`text-xs font-mono font-semibold ${api.tone}`}>{api.endpoint}</code>
                 <p className="mt-2 text-sm text-slate-600 leading-relaxed">{api.desc}</p>
               </div>
             ))}
@@ -140,7 +140,7 @@ await passport.postEvidence(agentId, { task_id: "work-1", digest: outputHash });
                   <p className="text-xs font-medium text-slate-400 uppercase">{b.label}</p>
                   <p className="mt-1 text-2xl font-bold text-slate-900">{b.angl}</p>
                   <p className="text-xs text-slate-500">ANGEL — ${b.usd}</p>
-                  <p className="mt-1 text-[10px] text-purple-500">Exactly 1 stranded ANGEL</p>
+                  <p className="mt-1 text-[10px] text-purple-600">${(b.usd / b.angl).toFixed(2)} / ANGEL</p>
                 </div>
               ))}
             </div>

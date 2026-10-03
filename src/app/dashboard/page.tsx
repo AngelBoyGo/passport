@@ -298,7 +298,7 @@ export default function UserDashboard() {
       <SiteHeader />
 
       <main className="flex-1 mx-auto max-w-7xl w-full px-4 py-8 sm:px-6 lg:px-8 space-y-8">
-        {/* â”€â”€ Top Bar / Header â”€â”€ */}
+        {/* ── Top Bar / Header ── */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-800 pb-6">
           <div>
             <div className="flex items-center gap-3">
@@ -312,7 +312,7 @@ export default function UserDashboard() {
               )}
             </div>
             <p className="mt-1 text-xs text-slate-400">
-              Signed in as <strong className="text-slate-200">{data?.operator.email ?? "Operator"}</strong> Â· Credits: {data?.operator.credits ?? 0}
+              Signed in as <strong className="text-slate-200">{data?.operator.email ?? "Operator"}</strong> · Credits: {data?.operator.credits ?? 0}
             </p>
           </div>
 
@@ -321,18 +321,18 @@ export default function UserDashboard() {
               href="/admin"
               className="rounded-lg border border-slate-700 bg-slate-800 px-3.5 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-700 transition"
             >
-              Admin Console â†—
+              Admin Console ↗
             </Link>
             <button
               onClick={handleLogout}
               className="rounded-lg border border-red-500/30 bg-red-500/10 px-3.5 py-2 text-xs font-semibold text-red-300 hover:bg-red-500/20 transition"
             >
-              Sign out âŽ‹
+              Sign out ⎋
             </button>
           </div>
         </div>
 
-        {/* â”€â”€ Adaptive Persona Switcher (The Versatile Lenses) â”€â”€ */}
+        {/* ── Adaptive Persona Switcher (The Versatile Lenses) ── */}
         <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-2 shadow-inner">
           <p className="px-3 pt-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
             Select Your Specialized Verification Lens
@@ -347,7 +347,7 @@ export default function UserDashboard() {
               }`}
             >
               <div className="text-xs font-bold flex items-center gap-1.5">
-                <span>ðŸš€</span> Vibe Coder / Builder
+                <span>🚀</span> Vibe Coder / Builder
               </div>
               <p className="mt-0.5 text-[10px] opacity-80 leading-tight">API keys, SDKs, agent cards, embed badges</p>
             </button>
@@ -361,9 +361,9 @@ export default function UserDashboard() {
               }`}
             >
               <div className="text-xs font-bold flex items-center gap-1.5">
-                <span>âš¡</span> Data Center & Energy
+                <span>⚡</span> Data Center & Energy
               </div>
-              <p className="mt-0.5 text-[10px] opacity-80 leading-tight">Hardware power Î”, thermal safety, carbon</p>
+              <p className="mt-0.5 text-[10px] opacity-80 leading-tight">Hardware power Δ, thermal safety, carbon</p>
             </button>
 
             <button
@@ -375,7 +375,7 @@ export default function UserDashboard() {
               }`}
             >
               <div className="text-xs font-bold flex items-center gap-1.5">
-                <span>ðŸ›¡ï¸</span> Enterprise & Compliance
+                <span>🛡️</span> Enterprise & Compliance
               </div>
               <p className="mt-0.5 text-[10px] opacity-80 leading-tight">EU AI Act, NIST AI RMF, SOC 2, HIPAA packages</p>
             </button>
@@ -389,14 +389,14 @@ export default function UserDashboard() {
               }`}
             >
               <div className="text-xs font-bold flex items-center gap-1.5">
-                <span>ðŸ”</span> Sovereign Crypto Auditor
+                <span>🔍</span> Sovereign Crypto Auditor
               </div>
               <p className="mt-0.5 text-[10px] opacity-80 leading-tight">Merkle roots, Ed25519 signatures, offline CLI</p>
             </button>
           </div>
         </div>
 
-        {/* â”€â”€ High-Level Metric Tiles â”€â”€ */}
+        {/* ── High-Level Metric Tiles ── */}
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <div className="rounded-xl border border-slate-800 bg-slate-800/60 p-4 shadow-sm">
             <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wide">Total Signed Receipts</span>
@@ -423,13 +423,13 @@ export default function UserDashboard() {
           </div>
         </div>
 
-        {/* â”€â”€ Agent Operations Console â”€â”€ */}
+        {/* ── Agent Operations Console ── */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <SchedulerCard />
           <AgentInbox />
         </div>
 
-        {/* â”€â”€ Agent governance snapshot (from governance) â”€â”€ */}
+        {/* ── Agent governance snapshot (from governance) ── */}
         {governance && (
           <div className="rounded-xl border border-slate-800 bg-slate-800/60 p-4 shadow-sm flex flex-col items-center text-center">
             <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wide">Access Tier</span>
@@ -441,26 +441,26 @@ export default function UserDashboard() {
               {governance.live_status.statusLabel === "Active" ? "Active" : "Not Live"}
             </span>
             <p className="mt-1 text-[10px] text-slate-400">
-              {governance.wallet.credits} credits available Â· {governance.wallet.locked} locked
+              {governance.wallet.credits} credits available · {governance.wallet.locked} locked
             </p>
           </div>
         )}
 
-        {/* â”€â”€ Add credits (USDC) + custodial wallet â”€â”€ */}
+        {/* ── Add credits (USDC) + custodial wallet ── */}
         <div className="rounded-xl border border-slate-800 bg-slate-800/80 p-5 shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <h2 className="text-base font-bold text-white flex items-center gap-2">
-                <span>ðŸ’µ</span> Add Credits (USDC) Â· Stablecoin
+                <span>💵</span> Add Credits (USDC) · Stablecoin
               </h2>
-              <p className="text-xs text-slate-400">Top up Operator.credits with USDC via Stripe â€” settlement is backed by real dollars.</p>
+              <p className="text-xs text-slate-400">Top up Operator.credits with USDC via Stripe — settlement is backed by real dollars.</p>
             </div>
             <button
               type="button"
               onClick={loadWalletCard}
               className="text-xs text-indigo-400 hover:underline"
             >
-              {walletCard ? (walletCard.chain_address ? `Wallet ${walletCard.chain_address.slice(0,8)}â€¦` : "Refresh wallet") : "View wallet"}
+              {walletCard ? (walletCard.chain_address ? `Wallet ${walletCard.chain_address.slice(0,8)}…` : "Refresh wallet") : "View wallet"}
             </button>
           </div>
 
@@ -472,10 +472,10 @@ export default function UserDashboard() {
                 onChange={(e) => setTopUpAmount(Number(e.target.value))}
                 className="mt-1 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200"
               >
-                <option value={1000}>$10 â€” 1,000 credits</option>
-                <option value={5000}>$50 â€” 5,000 credits</option>
-                <option value={10000}>$100 â€” 10,000 credits</option>
-                <option value={50000}>$500 â€” 50,000 credits</option>
+                <option value={1000}>$10 — 1,000 credits</option>
+                <option value={5000}>$50 — 5,000 credits</option>
+                <option value={10000}>$100 — 10,000 credits</option>
+                <option value={50000}>$500 — 50,000 credits</option>
               </select>
             </div>
             <button
@@ -484,12 +484,12 @@ export default function UserDashboard() {
               disabled={toppingUp}
               className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-500 transition disabled:opacity-50"
             >
-              {toppingUp ? "Startingâ€¦" : "Top up with USDC â†’"}
+              {toppingUp ? "Starting…" : "Top up with USDC →"}
             </button>
           </div>
         </div>
 
-        {/* â”€â”€ Dynamic Lens Content â”€â”€ */}
+        {/* ── Dynamic Lens Content ── */}
 
         {/* 1. BUILDER LENS */}
         {lens === "builder" && (
@@ -499,7 +499,7 @@ export default function UserDashboard() {
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                   <h2 className="text-base font-bold text-white flex items-center gap-2">
-                    <span>ðŸ”‘</span> API Authentication & Quick Launcher
+                    <span>🔑</span> API Authentication & Quick Launcher
                   </h2>
                   <p className="text-xs text-slate-400">Use your Bearer API key to issue receipts and post evidence from Python, TS, or cURL.</p>
                 </div>
@@ -532,14 +532,14 @@ export default function UserDashboard() {
 
               {createdKeyRaw && (
                 <div className="rounded-lg border border-emerald-500/40 bg-emerald-950/40 p-4 text-xs space-y-2">
-                  <p className="font-bold text-emerald-300">âœ“ New API Key Created â€” Save It Now (Shown Once):</p>
+                  <p className="font-bold text-emerald-300">✓ New API Key Created — Save It Now (Shown Once):</p>
                   <div className="flex items-center justify-between bg-slate-900 p-2.5 rounded border border-emerald-800 font-mono text-emerald-200">
                     <span className="break-all">{createdKeyRaw}</span>
                     <button
                       onClick={() => copyText(createdKeyRaw, "newKey")}
                       className="ml-3 shrink-0 text-emerald-400 hover:text-emerald-300 font-sans font-bold"
                     >
-                      {copiedKey === "newKey" ? "âœ“ Copied!" : "Copy"}
+                      {copiedKey === "newKey" ? "✓ Copied!" : "Copy"}
                     </button>
                   </div>
                 </div>
@@ -558,7 +558,7 @@ export default function UserDashboard() {
                     }
                     className="text-indigo-400 hover:underline"
                   >
-                    {copiedKey === "curl" ? "âœ“ Copied" : "Copy cURL"}
+                    {copiedKey === "curl" ? "✓ Copied" : "Copy cURL"}
                   </button>
                 </div>
                 <pre className="text-[11px] font-mono text-indigo-300 overflow-x-auto select-all">
@@ -574,7 +574,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
             {/* Badge & GitHub Embed Generator */}
             <div className="rounded-xl border border-slate-800 bg-slate-800/80 p-6 shadow-sm space-y-4">
               <h2 className="text-base font-bold text-white flex items-center gap-2">
-                <span>ðŸ›¡ï¸</span> Live Badge Generator for GitHub READMEs
+                <span>🛡️</span> Live Badge Generator for GitHub READMEs
               </h2>
               <p className="text-xs text-slate-400">Embed a dynamic, verified badge that automatically updates as your agent completes work.</p>
 
@@ -591,7 +591,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
                       }
                       className="text-indigo-400 hover:underline"
                     >
-                      {copiedKey === "badgeMd" ? "âœ“ Copied" : "Copy"}
+                      {copiedKey === "badgeMd" ? "✓ Copied" : "Copy"}
                     </button>
                   </div>
                   <code className="block text-[11px] font-mono text-slate-400 bg-slate-950 p-2 rounded">
@@ -611,7 +611,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
                       }
                       className="text-indigo-400 hover:underline"
                     >
-                      {copiedKey === "badgeHtml" ? "âœ“ Copied" : "Copy"}
+                      {copiedKey === "badgeHtml" ? "✓ Copied" : "Copy"}
                     </button>
                   </div>
                   <code className="block text-[11px] font-mono text-slate-400 bg-slate-950 p-2 rounded">
@@ -622,7 +622,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
 
               <div className="rounded-lg bg-indigo-950/30 border border-indigo-700/40 p-3 space-y-2">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-medium text-indigo-300">Authenticity Card â€” &quot;Passport Verified Â· Authenticated AI Build&quot;</span>
+                  <span className="font-medium text-indigo-300">Authenticity Card — &quot;Passport Verified · Authenticated AI Build&quot;</span>
                   <button
                     onClick={() =>
                       copyText(
@@ -632,7 +632,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
                     }
                     className="text-indigo-400 hover:underline"
                   >
-                    {copiedKey === "cardMd" ? "âœ“ Copied" : "Copy Embed"}
+                    {copiedKey === "cardMd" ? "✓ Copied" : "Copy Embed"}
                   </button>
                 </div>
                 <img
@@ -648,19 +648,20 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
           </div>
         )}
 
-        {/* â”€â”€ AngelCoin Economy â€” live wallet, independence, and buy flow â”€â”€ */}
+        {/* ── AngelCoin Economy — live wallet, independence, and buy flow ── */}
         <div className="rounded-xl border border-purple-500/30 bg-purple-950/20 p-6 shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-purple-900/60 pb-4">
             <div>
               <h2 className="text-base font-bold text-white flex items-center gap-2">
-                <span>ðŸ‘›</span> AngelCoin Economy
+                <span>👛</span> AngelCoin Economy
               </h2>
               <p className="text-xs text-slate-300">
-                AngelCoin credits power agent payments, access tiers, and marketplace escrow.
-                1 ANGL = $0.01 USD; reserve-backing is a design goal, not yet audited.
+                AngelCoin (ANGEL) powers agent payments, access tiers, and marketplace escrow.
+                Pegged at 1 ANGEL = $5.00 USD (reserve-backing is a design goal, not yet audited).
+                Operator credits are separate: 100 credits = $1.00.
                 {governanceAgent && (
                   <span className="font-mono text-xs text-purple-400 ml-1">
-                    commitment {governanceAgent.slice(0, 12)}â€¦
+                    commitment {governanceAgent.slice(0, 12)}…
                   </span>
                 )}
               </p>
@@ -672,7 +673,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
                   disabled={governanceLoading}
                   className="rounded-lg border border-purple-700/50 bg-slate-900 px-3 py-1.5 text-xs font-medium text-purple-200 hover:bg-slate-800 transition"
                 >
-                  {governanceLoading ? "Refreshingâ€¦" : "Refresh"}
+                  {governanceLoading ? "Refreshing…" : "Refresh"}
                 </button>
               )}
               {governanceAgent && (
@@ -682,7 +683,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
                   rel="noreferrer"
                   className="rounded-lg border border-emerald-700/50 bg-slate-900 px-3 py-1.5 text-xs font-medium text-emerald-200 hover:bg-slate-800 transition"
                 >
-                  Share Trust Report â†—
+                  Share Trust Report ↗
                 </a>
               )}
               {governanceAgent && (
@@ -692,7 +693,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
                   rel="noreferrer"
                   className="rounded-lg border border-amber-700/50 bg-slate-900 px-3 py-1.5 text-xs font-medium text-amber-200 hover:bg-slate-800 transition"
                 >
-                  Weekly Digest â†—
+                  Weekly Digest ↗
                 </a>
               )}
               {governanceAgent && (
@@ -702,20 +703,20 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
                   rel="noreferrer"
                   className="rounded-lg border border-rose-700/50 bg-slate-900 px-3 py-1.5 text-xs font-medium text-rose-200 hover:bg-slate-800 transition"
                 >
-                  Needs Card â†—
+                  Needs Card ↗
                 </a>
               )}
               <a
                 href="/angelcoin"
                 className="rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-purple-500 transition"
               >
-                Buy ANGL â†—
+                Buy ANGL ↗
               </a>
               <a
                 href="/docs/api-reference"
                 className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-800 transition"
               >
-                API Docs â†’
+                API Docs →
               </a>
             </div>
           </div>
@@ -725,12 +726,12 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
               <div className="rounded-lg bg-slate-900 border border-slate-800 p-4">
                 <span className="text-[10px] font-semibold uppercase text-slate-400">Available Credits</span>
                 <p className="mt-1 text-2xl font-bold text-purple-300">{governance.wallet?.credits ?? 0}</p>
-                <p className="mt-0.5 text-slate-400">â‰ˆ ${((governance.wallet?.credits ?? 0) * 0.01).toFixed(2)} USD</p>
+                <p className="mt-0.5 text-slate-400">≈ ${((governance.wallet?.credits ?? 0) * 0.01).toFixed(2)} USD</p>
               </div>
               <div className="rounded-lg bg-slate-900 border border-slate-800 p-4">
                 <span className="text-[10px] font-semibold uppercase text-slate-400">Access Tier</span>
-                <p className="mt-1 text-2xl font-bold text-white">{governance.access_tier ?? "â€”"}</p>
-                <p className="mt-0.5 text-slate-400">live status: {governance.live_status?.statusLabel ?? "â€”"}</p>
+                <p className="mt-1 text-2xl font-bold text-white">{governance.access_tier ?? "—"}</p>
+                <p className="mt-0.5 text-slate-400">live status: {governance.live_status?.statusLabel ?? "—"}</p>
               </div>
               <div className="rounded-lg bg-slate-900 border border-slate-800 p-4">
                 <span className="text-[10px] font-semibold uppercase text-slate-400">Admin Override</span>
@@ -748,8 +749,8 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
               <p className="text-sm font-semibold text-purple-200">Your AngelCoin account will appear here</p>
               <p className="text-xs text-slate-400 max-w-lg mx-auto">
                 AngelCoin credits are minted automatically when you enroll an agent and post evidence.
-                Credits control access tiers (FULL â†’ SUSPENDED), fund escrow locks for marketplace
-                engagements, and power agent-to-agent payments. <strong className="text-slate-300">No separate setup required</strong> â€” 
+                Credits control access tiers (FULL → SUSPENDED), fund escrow locks for marketplace
+                engagements, and power agent-to-agent payments. <strong className="text-slate-300">No separate setup required</strong> — 
                 just enroll an agent and start posting evidence from the <strong className="text-indigo-400">Builder</strong> lens above.
               </p>
               <div className="flex flex-wrap justify-center gap-2 pt-1">
@@ -757,13 +758,13 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
                   href="/docs/getting-started"
                   className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-500 transition"
                 >
-                  Getting Started Guide â†—
+                  Getting Started Guide ↗
                 </a>
                 <a
                   href="/docs/api-reference"
                   className="rounded-lg border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800 transition"
                 >
-                  API Reference â†—
+                  API Reference ↗
                 </a>
               </div>
             </div>
@@ -787,11 +788,11 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
           )}
         </div>
 
-        {/* Agent Payments (API) â€” programmatic actions for operators */}
+        {/* Agent Payments (API) — programmatic actions for operators */}
         <div className="rounded-xl border border-emerald-500/25 bg-emerald-950/10 p-6 shadow-sm space-y-4">
           <div>
             <h2 className="text-base font-bold text-white flex items-center gap-2">
-              <span>ðŸ¤–</span> Agent Payments
+              <span>🤖</span> Agent Payments
             </h2>
             <p className="text-xs text-slate-400">
               Programmatic actions an operator (or agent) can take against the payment rail with a Bearer API key.
@@ -802,7 +803,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
           <div className="grid gap-3 text-xs sm:grid-cols-3">
             <div className="rounded-lg bg-slate-900 border border-slate-800 p-3 space-y-2">
               <span className="font-semibold text-emerald-300">Spend (scoped)</span>
-              <p className="text-slate-400">POST /api/v1/agent-pay/spend â€” authorize a product (e.g. portable_credential_issuance) within a spend ceiling.</p>
+              <p className="text-slate-400">POST /api/v1/agent-pay/spend — authorize a product (e.g. portable_credential_issuance) within a spend ceiling.</p>
               <button
                 onClick={() =>
                   copyText(
@@ -815,13 +816,13 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
                 }
                 className="text-emerald-400 hover:underline"
               >
-                {copiedKey === "paySpend" ? "âœ“ Copied" : "Copy cURL"}
+                {copiedKey === "paySpend" ? "✓ Copied" : "Copy cURL"}
               </button>
             </div>
 
             <div className="rounded-lg bg-slate-900 border border-slate-800 p-3 space-y-2">
               <span className="font-semibold text-emerald-300">Settlement (inbound)</span>
-              <p className="text-slate-400">POST /api/v1/agent-pay/settlement â€” HMAC-authenticated credit from a rail (Stripe, x402, Visa).</p>
+              <p className="text-slate-400">POST /api/v1/agent-pay/settlement — HMAC-authenticated credit from a rail (Stripe, x402, Visa).</p>
               <button
                 onClick={() =>
                   copyText(
@@ -834,13 +835,13 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
                 }
                 className="text-emerald-400 hover:underline"
               >
-                {copiedKey === "paySettle" ? "âœ“ Copied" : "Copy cURL"}
+                {copiedKey === "paySettle" ? "✓ Copied" : "Copy cURL"}
               </button>
             </div>
 
             <div className="rounded-lg bg-slate-900 border border-slate-800 p-3 space-y-2">
               <span className="font-semibold text-emerald-300">Withdraw (on-chain)</span>
-              <p className="text-slate-400">POST /api/v1/agent-pay/withdraw â€” burn ANGL to the custodial wallet (KYC-gated in live).</p>
+              <p className="text-slate-400">POST /api/v1/agent-pay/withdraw — burn ANGL to the custodial wallet (KYC-gated in live).</p>
               <button
                 onClick={() =>
                   copyText(
@@ -853,24 +854,24 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
                 }
                 className="text-emerald-400 hover:underline"
               >
-                {copiedKey === "payWithdraw" ? "âœ“ Copied" : "Copy cURL"}
+                {copiedKey === "payWithdraw" ? "✓ Copied" : "Copy cURL"}
               </button>
             </div>
           </div>
 
           <a href="/docs/api-reference" className="text-xs text-indigo-400 hover:underline inline-block">
-            Full API reference â†’
+            Full API reference →
           </a>
         </div>
 
-        {/* â”€â”€ Live Activity Feed â”€â”€ */}
+        {/* ── Live Activity Feed ── */}
         <div className="rounded-xl border border-slate-800 bg-slate-800/80 p-5 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-bold text-white flex items-center gap-2">
-              <span>âš¡</span> Live Activity Feed
+              <span>⚡</span> Live Activity Feed
             </h2>
             <Link href="/leaderboard" className="text-xs text-indigo-400 hover:underline">
-              View Leaderboard â†—
+              View Leaderboard ↗
             </Link>
           </div>
           {activityFeed && activityFeed.length > 0 ? (
@@ -892,7 +893,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
                     href={event.link || "#"}
                     className="shrink-0 text-indigo-400 hover:underline ml-2"
                   >
-                    View â†’
+                    View →
                   </a>
                 </div>
               ))}
@@ -902,10 +903,10 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
           )}
         </div>
 
-        {/* â”€â”€ Referral Code â”€â”€ */}
+        {/* ── Referral Code ── */}
         <div className="rounded-xl border border-sky-500/30 bg-sky-950/20 p-5 shadow-sm space-y-4">
           <h2 className="text-base font-bold text-white flex items-center gap-2">
-            <span>ðŸ”—</span> Invite Friends â€” Earn Credits
+            <span>🔗</span> Invite Friends — Earn Credits
           </h2>
           <p className="text-xs text-slate-400">
             Share your referral code. When a new operator signs up with it, you get bonus credits!
@@ -923,7 +924,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
                 }}
                 className="rounded-lg bg-sky-600 px-4 py-2 text-xs font-semibold text-white hover:bg-sky-500 transition"
               >
-                {copiedRef ? "âœ“ Copied!" : "Copy"}
+                {copiedRef ? "✓ Copied!" : "Copy"}
               </button>
             </div>
           ) : (
@@ -941,7 +942,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-emerald-900/60 pb-4">
                 <div>
                   <h2 className="text-base font-bold text-white flex items-center gap-2">
-                    <span>âš¡</span> Data Center Infrastructure & GPU Energy Governance
+                    <span>⚡</span> Data Center Infrastructure & GPU Energy Governance
                   </h2>
                   <p className="text-xs text-slate-300">Empirically verify hardware-measured power reductions, thermal safety, and Scope 2 carbon savings.</p>
                 </div>
@@ -949,7 +950,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
                   href="/datacenter"
                   className="rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-500 transition"
                 >
-                  Open Full Data Center Hub â†—
+                  Open Full Data Center Hub ↗
                 </Link>
               </div>
 
@@ -957,7 +958,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
                 <div className="rounded-lg bg-slate-900 border border-slate-800 p-4">
                   <span className="text-[10px] font-semibold uppercase text-slate-400">Active Setpoint Policy</span>
                   <p className="mt-1 text-lg font-bold text-emerald-400 font-mono">{data?.datacenter.acting_champion_policy ?? "Active"}</p>
-                  <p className="mt-0.5 text-xs text-slate-400">Avg Power Î”: <strong>{data?.datacenter.avg_power_reduction_pct ? `${data.datacenter.avg_power_reduction_pct}%` : "Measured"}</strong></p>
+                  <p className="mt-0.5 text-xs text-slate-400">Avg Power Δ: <strong>{data?.datacenter.avg_power_reduction_pct ? `${data.datacenter.avg_power_reduction_pct}%` : "Measured"}</strong></p>
                 </div>
 
                 <div className="rounded-lg bg-slate-900 border border-slate-800 p-4">
@@ -982,7 +983,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
                   rel="noreferrer"
                   className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500 transition"
                 >
-                  Export DataCenter Sustainability VC (JSON-LD) â†—
+                  Export DataCenter Sustainability VC (JSON-LD) ↗
                 </a>
                 <a
                   href="/api/v1/datacenter/receipts"
@@ -990,7 +991,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
                   rel="noreferrer"
                   className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-800 transition"
                 >
-                  View DataCenter Receipts Ledger â†—
+                  View DataCenter Receipts Ledger ↗
                 </a>
               </div>
             </div>
@@ -1004,7 +1005,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-sky-900/60 pb-4">
                 <div>
                   <h2 className="text-base font-bold text-white flex items-center gap-2">
-                    <span>ðŸ›¡ï¸</span> Regulatory & Enterprise ESG Compliance Engine
+                    <span>🛡️</span> Regulatory & Enterprise ESG Compliance Engine
                   </h2>
                   <p className="text-xs text-slate-300">Generate signed, audit-grade packages mapped to international AI and data security standards.</p>
                 </div>
@@ -1027,7 +1028,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
                     rel="noreferrer"
                     className="rounded-lg bg-sky-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-sky-500 transition"
                   >
-                    Download Package JSON â†—
+                    Download Package JSON ↗
                   </a>
                 </div>
               </div>
@@ -1051,7 +1052,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
                 <div>
                   <h3 className="text-sm font-bold text-emerald-300">Metered Reputation-as-a-Service (RaaS)</h3>
                   <p className="text-xs text-slate-400 mt-1">
-                    Premium attestation products billed against your credit ledger â€” verified reputation lookups, portable
+                    Premium attestation products billed against your credit ledger — verified reputation lookups, portable
                     credential issuance, audit packages, and neutrality/residency attestations.
                   </p>
                 </div>
@@ -1062,13 +1063,13 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
                     rel="noreferrer"
                     className="rounded-lg bg-emerald-600 px-3 py-1.5 font-bold text-white hover:bg-emerald-500 transition"
                   >
-                    POST Metered Portable Credential (0.5 credit) â†—
+                    POST Metered Portable Credential (0.5 credit) ↗
                   </a>
                   <a
                     href="/docs/verification"
                     className="rounded-lg border border-emerald-600/40 bg-slate-900 px-3 py-1.5 font-medium text-emerald-300 hover:bg-slate-800 transition"
                   >
-                    RaaS Product Catalog â†’
+                    RaaS Product Catalog →
                   </a>
                 </div>
               </div>
@@ -1082,7 +1083,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
             <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-6 shadow-sm space-y-4">
               <div className="border-b border-amber-900/60 pb-4">
                 <h2 className="text-base font-bold text-white flex items-center gap-2">
-                  <span>ðŸ”</span> Air-Gapped & Sovereign Cryptographic Audit Center
+                  <span>🔍</span> Air-Gapped & Sovereign Cryptographic Audit Center
                 </h2>
                 <p className="text-xs text-slate-300">Independently verify ledger inclusion and Ed25519 signatures without trusting Passport servers.</p>
               </div>
@@ -1100,7 +1101,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
                       }
                       className="text-amber-400 hover:underline"
                     >
-                      {copiedKey === "cliVerif" ? "âœ“ Copied" : "Copy Command"}
+                      {copiedKey === "cliVerif" ? "✓ Copied" : "Copy Command"}
                     </button>
                   </div>
                   <pre className="text-[11px] font-mono text-amber-300 overflow-x-auto select-all">
@@ -1115,7 +1116,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
                     rel="noreferrer"
                     className="rounded-lg border border-amber-600/40 bg-slate-900 px-3 py-1.5 font-medium text-amber-300 hover:bg-slate-800 transition"
                   >
-                    Public Key Transparency Log (Append-Only) â†—
+                    Public Key Transparency Log (Append-Only) ↗
                   </a>
                   <a
                     href="/api/v1/receipts/checkpoints/latest"
@@ -1123,7 +1124,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
                     rel="noreferrer"
                     className="rounded-lg border border-amber-600/40 bg-slate-900 px-3 py-1.5 font-medium text-amber-300 hover:bg-slate-800 transition"
                   >
-                    Latest Merkle Checkpoint Root â†—
+                    Latest Merkle Checkpoint Root ↗
                   </a>
                   <a
                     href="/api/v1/receipts/checkpoints/latest"
@@ -1131,7 +1132,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
                     rel="noreferrer"
                     className="rounded-lg border border-emerald-600/40 bg-slate-900 px-3 py-1.5 font-medium text-emerald-300 hover:bg-slate-800 transition"
                   >
-                    External Notary Anchor (Merkle Head) â†—
+                    External Notary Anchor (Merkle Head) ↗
                   </a>
                   <a
                     href={`/api/v1/compliance/audit-package/${data?.agents[0]?.agentId || "agent_default"}?framework=SOC2_TYPE2`}
@@ -1139,7 +1140,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
                     rel="noreferrer"
                     className="rounded-lg border border-sky-600/40 bg-slate-900 px-3 py-1.5 font-medium text-sky-300 hover:bg-slate-800 transition"
                   >
-                    Audit-Grade SOC 2 Evidence Package â†—
+                    Audit-Grade SOC 2 Evidence Package ↗
                   </a>
                 </div>
               </div>
@@ -1147,7 +1148,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
           </div>
         )}
 
-        {/* â”€â”€ Universal Receipts Stream & Cryptographic Inspector â”€â”€ */}
+        {/* ── Universal Receipts Stream & Cryptographic Inspector ── */}
         <div className="rounded-xl border border-slate-800 bg-slate-800/80 shadow-sm">
           <div className="border-b border-slate-800 p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
@@ -1158,7 +1159,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
               href="/admin/receipts"
               className="text-xs text-indigo-400 hover:underline"
             >
-              View Full Receipts Explorer â†’
+              View Full Receipts Explorer →
             </Link>
           </div>
 
@@ -1204,7 +1205,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
                           onClick={() => setSelectedReceipt(r)}
                           className="text-indigo-400 hover:text-indigo-300 hover:underline font-semibold"
                         >
-                          Inspect Proof ðŸ”
+                          Inspect Proof 🔍
                         </button>
                       </td>
                     </tr>
@@ -1215,7 +1216,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
           </div>
         </div>
 
-        {/* â”€â”€ Cryptographic Proof Inspector Modal â”€â”€ */}
+        {/* ── Cryptographic Proof Inspector Modal ── */}
         {selectedReceipt && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
             <div className="max-w-2xl w-full rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
@@ -1228,7 +1229,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
                   onClick={() => setSelectedReceipt(null)}
                   className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white"
                 >
-                  âœ•
+                  ✕
                 </button>
               </div>
 
@@ -1255,7 +1256,7 @@ curl -X POST "${origin}/api/v1/passport/agents/AGENT_ID/evidence" \\
                     rel="noreferrer"
                     className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-500 transition"
                   >
-                    Open Public Verification Page â†—
+                    Open Public Verification Page ↗
                   </a>
                   <button
                     onClick={() => setSelectedReceipt(null)}
