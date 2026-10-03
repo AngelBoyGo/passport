@@ -32,5 +32,7 @@ export async function register() {
     startRevenueRunner();
     const { startFleetWatchScheduler } = await import("@/lib/scheduler/fleet-watch-scheduler");
     startFleetWatchScheduler();
+    const { startFleetDispatchScheduler } = await import("@/lib/scheduler/fleet-dispatch-scheduler");
+    startFleetDispatchScheduler();
   }
 }
