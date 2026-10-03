@@ -9,7 +9,12 @@ export async function register() {
     // SIGNING_PRIVATE_KEY/SESSION_SECRET booted silently and degraded.
     try {
       const { validateEnv } = await import("@/lib/config/env");
-      validateEnv();
+      const report = validateEnv();
+      // Surface non-fatal warnings (e.g. empty admin allowlist) at boot so a
+      // misconfiguration is visible in logs instead of silently breaking a page.
+      for (const w of report.warnings ?? []) {
+        console.warn("[env] warning:", w);
+      }
     } catch (err) {
       console.error(
         "[env] startup validation failed:",

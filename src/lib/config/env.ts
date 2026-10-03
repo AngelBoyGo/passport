@@ -176,6 +176,18 @@ function collectWarnings(): string[] {
     );
   }
 
+  // Guard: in production an empty executive-admin allowlist silently locks the
+  // entire admin console (isExecutiveAdmin() returns false for everyone). Fail
+  // loudly so a deploy missing ADMIN_OPERATOR_EMAILS is caught immediately.
+  if (
+    process.env.NODE_ENV === "production" &&
+    !envPresent("ADMIN_OPERATOR_EMAILS")
+  ) {
+    warnings.push(
+      "ADMIN_OPERATOR_EMAILS is empty in production — the entire executive admin console will return 'no passports / access denied'. Set it to a comma-separated list of operator emails."
+    );
+  }
+
   return warnings;
 }
 
