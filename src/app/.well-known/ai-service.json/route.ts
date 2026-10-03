@@ -54,6 +54,16 @@ export async function GET(request: NextRequest) {
         enrollment_docs: `${baseUrl}/docs/getting-started`,
         did_document: `${baseUrl}/.well-known/did.json`,
         key_transparency: `${baseUrl}/api/v1/transparency/keys`,
+        // "Sign in with Passport" — portable OIDC agent identity (cross-org).
+        sign_in_with_passport: {
+          description: "Let any OIDC-capable app accept an agent's sign-in and learn its accountable owner.",
+          openid_configuration: `${baseUrl}/.well-known/openid-configuration`,
+          jwks_uri: `${baseUrl}/.well-known/jwks.json`,
+          token_endpoint: `${baseUrl}/api/v1/agent-identity/token`,
+          authorize_endpoint: `${baseUrl}/api/v1/agent-identity/authorize`,
+          userinfo_endpoint: `${baseUrl}/api/v1/agent-identity/userinfo`,
+          docs: `${baseUrl}/docs/agent-identity-oidc`,
+        },
       },
       reputation: {
         description: "Verifiable reputation score (0-1000) with 5 tiers (Bronze→Diamond).",
