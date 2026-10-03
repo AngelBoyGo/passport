@@ -142,3 +142,59 @@ export async function verifyAgentIdToken (token: string): Promise<Record<string,
 }
 
 export const AGENT_IDENTITY_TTL_SECONDS = ID_TOKEN_TTL_SECONDS;
+
+/**
+ * Authorization codes for the BROWSER/owner-approval flow ("hand the sign-in to
+ * your owner"). An owner approves an agent's sign-in in the browser; Passport
+ * issues a short-lived, single-use code the agent (or the app) exchanges at the
+ * token endpoint. Stored in `platform_settings` to avoid a schema migration.
+ */
+export const AUTH_CODE_TTL_SECONDS = 120;
+const AUTH_CODE_PREFIX = "agentid:code:";
+
+export interface AuthCodeRecord {
+  agent_commitment: string;
+  audience: string;
+  scopes: string[];
+  owner_email: string | null;
+  owner_name: string | null;
+  created_at: number; // unix seconds
+}
+
+function codeKey (code: string): string {
+  return AUTH_CODE_PREFIX + code;
+}
+
+export function newAuthCode (): string {
+  return sha256Hex(`agentid:${Date.now()}:${Math.random()}:${Math.random()}`).slice(0, 40);
+}
+
+/** Persist an authorization code (single-use, short TTL). */
+export async function storeAuthCode (
+  db: { collection: (n: string) => { updateOne: (q: unknown, u: unknown, o?: unknown) => Promise<unknown> } },
+  code: string,
+  record: AuthCodeRecord
+): Promise<void> {
+  await db.collection("platform_settings").updateOne(
+    { key: codeKey(code) },
+    { $set: { key: codeKey(code), value: record, updated_at: new Date() } },
+    { upsert: true }
+  );
+}
+
+/** Consume an authorization code exactly once. Returns null when missing/expired/used. */
+export async function consumeAuthCode (
+  db: { collection: (n: string) => { findOne: (q: unknown) => Promise<unknown>; deleteOne: (q: unknown) => Promise<unknown> } },
+  code: string
+): Promise<AuthCodeRecord | null> {
+  const key = codeKey(code);
+  const doc = (await db.collection("platform_settings").findOne({ key })) as
+    | { value?: AuthCodeRecord }
+    | null;
+  const rec = doc?.value;
+  if (!rec) return null;
+  // Single-use: delete immediately so it can never be replayed.
+  await db.collection("platform_settings").deleteOne({ key });
+  if (Math.floor(Date.now() / 1000) - rec.created_at > AUTH_CODE_TTL_SECONDS) return null;
+  return rec;
+}
