@@ -35,20 +35,13 @@ export type LlmTier = (typeof LLM_TIERS)[number];
  */
 export const TIER_MODEL_ALLOWLIST: Record<LlmTier, readonly string[]> = {
   neuron: ["deepseek-v4-flash"],
-  cortex: [
-    "llama-3.1-8b-instant",
-    "gemini-1.5-flash",
-    "mistral-small-latest",
-    "gpt-4o-mini",
-    "claude-3-haiku-20240307",
-    "deepseek-v4-flash",
-  ],
+  cortex: ["deepseek-v4-flash", "gpt-4o-mini"],
   money: ["deepseek-v4-pro"],
 };
 
 export const DEFAULT_TIER_MODEL: Record<LlmTier, string> = {
   neuron: "deepseek-v4-flash",
-  cortex: "llama-3.1-8b-instant",
+  cortex: "gpt-4o-mini",
   money: "deepseek-v4-pro",
 };
 

@@ -16,7 +16,7 @@ describe("llm tiers — cortex expansion", () => {
   });
 
   it("cortex admits only cheap, allowlisted models", () => {
-    expect(TIER_MODEL_ALLOWLIST.cortex).toContain("llama-3.1-8b-instant");
+    expect(TIER_MODEL_ALLOWLIST.cortex).toContain("gpt-4o-mini");
     expect(TIER_MODEL_ALLOWLIST.cortex).toContain("deepseek-v4-flash");
     // money-tier model is never admitted on cortex
     expect(TIER_MODEL_ALLOWLIST.cortex).not.toContain("deepseek-v4-pro");
@@ -35,7 +35,7 @@ describe("llm tiers — cortex expansion", () => {
   });
 
   it("resolveAllowlistedModel accepts allowlisted, rejects unknown", () => {
-    expect(resolveAllowlistedModel("cortex", "llama-3.1-8b-instant")).toBe("llama-3.1-8b-instant");
+    expect(resolveAllowlistedModel("cortex", "gpt-4o-mini")).toBe("gpt-4o-mini");
     expect(() => resolveAllowlistedModel("cortex", "bogus-model")).toThrow(/tier_model_not_allowed/);
   });
 

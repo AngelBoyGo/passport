@@ -81,7 +81,7 @@ describe("dialogue — Plan → Critique → Revise → Commit", () => {
       .mockResolvedValueOnce(JSON.stringify({ steps: [{ action: "RUN_DISCOVERY", params: {}, rationale: "d" }] }));
     await runMissionDialogue(CTX);
     const models = completeMock.mock.calls.map((c) => c[0].model);
-    expect(models[0]).toBe("llama-3.1-8b-instant"); // MUSE default
+    expect(models[0]).toBe("gpt-4o-mini"); // MUSE default
     expect(models[1]).toBe("deepseek-v4-flash"); // MARS default
   });
 });

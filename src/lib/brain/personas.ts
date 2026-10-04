@@ -69,7 +69,7 @@ export const MARS: Persona = {
 export const MUSE: Persona = {
   id: "muse",
   name: "MUSE",
-  defaultModel: "llama-3.1-8b-instant",
+  defaultModel: "gpt-4o-mini",
   modelEnv: "LLM_MODEL_MUSE",
   temperature: 0.85,
   systemPrompt:
