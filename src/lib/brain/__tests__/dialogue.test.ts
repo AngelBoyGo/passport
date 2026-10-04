@@ -97,9 +97,10 @@ describe("vetSteps (deterministic arbiter)", () => {
     expect(out.map((s) => s.step)).toEqual([1, 2]);
   });
 
-  it("rejects ADVANCE_MISSION_PLAN recursion is handled by callers, but self is allowlisted here", () => {
-    // ADVANCE_MISSION_PLAN is on the allowlist; command-brain guards recursion at execution.
+  it("rejects ADVANCE_MISSION_PLAN as a stored step (it is a meta-action)", () => {
+    // A plan step must be real work; ADVANCE_MISSION_PLAN is how the cycle runs
+    // a stored step, so it can never itself be stored.
     const out = vetSteps([{ step: 1, action: "ADVANCE_MISSION_PLAN", params: { mission_id: "m1" }, rationale: "x", done: false }]);
-    expect(out).toHaveLength(1);
+    expect(out).toHaveLength(0);
   });
 });

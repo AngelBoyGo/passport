@@ -143,6 +143,10 @@ export function vetSteps(steps: MissionStep[]): MissionStep[] {
   for (const s of steps) {
     const action = s.action.toUpperCase();
     if (!isAllowedAction(action)) continue;
+    // ADVANCE_MISSION_PLAN is a META-action the cycle applies to run a stored
+    // step — it must never itself be stored as a plan step (that would be a
+    // self-referential step). Reject it here so plans contain only real work.
+    if (action === "ADVANCE_MISSION_PLAN") continue;
     const check = validateActionParams(action, s.params);
     if (!check.ok) continue;
     vetted.push({ ...s, step: vetted.length + 1, action, params: check.params });
