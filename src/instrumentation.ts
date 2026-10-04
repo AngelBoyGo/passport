@@ -34,5 +34,7 @@ export async function register() {
     startFleetWatchScheduler();
     const { startFleetDispatchScheduler } = await import("@/lib/scheduler/fleet-dispatch-scheduler");
     startFleetDispatchScheduler();
+    const { startMoltbookScheduler } = await import("@/lib/scheduler/moltbook-scheduler");
+    startMoltbookScheduler();
   }
 }

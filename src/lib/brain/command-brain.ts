@@ -58,6 +58,7 @@ export const BRAIN_ACTIONS = [
   "RETIRE_AGENT",
   "REQUEST_MONEY_INTENT",
   "RUN_LOCUM_SEARCH",
+  "ADVANCE_MISSION_PLAN",
 ] as const;
 export type BrainAction = (typeof BRAIN_ACTIONS)[number];
 
@@ -98,6 +99,16 @@ export interface BrainDatapoints {
     human_routes?: number;
     hybrid_routes?: number;
   };
+  /** Forward-looking objectives the brain authored and is advancing. */
+  missions?: Array<{
+    missionId: string;
+    title: string;
+    objective: string;
+    status: string;
+    priority: number;
+    next_step?: { action: string; rationale: string } | null;
+    open_steps?: number;
+  }>;
 }
 
 /** Composite 0..1 health used for trend/learning. Penalties for under-collateralization,
@@ -169,6 +180,33 @@ export async function gatherDatapoints(now: Date): Promise<BrainDatapoints> {
     ? Math.round(((now.getTime() - lastLocum.createdAt.getTime()) / 3_600_000) * 10) / 10
     : null;
 
+  // Mission awareness: the brain's own forward-looking objectives + their next
+  // committed step, so its decision is mission-aware. Best-effort — a mission
+  // read failure omits the datapoint, it never breaks the cycle.
+  const missions = await (async () => {
+    try {
+      const { listActiveMissions, getCurrentPlan } = await import("@/lib/brain/mission-service");
+      const active = await listActiveMissions(8);
+      return Promise.all(
+        active.map(async (m) => {
+          const plan = await getCurrentPlan(m.missionId).catch(() => null);
+          const next = plan?.steps.find((s) => !s.done) ?? null;
+          return {
+            missionId: m.missionId,
+            title: m.title,
+            objective: m.objective,
+            status: m.status,
+            priority: m.priority,
+            next_step: next ? { action: next.action, rationale: next.rationale.slice(0, 160) } : null,
+            open_steps: plan ? plan.steps.filter((s) => !s.done).length : 0,
+          };
+        })
+      );
+    } catch {
+      return undefined;
+    }
+  })();
+
   return {
     economy: economyRes?.health ? { ...economyRes.health } : {},
     integrity: { ok: Boolean(integ.ok), issues: integ.issues ?? [] },
@@ -178,6 +216,7 @@ export async function gatherDatapoints(now: Date): Promise<BrainDatapoints> {
     ...(marketplace ? { marketplace } : {}),
     ...(locumCandidate ? { locum_candidate: locumCandidate } : {}),
     ...(locumLastRunHours != null ? { locum_last_run_hours: locumLastRunHours } : {}),
+    ...(missions && missions.length > 0 ? { missions } : {}),
     health_score: computeHealthScore(
       { reserve_adequate: Boolean((economy as any).reserve_adequate) },
       { ok: Boolean(integ.ok) },
@@ -327,6 +366,10 @@ const SYSTEM_PROMPT =
   "If locum_candidate is present in the datapoints, run it when locum_last_run_hours is " +
   "absent (never run) or >= 6 — the candidate has jobs at $350+/hr and the market moves. " +
   "The candidate info (name + id) is in locum_candidate. " +
+  "MISSIONS: datapoints.missions lists your own forward-looking objectives, each with a " +
+  "committed next_step (action + rationale). When a mission has a next_step, prefer " +
+  "ADVANCE_MISSION_PLAN (params: {mission_id, step_index?}) to execute it — but only if it is " +
+  "the highest-value thing to do this cycle. " +
   "Prefer NOOP unless a datapoint clearly " +
   "warrants action (e.g. integrity issues -> TRIGGER_ATTESTATION; a broken rail -> QUARANTINE_RAIL; " +
   "stale discovery -> RUN_DISCOVERY; no recent self-research -> RUN_RESEARCH_SCAN; " +
@@ -357,6 +400,124 @@ function skippedReport(
     health_score: healthScore,
     ...(error ? { error } : {}),
   };
+}
+
+/**
+ * Continuous mission reflection. Gated by env + a minimum interval floor so a
+ * 10-minute cycle does not multiply persona calls without bound. Uses the last
+ * dialogue NOTE's timestamp to throttle.
+ */
+async function runDialogueReflection(datapoints: BrainDatapoints, cycleId: string): Promise<void> {
+  if (String(process.env.BRAIN_DIALOGUE_ENABLED || "true").toLowerCase() === "false") return;
+
+  const minInterval = Number(process.env.BRAIN_DIALOGUE_MIN_INTERVAL_MINUTES);
+  const floorMinutes = Number.isFinite(minInterval) && minInterval >= 0 ? minInterval : 10;
+  if (floorMinutes > 0) {
+    const last = await prisma.brainMemory
+      .findFirst({
+        where: { kind: "DIALOGUE" },
+        orderBy: { createdAt: "desc" },
+        select: { createdAt: true },
+      })
+      .catch(() => null);
+    if (last && Date.now() - last.createdAt.getTime() < floorMinutes * 60_000) return;
+  }
+
+  const { listActiveMissions, getCurrentPlan, createMission, commitPlan } = await import(
+    "@/lib/brain/mission-service"
+  );
+  const { runMissionDialogue } = await import("@/lib/brain/dialogue");
+
+  const recent = await prisma.brainMemory
+    .findMany({ orderBy: { createdAt: "desc" }, take: 8, select: { kind: true, summary: true } })
+    .catch(() => [] as { kind: string; summary: string }[]);
+
+  let missions = await listActiveMissions(5);
+
+  // Genesis: if no missions exist, let the personas author the first one from
+  // the current datapoints. This is what makes missions brain-generated.
+  if (missions.length === 0) {
+    const genesis = await proposeMissionGenesis(datapoints, recent);
+    if (genesis) {
+      const created = await createMission(genesis);
+      if (created.ok) missions = [created.mission];
+    }
+  }
+
+  for (const m of missions) {
+    const plan = await getCurrentPlan(m.missionId).catch(() => null);
+    const openSteps = plan ? plan.steps.filter((s) => !s.done) : [];
+    const result = await runMissionDialogue({
+      missionId: m.missionId,
+      title: m.title,
+      objective: m.objective,
+      thesis: m.thesis,
+      datapoints: datapoints as unknown as Record<string, unknown>,
+      recentMemory: recent,
+      openSteps,
+    });
+
+    await prisma.brainMemory
+      .create({
+        data: {
+          cycleId,
+          kind: "DIALOGUE",
+          summary: `mission=${m.missionId} ${result.ok ? result.summary : `no plan: ${result.reason}`}`.slice(0, 500),
+          action: "ADVANCE_MISSION_PLAN",
+          actionResult: result.ok ? "committed" : "failed",
+          data: { turns: result.turns, steps: result.steps } as never,
+        },
+      })
+      .catch(() => null);
+
+    if (result.ok && result.steps.length > 0) {
+      const committed = await commitPlan({
+        missionId: m.missionId,
+        cycleId,
+        steps: result.steps,
+        dialogue: result.turns,
+        createdByPersona: result.draftedBy,
+        committedStep: result.committedStep,
+      });
+      if (committed.ok) {
+        console.log(
+          `[command-brain] Dialogue committed plan ${committed.plan.planId} for mission ${m.missionId} (${result.steps.length} steps)`
+        );
+      }
+    }
+  }
+}
+
+/** One-shot persona genesis of a mission when none exist. Returns createMission input or null. */
+async function proposeMissionGenesis(
+  datapoints: BrainDatapoints,
+  memory: Array<{ kind: string; summary: string }>
+): Promise<{ title: string; objective: string; thesis?: string; priority?: number; originPersona?: string; evidenceRefs?: unknown } | null> {
+  try {
+    const raw = await brainComplete({
+      system:
+        "You are MARS and MUSE jointly, the two-persona Passport Command Brain. The economy has " +
+        "no active missions. Author ONE high-leverage mission that a commodity-backed autonomous " +
+        "agent economy should pursue next, grounded in the datapoints. Return STRICT JSON: " +
+        '{"title":"<short>","objective":"<measurable>","thesis":"<2-3 sentences>","priority":<0-100>}.',
+      user: JSON.stringify({ datapoints, recent_memory: memory }),
+      json: true,
+    });
+    const parsed = parseJsonObject(raw);
+    const title = String(parsed.title ?? "").trim();
+    const objective = String(parsed.objective ?? "").trim();
+    if (!title || !objective) return null;
+    return {
+      title,
+      objective,
+      thesis: String(parsed.thesis ?? "").slice(0, 800),
+      priority: Number.isFinite(Number(parsed.priority)) ? Math.trunc(Number(parsed.priority)) : 60,
+      originPersona: "mars",
+      evidenceRefs: { source: "mission_genesis", cycle_datapoints: true },
+    };
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -488,6 +649,20 @@ export async function runBrainCycle(now: Date = new Date(), deps: BrainDeps = {}
       .create({
         data: { cycleId, kind: "DECISION", summary: rationale.slice(0, 500), action, data: params as any },
       });
+
+    // Two-persona self-dialogue: MUSE drafts / MARS critiques / MUSE revises /
+    // a deterministic arbiter commits a plan. Runs best-effort BEFORE execution
+    // so a dialogue fault never blocks the primary decision. Gated by
+    // BRAIN_DIALOGUE_ENABLED (default on) and a configurable interval floor
+    // (BRAIN_DIALOGUE_MIN_INTERVAL_MINUTES, default 10 = every cycle).
+    try {
+      await runDialogueReflection(datapoints, cycleId);
+    } catch (err) {
+      console.warn(
+        "[command-brain] Dialogue reflection failed (best-effort):",
+        err instanceof Error ? err.message : String(err)
+      );
+    }
 
     // Phase 43: canary SHADOW comparison. If a proposal is in CANARY, its policy
     // decides what IT would do this cycle — recorded as a NOTE, NEVER executed.

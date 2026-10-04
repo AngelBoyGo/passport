@@ -12,7 +12,8 @@
  */
 
 import { prisma } from "@/lib/db";
-import { completeTier } from "@/lib/llm/gateway-client";
+import { completeTier, type ChatMessage } from "@/lib/llm/gateway-client";
+import { resolveAllowlistedModel } from "@/lib/llm/tiers";
 import type { LlmTier } from "@/lib/llm/tiers";
 
 export interface BrainConfig {
@@ -31,9 +32,12 @@ export function getBrainConfig(): BrainConfig | null {
 }
 
 /**
- * The brain's LLM call — routed through the tiered gateway client on the
- * `neuron` tier (model pinned by src/lib/llm/tiers.ts; callers cannot inject
- * a raw model id). The brain NEVER executes on the money tier.
+ * The brain's LLM call — routed through the tiered gateway client.
+ *
+ * Default tier is `neuron` (model pinned by src/lib/llm/tiers.ts). The
+ * two-persona dialogue loop may request the cheaper `cortex` tier and an
+ * explicit allowlisted model. The brain NEVER executes on the money tier:
+ * `money` is rejected here regardless of caller.
  */
 export async function brainComplete(opts: {
   system: string;
@@ -41,11 +45,17 @@ export async function brainComplete(opts: {
   json?: boolean;
   temperature?: number;
   tier?: LlmTier;
+  /** Explicit model id — validated against the tier allowlist (fail-closed). */
+  model?: string;
+  /** Multi-turn conversation; replaces [system,user] when present. */
+  messages?: ChatMessage[];
 }): Promise<string> {
-  if (opts.tier && opts.tier !== "neuron") {
-    throw new Error(`brain_tier_violation:${opts.tier}`);
+  const tier = opts.tier ?? "neuron";
+  if (tier === "money") {
+    throw new Error(`brain_tier_violation:${tier}`);
   }
-  return completeTier(opts.tier ?? "neuron", opts);
+  const model = opts.model ? resolveAllowlistedModel(tier, opts.model) : undefined;
+  return completeTier(tier, { ...opts, model });
 }
 
 /** Parses model output, tolerating ```json fences; throws on invalid/absent object. */

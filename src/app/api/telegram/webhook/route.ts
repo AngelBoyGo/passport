@@ -187,6 +187,96 @@ async function handleCommand(command: string, args: string[], from: string): Pro
     case "jobs":
       return "_Job pipeline lives in the Callora boundary. Use `/brain RUN_LOCUM_SEARCH` to kick a search; results land in the Callora apply view._";
 
+    case "missions": {
+      const { listActiveMissions, getCurrentPlan } = await import("@/lib/brain/mission-service");
+      const active = await listActiveMissions(10);
+      if (active.length === 0) {
+        return "*Missions:* none active yet. The brain authors one on its next cycle, or use `/plan`.";
+      }
+      const lines = await Promise.all(
+        active.map(async (m) => {
+          const plan = await getCurrentPlan(m.missionId).catch(() => null);
+          const next = plan?.steps.find((s) => !s.done);
+          return `\`${m.missionId}\` [P${m.priority}] *${m.title}*\n  ${next ? `next: ${next.action}` : "no committed step"}`;
+        })
+      );
+      return ["*Active missions*", ...lines, "", "`/mission <id>` for detail · `/plan` to re-plan"].join("\n");
+    }
+
+    case "mission": {
+      const id = String(args[0] ?? "").trim();
+      if (!id) return "Usage: `/mission <mission_id>`";
+      const { getMission, getCurrentPlan } = await import("@/lib/brain/mission-service");
+      const m = await getMission(id);
+      if (!m) return `Mission \`${id}\` not found.`;
+      const plan = await getCurrentPlan(id).catch(() => null);
+      const steps = plan
+        ? plan.steps.map((s) => `  ${s.done ? "✓" : "•"} ${s.step}. ${s.action} — ${s.rationale.slice(0, 100)}`).join("\n")
+        : "  (no committed plan)";
+      return [
+        `*${m.title}*`,
+        `Status: ${m.status} · Priority ${m.priority} · by ${m.originPersona}`,
+        `Objective: ${m.objective}`,
+        m.thesis ? `Thesis: ${m.thesis}` : "",
+        "*Plan:*",
+        steps,
+      ].filter(Boolean).join("\n");
+    }
+
+    case "plan": {
+      const { listActiveMissions, getCurrentPlan, createMission, commitPlan } = await import("@/lib/brain/mission-service");
+      const { runMissionDialogue } = await import("@/lib/brain/dialogue");
+      const { gatherDatapoints } = await import("@/lib/brain/command-brain");
+      const dps = await gatherDatapoints(new Date());
+      let active = await listActiveMissions(5);
+      if (active.length === 0) {
+        const created = await createMission({
+          title: "Prove the earning loop end-to-end",
+          objective: "Land a first externally-paid engagement and record the revenue",
+          thesis: "Operator-seeded genesis mission for the dialogue loop.",
+          priority: 70,
+          originPersona: "muse",
+          evidenceRefs: { source: "telegram_seed" },
+        });
+        if (created.ok) active = [created.mission];
+      }
+      const m = active[0];
+      if (!m) return "No mission available to plan.";
+      const plan = await getCurrentPlan(m.missionId).catch(() => null);
+      const result = await runMissionDialogue({
+        missionId: m.missionId,
+        title: m.title,
+        objective: m.objective,
+        thesis: m.thesis,
+        datapoints: dps as unknown as Record<string, unknown>,
+        openSteps: plan ? plan.steps.filter((s) => !s.done) : [],
+      });
+      if (!result.ok) return `Dialogue did not commit a plan: ${result.reason}`;
+      await commitPlan({
+        missionId: m.missionId,
+        steps: result.steps,
+        dialogue: result.turns,
+        createdByPersona: result.draftedBy,
+        committedStep: result.committedStep,
+      });
+      return [
+        "*Dialogue complete*",
+        `Mission: ${m.title}`,
+        result.steps.map((s) => `  ${s.step}. ${s.action} — ${s.rationale.slice(0, 110)}`).join("\n"),
+      ].join("\n");
+    }
+
+    case "moltbook": {
+      const { moltbookConfigured, moltbookRead, recentMoltbookItems } = await import("@/lib/brain/moltbook");
+      if (!moltbookConfigured()) {
+        return "Moltbook not configured. Register + set `MOLTBOOK_API_KEY` from the admin console first.";
+      }
+      await moltbookRead().catch(() => null);
+      const items = await recentMoltbookItems(5);
+      const lines = items.map((i) => `  • ${(i.title ?? i.body).slice(0, 90)}${i.injectionScan.safe ? "" : " ⚠️(injection)"}`);
+      return ["*Moltbook (latest learned)*", lines.join("\n") || "  (nothing stored yet)"].join("\n");
+    }
+
     default:
       return `Unknown command \`/${command}\`. /help for the list.`;
   }

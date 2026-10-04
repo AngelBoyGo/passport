@@ -1751,6 +1751,75 @@ model BreachResponse {
   @@index([at])
 }
 
+/// Mission — a durable, forward-looking objective the Command Brain authors and
+/// advances. Missions are brain-generated (originPersona records which half of
+/// the two-persona loop proposed it) and auto-activated up to a bounded cap.
+/// `thesis` is the strategic reasoning; `keyResults` is an optional JSON array
+/// of measurable checkpoints. Status is a strict string enum enforced in code.
+model Mission {
+  id            String   @id @default(cuid())
+  missionId     String   @unique
+  title         String
+  objective     String
+  thesis        String?
+  status        String   @default("ACTIVE") // ACTIVE | PAUSED | ACHIEVED | ABANDONED
+  priority      Int      @default(50)
+  originPersona String   @default("mars")   // mars | muse
+  keyResults    Json?
+  /// Evidence citation requirement for auto-created missions (commitment/hash refs).
+  evidenceRefs  Json?
+  currentPlanId String?
+  createdBy     String   @default("command_brain")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
+  @@index([status])
+  @@index([priority])
+  @@index([createdAt])
+}
 
+/// MissionPlan — the artifact of one Plan → Critique → Revise → Commit dialogue.
+/// `steps` is an ordered JSON array of proposed steps (each: action + params +
+/// rationale + done flag); `dialogue` is the full MARS/MUSE transcript. A plan
+/// is COMMITTED once the deterministic arbiter accepts a step; executing a step
+/// still goes through the normal allowlist + param validation at cycle time.
+model MissionPlan {
+  id              String   @id @default(cuid())
+  planId          String   @unique
+  missionId       String
+  cycleId         String?
+  horizon         String   @default("DAILY") // DAILY | WEEKLY
+  /// Ordered steps: [{ step, action, params, rationale, done }]
+  steps           Json?
+  /// Full persona transcript: [{ persona, role, content }]
+  dialogue        Json?
+  status          String   @default("DRAFT") // DRAFT | COMMITTED | COMPLETED | SUPERSEDED
+  createdByPersona String  @default("muse")
+  committedStep   Int?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([missionId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+/// Moltbook read/learn state — dedupe + provenance for the external agent forum.
+/// Items are hashed (contentHash) and injection-scanned before persistence; the
+/// platform is treated as UNTRUSTED (trust level is never VERIFIED_SOURCE).
+model MoltbookItem {
+  id          String   @id @default(cuid())
+  contentHash String   @unique
+  kind        String   // post | comment | home | heartbeat
+  title       String?
+  body        String
+  author      String?
+  sourceUrl   String?
+  injectionScan Json?
+  trustLevel  String   @default("UNKNOWN")
+  seenAt      DateTime @default(now())
+
+  @@index([kind])
+  @@index([seenAt])
+}
 

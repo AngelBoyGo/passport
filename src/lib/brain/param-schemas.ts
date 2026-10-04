@@ -99,6 +99,13 @@ export const RUN_LOCUM_SEARCH_PARAMS = z
   })
   .strict();
 
+export const ADVANCE_MISSION_PLAN_PARAMS = z
+  .object({
+    mission_id: z.string().min(1).max(ID_MAX),
+    step_index: z.number().int().min(1).max(20).optional(),
+  })
+  .strict();
+
 /**
  * Strict param schema per allowlisted action. Unknown keys are rejected.
  * Every action MUST have an entry — enforced by the Record<BrainAction, ...> type.
@@ -117,6 +124,7 @@ export const ACTION_PARAM_SCHEMAS: Record<BrainAction, z.ZodTypeAny> = {
   RETIRE_AGENT: RETIRE_AGENT_PARAMS,
   REQUEST_MONEY_INTENT: REQUEST_MONEY_INTENT_PARAMS,
   RUN_LOCUM_SEARCH: RUN_LOCUM_SEARCH_PARAMS,
+  ADVANCE_MISSION_PLAN: ADVANCE_MISSION_PLAN_PARAMS,
 };
 
 /**

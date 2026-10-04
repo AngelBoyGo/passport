@@ -35,6 +35,12 @@ export function getGatewayConfig(env: Record<string, string | undefined> = proce
   return { baseUrl, apiKey };
 }
 
+export type ChatRole = "system" | "user" | "assistant";
+export interface ChatMessage {
+  role: ChatRole;
+  content: string;
+}
+
 export interface TierCompleteOptions {
   system: string;
   user: string;
@@ -42,6 +48,13 @@ export interface TierCompleteOptions {
   temperature?: number;
   /** Explicit non-default model id — MUST be allowlisted for the tier. */
   model?: string;
+  /**
+   * Multi-turn conversation. When present it REPLACES the default
+   * [system, user] pair — used by the two-persona dialogue loop
+   * (Plan → Critique → Revise → Commit). Single-turn callers leave it unset
+   * and behave exactly as before.
+   */
+  messages?: ChatMessage[];
 }
 
 /**
@@ -67,6 +80,16 @@ export async function completeTier(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), GATEWAY_TIMEOUT_MS);
   try {
+    // Multi-turn callers supply the full message list; single-turn callers use
+    // the [system, user] pair. An explicitly empty messages array falls back to
+    // the pair so a caller bug can never produce a zero-message request.
+    const messages =
+      opts.messages && opts.messages.length > 0
+        ? opts.messages
+        : [
+            { role: "system" as const, content: opts.system },
+            { role: "user" as const, content: opts.user },
+          ];
     const res = await fetch(`${cfg.baseUrl.replace(/\/+$/, "")}/chat/completions`, {
       method: "POST",
       headers: {
@@ -75,10 +98,7 @@ export async function completeTier(
       },
       body: JSON.stringify({
         model,
-        messages: [
-          { role: "system", content: opts.system },
-          { role: "user", content: opts.user },
-        ],
+        messages,
         temperature: opts.temperature ?? 0.2,
         ...(opts.json ? { response_format: { type: "json_object" } } : {}),
       }),
