@@ -29,6 +29,7 @@ import {
   DRAFTER,
   CRITIC,
   personaModel,
+  ACTION_PARAMS_CHEATSHEET,
   type PersonaId,
 } from "@/lib/brain/personas";
 import type { MissionStep } from "@/lib/brain/mission-service";
@@ -83,7 +84,7 @@ async function askPersona(
     tier: PERSONA_TIER,
     model,
     temperature: persona.temperature,
-    json: true,
+    json: opts.json ?? true,
   });
 }
 
@@ -172,6 +173,8 @@ export async function runMissionDialogue(ctx: MissionContext): Promise<DialogueR
       user:
         "Draft up to 2 candidate NEXT STEPS to advance this mission. Each step must name one " +
         "allowlisted action and its params. Be concrete and novel.\n" +
+        ACTION_PARAMS_CHEATSHEET +
+        "\n" +
         `Return STRICT JSON: {"steps":[{"action":"<ALLOWLIST>","params":{},"rationale":"..."}]}.\n\n` +
         sharedContext,
     });
@@ -187,11 +190,14 @@ export async function runMissionDialogue(ctx: MissionContext): Promise<DialogueR
   // ── 2. CRITIQUE (MARS) ─────────────────────────────────────────────────────
   let critiqueText = "";
   try {
+    // Free-form critique (no JSON mode): ranking is prose, and some providers
+    // return empty completions under strict JSON mode at high temperature.
     critiqueText = await askPersona(CRITIC, {
+      json: false,
       user:
         "Adversarially critique these candidate steps for this mission. Attack cost, risk, " +
-        "distraction, unproven assumptions, and expected value. Rank them best→worst.\n" +
-        `Return STRICT JSON: {"ranking":["<rationale>",...],"notes":"..."}.\n\n` +
+        "distraction, unproven assumptions, and expected value. Rank them best→worst in 2-4 " +
+        "short sentences.\n\n" +
         `mission=${JSON.stringify({ title: ctx.title, objective: ctx.objective })}\n` +
         `candidates=${JSON.stringify(draft)}`,
     });
@@ -209,7 +215,9 @@ export async function runMissionDialogue(ctx: MissionContext): Promise<DialogueR
     const reviseRaw = await askPersona(DRAFTER, {
       user:
         "Revise your candidate steps in light of the critique. Drop weak steps, keep the " +
-        "strongest, and return the FINAL ordered plan.\n" +
+        "strongest, and return the FINAL ordered plan. Use ONLY the exact params allowed:\n" +
+        ACTION_PARAMS_CHEATSHEET +
+        "\n" +
         `Return STRICT JSON: {"steps":[{"action":"<ALLOWLIST>","params":{},"rationale":"..."}]}.\n\n` +
         `mission=${JSON.stringify({ title: ctx.title, objective: ctx.objective })}\n` +
         `draft=${JSON.stringify(draft)}\ncritique=${critiqueText}`,

@@ -49,6 +49,28 @@ const ACTION_CONTRACT =
   "ADVANCE_MISSION_PLAN. You can NEVER move money: REQUEST_MONEY_INTENT only STAGES a pending " +
   "intent. Return STRICT JSON only — no prose outside the JSON object.";
 
+/**
+ * Exact params per action. Strict schemas reject unknown keys, so a well-meaning
+ * action with an invented param (e.g. RUN_DISCOVERY with {target}) is dropped by
+ * the arbiter. This cheat-sheet keeps the personas inside the schemas.
+ */
+export const ACTION_PARAMS_CHEATSHEET =
+  "EXACT params per action (unknown keys are REJECTED):\n" +
+  "- NOOP: {}\n" +
+  "- RECORD_NOTE: {note?: string}  (a memo; no execution)\n" +
+  "- RUN_DISCOVERY: {}  (no params)\n" +
+  "- RUN_TICK: {}\n" +
+  "- TRIGGER_ATTESTATION: {}\n" +
+  "- QUARANTINE_RAIL: {rail_key: string, reason?: string}\n" +
+  "- INVESTIGATE_DISPUTE: {dispute_id?: string, reason?: string}\n" +
+  "- RUN_RESEARCH_SCAN: {focus?: string}\n" +
+  "- RUN_EXTERNAL_RESEARCH: {focus?: string}\n" +
+  "- SCALE_FLEET_UP: {capability: string, llm_tier: \"neuron\"|\"money\", count?: 1-3}\n" +
+  "- RETIRE_AGENT: {commitment: 64-hex, reason?: string}\n" +
+  "- REQUEST_MONEY_INTENT: {intent_kind: \"hire_agent\"|\"treasury_transfer\"|\"fund_compute\", worker_commitment?: 64-hex, amount_angels: number>0, reason: string}\n" +
+  "- RUN_LOCUM_SEARCH: {candidate_id: string, pay_floor?: number>0}\n" +
+  "- ADVANCE_MISSION_PLAN: {mission_id: string, step_index?: int>=1}";
+
 export const MARS: Persona = {
   id: "mars",
   name: "MARS",
