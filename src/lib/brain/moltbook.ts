@@ -1,6 +1,6 @@
 /**
- * Moltbook integration — the brain reads/learns from the AI-agent forum and can
- * register an agent account.
+ * Moltbook integration — the brain reads/learns from the AI-agent forum, registers
+ * an agent account, and can post/comment to engage the community.
  *
  * RECONCILIATION WITH THE TRUST MODEL:
  *   Moltbook is an EXTERNAL, untrusted surface. Everything fetched is treated as
@@ -14,10 +14,12 @@
  *   - GET  /agents/me | /home      (Bearer key)
  *   - GET  /feed | /posts          (Bearer key)
  *   - POST /posts                  (Bearer key; reverse-CAPTCHA gated)
+ *   - POST /posts/:id/comments     (Bearer key; reverse-CAPTCHA gated)
+ *   - POST /verify                 (solve the CAPTCHA)
  *
- * Posting is opt-in (MOLTBOOK_POST_ENABLED) and deferred to v1.1: the platform's
- * reverse-CAPTCHA must be solved within a short window or the agent is
- * auto-suspended after 10 misses, so read-only is the safe default.
+ * Posting is opt-in (MOLTBOOK_POST_ENABLED) and requires solving a reverse-CAPTCHA
+ * (lobster-themed math word problem) within 5 minutes. The solver uses MUSE's
+ * cheap model to parse the obfuscated text and compute the answer.
  *
  * The API key is NEVER logged and NEVER sent anywhere except www.moltbook.com.
  */
@@ -26,6 +28,7 @@ import { prisma } from "@/lib/db";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 import { scanForPromptInjection } from "@/lib/brain/external-research";
+import { brainComplete } from "@/lib/raillab/factory-brain";
 
 export const MOLTBOOK_BASE = "https://www.moltbook.com/api/v1";
 
@@ -225,4 +228,178 @@ export async function recentMoltbookItems(limit = 10): Promise<MoltbookItemRecor
     injectionScan: (r.injectionScan as { safe: boolean; matched: string[] }) ?? { safe: true, matched: [] },
     trustLevel: "UNKNOWN",
   }));
+}
+
+/**
+ * Solves the reverse-CAPTCHA (lobster-themed math word problem) using MUSE's
+ * cheap model. The challenge is obfuscated text with alternating caps, scattered
+ * symbols, and broken words — but the math is simple arithmetic.
+ *
+ * Returns the answer as a string with 2 decimal places (e.g. "15.00").
+ */
+async function solveCaptcha(challengeText: string): Promise<string | null> {
+  try {
+    const response = await brainComplete({
+      system:
+        "You are a math solver. The input is an obfuscated lobster-themed math word problem with " +
+        "alternating caps, scattered symbols (^/[]-), and broken words. Extract the two numbers " +
+        "and the operation (+, -, *, /), compute the answer, and return ONLY the number with " +
+        "exactly 2 decimal places (e.g. '15.00', '525.00', '-3.50'). No explanation.",
+      user: challengeText,
+      tier: "cortex",
+      model: "gpt-4o-mini",
+      temperature: 0.1,
+    });
+    const cleaned = response.trim().replace(/[^0-9.\-]/g, "");
+    const num = parseFloat(cleaned);
+    if (isNaN(num)) return null;
+    return num.toFixed(2);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Posts to Moltbook and solves the reverse-CAPTCHA if required. Returns the post
+ * ID on success, or null if posting is disabled or the CAPTCHA fails.
+ */
+export async function postToMoltbook(
+  input: { submolt_name: string; title: string; content?: string; url?: string },
+  fetchImpl: typeof fetch = fetch
+): Promise<{ ok: true; postId: string } | { ok: false; reason: string }> {
+  if (!moltbookConfigured()) return { ok: false, reason: "moltbook_not_configured" };
+  if (String(process.env.MOLTBOOK_POST_ENABLED || "").toLowerCase() !== "true") {
+    return { ok: false, reason: "posting_disabled_set_MOLTBOOK_POST_ENABLED_true" };
+  }
+
+  const key = apiKey();
+  if (!key) return { ok: false, reason: "no_api_key" };
+
+  try {
+    const res = await fetchImpl(`${MOLTBOOK_BASE}/posts`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify({
+        submolt_name: input.submolt_name,
+        title: input.title,
+        content: input.content,
+        url: input.url,
+      }),
+    });
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      return { ok: false, reason: `post_http_${res.status}:${body.slice(0, 160)}` };
+    }
+
+    const data = (await res.json()) as {
+      success?: boolean;
+      post?: { id?: string; verification_required?: boolean; verification?: { verification_code?: string; challenge_text?: string } };
+    };
+
+    if (!data.success || !data.post?.id) {
+      return { ok: false, reason: "post_missing_id" };
+    }
+
+    // If verification is required, solve the CAPTCHA
+    if (data.post.verification_required && data.post.verification?.verification_code) {
+      const answer = await solveCaptcha(data.post.verification.challenge_text ?? "");
+      if (!answer) {
+        return { ok: false, reason: "captcha_solve_failed" };
+      }
+
+      const verifyRes = await fetchImpl(`${MOLTBOOK_BASE}/verify`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${key}`,
+        },
+        body: JSON.stringify({
+          verification_code: data.post.verification.verification_code,
+          answer,
+        }),
+      });
+
+      if (!verifyRes.ok) {
+        return { ok: false, reason: `verify_http_${verifyRes.status}` };
+      }
+
+      const verifyData = (await verifyRes.json()) as { success?: boolean };
+      if (!verifyData.success) {
+        return { ok: false, reason: "verify_failed" };
+      }
+    }
+
+    return { ok: true, postId: data.post.id };
+  } catch (err) {
+    return { ok: false, reason: `post_error:${String(err instanceof Error ? err.message : err).slice(0, 160)}` };
+  }
+}
+
+/**
+ * Comments on a post and solves the reverse-CAPTCHA if required.
+ */
+export async function commentOnMoltbook(
+  postId: string,
+  content: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<{ ok: true; commentId: string } | { ok: false; reason: string }> {
+  if (!moltbookConfigured()) return { ok: false, reason: "moltbook_not_configured" };
+  if (String(process.env.MOLTBOOK_POST_ENABLED || "").toLowerCase() !== "true") {
+    return { ok: false, reason: "posting_disabled" };
+  }
+
+  const key = apiKey();
+  if (!key) return { ok: false, reason: "no_api_key" };
+
+  try {
+    const res = await fetchImpl(`${MOLTBOOK_BASE}/posts/${postId}/comments`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify({ content }),
+    });
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      return { ok: false, reason: `comment_http_${res.status}:${body.slice(0, 160)}` };
+    }
+
+    const data = (await res.json()) as {
+      success?: boolean;
+      comment?: { id?: string; verification_required?: boolean; verification?: { verification_code?: string; challenge_text?: string } };
+    };
+
+    if (!data.success || !data.comment?.id) {
+      return { ok: false, reason: "comment_missing_id" };
+    }
+
+    if (data.comment.verification_required && data.comment.verification?.verification_code) {
+      const answer = await solveCaptcha(data.comment.verification.challenge_text ?? "");
+      if (!answer) return { ok: false, reason: "captcha_solve_failed" };
+
+      const verifyRes = await fetchImpl(`${MOLTBOOK_BASE}/verify`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${key}`,
+        },
+        body: JSON.stringify({
+          verification_code: data.comment.verification.verification_code,
+          answer,
+        }),
+      });
+
+      if (!verifyRes.ok) return { ok: false, reason: `verify_http_${verifyRes.status}` };
+    }
+
+    return { ok: true, commentId: data.comment.id };
+  } catch (err) {
+    return { ok: false, reason: `comment_error:${String(err instanceof Error ? err.message : err).slice(0, 160)}` };
+  }
 }
