@@ -34,7 +34,7 @@ export type LlmTier = (typeof LLM_TIERS)[number];
  * enforcement point for "money moves only through Pro".
  */
 export const TIER_MODEL_ALLOWLIST: Record<LlmTier, readonly string[]> = {
-  neuron: ["deepseek-v4-flash"],
+  neuron: ["deepseek-v4-flash", "gpt-4o-mini"],
   cortex: ["deepseek-v4-flash", "gpt-4o-mini"],
   money: ["deepseek-v4-pro"],
 };

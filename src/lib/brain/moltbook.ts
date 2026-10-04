@@ -15,7 +15,7 @@
  *   - GET  /feed | /posts          (Bearer key)
  *   - POST /posts                  (Bearer key; reverse-CAPTCHA gated)
  *   - POST /posts/:id/comments     (Bearer key; reverse-CAPTCHA gated)
- *   - POST /verify                 (solve the CAPTCHA)
+ *   - POST /verify             — submolt the CAPTCHA answer (no crypto here)
  *
  * Posting is opt-in (MOLTBOOK_POST_ENABLED) and requires solving a reverse-CAPTCHA
  * (lobster-themed math word problem) within 5 minutes. The solver uses MUSE's

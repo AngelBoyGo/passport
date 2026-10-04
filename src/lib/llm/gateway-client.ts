@@ -60,11 +60,13 @@ export interface TierCompleteOptions {
 /**
  * Executes a completion on the given tier. Throws on unknown tier, disallowed
  * model, or any gateway failure. Returns raw text; parse JSON at call sites.
+ * `fetchImpl` is injectable for tests only.
  */
 export async function completeTier(
   tier: LlmTier,
   opts: TierCompleteOptions,
-  config: LlmGatewayConfig | null = null
+  config: LlmGatewayConfig | null = null,
+  fetchImpl: typeof fetch = fetch
 ): Promise<string> {
   requireLlmTier(tier);
   const cfg = config ?? getGatewayConfig();
@@ -90,7 +92,7 @@ export async function completeTier(
             { role: "system" as const, content: opts.system },
             { role: "user" as const, content: opts.user },
           ];
-    const res = await fetch(`${cfg.baseUrl.replace(/\/+$/, "")}/chat/completions`, {
+    const res = await fetchImpl(`${cfg.baseUrl.replace(/\/+$/, "")}/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -121,6 +123,64 @@ export async function completeTier(
   } finally {
     clearTimeout(timeout);
   }
+}
+
+/**
+ * Bounded retry + same-tier fallback around completeTier.
+ *
+ * The primary gateway model intermittently returns empty completions or
+ * malformed JSON (observed in prod as "LLM_UNAVAILABLE"). A single transient
+ * glitch should not drop a brain cycle. This wrapper:
+ *   - retries the SAME model up to `attemptsPerModel` times on any failure;
+ *   - if that model is exhausted, falls back to the NEXT allowlisted model on
+ *     the SAME tier (never another tier — the money model is never used here);
+ *   - throws (fail-closed) when every model × attempt fails.
+ *
+ * It never performs side effects, so retrying is safe (idempotent reads). The
+ * caller's model is respected as the primary; the tier default is second.
+ */
+export interface ResilientOptions {
+  config?: LlmGatewayConfig | null;
+  fetchImpl?: typeof fetch;
+  attemptsPerModel?: number;
+  retryDelayMs?: number;
+}
+
+export async function completeTierResilient(
+  tier: LlmTier,
+  opts: TierCompleteOptions,
+  resilient: ResilientOptions = {}
+): Promise<string> {
+  requireLlmTier(tier);
+  const attemptsPerModel = Math.max(1, resilient.attemptsPerModel ?? 2);
+  const retryDelayMs = Math.max(0, resilient.retryDelayMs ?? 250);
+
+  const allowed = TIER_MODEL_ALLOWLIST[tier];
+  // Primary = caller's explicit allowlisted model, else the tier default.
+  const primary = opts.model ?? DEFAULT_TIER_MODEL[tier];
+  if (!allowed.includes(primary)) {
+    throw new Error(`tier_model_not_allowed:${tier}:${primary}`);
+  }
+  // Fallback chain = the other allowlisted models for this tier (never another tier).
+  const chain = [primary, ...allowed.filter((m) => m !== primary)];
+
+  let lastErr: unknown = null;
+  for (const model of chain) {
+    for (let attempt = 0; attempt < attemptsPerModel; attempt++) {
+      try {
+        return await completeTier(tier, { ...opts, model }, resilient.config ?? null, resilient.fetchImpl);
+      } catch (err) {
+        lastErr = err;
+        if (attempt < attemptsPerModel - 1 && retryDelayMs > 0) {
+          await new Promise((r) => setTimeout(r, retryDelayMs));
+        }
+      }
+    }
+  }
+  throw new Error(
+    `LLM gateway failed after ${chain.length} model(s) × ${attemptsPerModel} attempt(s): ` +
+      `${lastErr instanceof Error ? lastErr.message : String(lastErr)}`
+  );
 }
 
 export { DEFAULT_TIER_MODEL, TIER_MODEL_ALLOWLIST, TIER_MODEL_ENV };

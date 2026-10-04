@@ -12,7 +12,7 @@
  */
 
 import { prisma } from "@/lib/db";
-import { completeTier, type ChatMessage } from "@/lib/llm/gateway-client";
+import { completeTierResilient, type ChatMessage } from "@/lib/llm/gateway-client";
 import { resolveAllowlistedModel } from "@/lib/llm/tiers";
 import type { LlmTier } from "@/lib/llm/tiers";
 
@@ -38,6 +38,10 @@ export function getBrainConfig(): BrainConfig | null {
  * two-persona dialogue loop may request the cheaper `cortex` tier and an
  * explicit allowlisted model. The brain NEVER executes on the money tier:
  * `money` is rejected here regardless of caller.
+ *
+ * Uses the RESILIENT path: bounded retries on the same model, then a same-tier
+ * fallback model, so a transient empty/malformed completion does not drop a
+ * cycle. This is read-only (no side effects), so retrying is safe.
  */
 export async function brainComplete(opts: {
   system: string;
@@ -55,7 +59,7 @@ export async function brainComplete(opts: {
     throw new Error(`brain_tier_violation:${tier}`);
   }
   const model = opts.model ? resolveAllowlistedModel(tier, opts.model) : undefined;
-  return completeTier(tier, { ...opts, model });
+  return completeTierResilient(tier, { ...opts, model });
 }
 
 /** Parses model output, tolerating ```json fences; throws on invalid/absent object. */

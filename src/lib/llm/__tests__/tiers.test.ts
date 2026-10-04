@@ -26,7 +26,12 @@ describe("tiers — table + resolution", () => {
     expect(() => resolveTierModel("money", { LLM_MODEL_MONEY: "deepseek-v4-flash" })).toThrow(
       /tier_model_not_allowed/
     );
-    expect(() => resolveTierModel("neuron", { LLM_MODEL_NEURON: "gpt-4o-mini" })).toThrow(
+    // A model that is allowlisted on cortex but NOT on money cannot be forced
+    // onto the money tier; and an arbitrary unknown id is refused everywhere.
+    expect(() => resolveTierModel("money", { LLM_MODEL_MONEY: "gpt-4o-mini" })).toThrow(
+      /tier_model_not_allowed/
+    );
+    expect(() => resolveTierModel("neuron", { LLM_MODEL_NEURON: "totally-made-up" })).toThrow(
       /tier_model_not_allowed/
     );
   });
