@@ -192,6 +192,24 @@ export async function moltbookRead(
   ];
   const stored = await persistMoltbookItems(items);
 
+  // Record what was learned in the brain's own memory so its cycles and the
+  // two-persona dialogue see fresh external intelligence, not just a raw table.
+  if (stored > 0) {
+    const titles = items
+      .slice(0, 4)
+      .map((i) => (i.title || i.body).slice(0, 80))
+      .join(" | ");
+    await prisma.brainMemory
+      .create({
+        data: {
+          kind: "OBSERVATION",
+          summary: `moltbook: learned ${stored} new item(s) — ${titles}`.slice(0, 500),
+          data: { source: "moltbook", stored, fetched: items.length } as never,
+        },
+      })
+      .catch(() => undefined);
+  }
+
   // Evidence row (best-effort) so the read is auditable + citable by missions.
   const digest = hashContent(JSON.stringify(items.map((i) => i.body.slice(0, 200))));
   await prisma.agentEvidence

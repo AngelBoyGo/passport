@@ -277,6 +277,40 @@ async function handleCommand(command: string, args: string[], from: string): Pro
       return ["*Moltbook (latest learned)*", lines.join("\n") || "  (nothing stored yet)"].join("\n");
     }
 
+    case "ask": {
+      // Operator asks the brain a direct question. The brain answers from its
+      // live resources (economy, fleet, missions, Moltbook, memory).
+      const question = args.join(" ").trim();
+      if (!question) return "Usage: `/ask <your question>` — the brain answers from its live resources.";
+      const { askBrain } = await import("@/lib/brain/ask");
+      const r = await askBrain(question);
+      return r.ok ? `🧠 ${r.answer}` : `⚠️ Brain could not answer: ${r.reason}`;
+    }
+
+    case "task": {
+      // Operator assigns a task; it becomes an OPERATOR-authored mission.
+      const instruction = args.join(" ").trim();
+      if (!instruction) return "Usage: `/task <what you want the brain to pursue>` — creates a top-priority mission.";
+      const { assignTask } = await import("@/lib/brain/ask");
+      const r = await assignTask(instruction);
+      if (!r.ok) return `⚠️ Could not create task: ${r.reason}`;
+      return [
+        "*Task assigned* ✅",
+        `Mission: \`${r.missionId}\``,
+        `Title: ${r.title}`,
+        "",
+        "The two-persona dialogue will plan it on the next cycle; use `/plan` to force planning now, `/missions` to track.",
+      ].join("\n");
+    }
+
+    case "directives": {
+      const { recentOperatorDirectives } = await import("@/lib/brain/ask");
+      const rows = await recentOperatorDirectives(8);
+      if (rows.length === 0) return "*Operator directives:* none yet. Use `/ask` or `/task`.";
+      const lines = rows.map((r) => `• [${r.action}] ${String(r.details ?? r.targetId ?? "").slice(0, 90)}`);
+      return ["*Recent operator directives*", ...lines].join("\n");
+    }
+
     default:
       return `Unknown command \`/${command}\`. /help for the list.`;
   }

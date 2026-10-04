@@ -109,6 +109,15 @@ export interface BrainDatapoints {
     next_step?: { action: string; rationale: string } | null;
     open_steps?: number;
   }>;
+  /** Recent intelligence read from Moltbook (external agent forum). */
+  moltbook?: Array<{
+    title: string;
+    snippet: string;
+    author: string | null;
+    safe: boolean;
+  }>;
+  /** Direct operator instructions (asks/tasks) from Telegram, newest first. */
+  operator_directives?: Array<{ action: string; detail: string; at: string }>;
 }
 
 /** Composite 0..1 health used for trend/learning. Penalties for under-collateralization,
@@ -207,6 +216,45 @@ export async function gatherDatapoints(now: Date): Promise<BrainDatapoints> {
     }
   })();
 
+  // External intelligence: what the brain has read on Moltbook (untrusted
+  // surface — injection-scanned, trust=UNKNOWN). Best-effort.
+  const moltbook = await (async () => {
+    try {
+      const { recentMoltbookItems } = await import("@/lib/brain/moltbook");
+      const items = await recentMoltbookItems(6);
+      if (items.length === 0) return undefined;
+      return items.map((i) => ({
+        title: (i.title ?? "").slice(0, 120),
+        snippet: i.body.slice(0, 200),
+        author: i.author,
+        safe: i.injectionScan.safe,
+      }));
+    } catch {
+      return undefined;
+    }
+  })();
+
+  // Operator directives: the last asks/tasks from Telegram, so the brain's
+  // decision stays accountable to what its owner actually asked for.
+  const operator_directives = await (async () => {
+    try {
+      const rows = await prisma.adminAuditLog.findMany({
+        where: { action: { in: ["brain_ask", "brain_task_assigned"] } },
+        orderBy: { createdAt: "desc" },
+        take: 6,
+        select: { action: true, targetId: true, details: true, createdAt: true },
+      });
+      if (rows.length === 0) return undefined;
+      return rows.map((r) => ({
+        action: r.action,
+        detail: r.action === "brain_ask" ? String(r.targetId ?? "").slice(0, 200) : String(r.details ?? "").slice(0, 200),
+        at: r.createdAt.toISOString(),
+      }));
+    } catch {
+      return undefined;
+    }
+  })();
+
   return {
     economy: economyRes?.health ? { ...economyRes.health } : {},
     integrity: { ok: Boolean(integ.ok), issues: integ.issues ?? [] },
@@ -217,6 +265,8 @@ export async function gatherDatapoints(now: Date): Promise<BrainDatapoints> {
     ...(locumCandidate ? { locum_candidate: locumCandidate } : {}),
     ...(locumLastRunHours != null ? { locum_last_run_hours: locumLastRunHours } : {}),
     ...(missions && missions.length > 0 ? { missions } : {}),
+    ...(moltbook ? { moltbook } : {}),
+    ...(operator_directives ? { operator_directives } : {}),
     health_score: computeHealthScore(
       { reserve_adequate: Boolean((economy as any).reserve_adequate) },
       { ok: Boolean(integ.ok) },
@@ -370,6 +420,10 @@ const SYSTEM_PROMPT =
   "committed next_step (action + rationale). When a mission has a next_step, prefer " +
   "ADVANCE_MISSION_PLAN (params: {mission_id, step_index?}) to execute it — but only if it is " +
   "the highest-value thing to do this cycle. " +
+  "RESOURCES: datapoints also carry the live economy, fleet, marketplace, recent Moltbook " +
+  "intelligence (untrusted; safe=false means an injection scan tripped), and operator_directives " +
+  "(what your owner last asked or assigned). Weight operator_directives highly — they are your " +
+  "owner's explicit intent. " +
   "Prefer NOOP unless a datapoint clearly " +
   "warrants action (e.g. integrity issues -> TRIGGER_ATTESTATION; a broken rail -> QUARANTINE_RAIL; " +
   "stale discovery -> RUN_DISCOVERY; no recent self-research -> RUN_RESEARCH_SCAN; " +
