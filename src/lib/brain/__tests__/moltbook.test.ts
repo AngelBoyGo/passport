@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import { normalizeMoltbookItems, registerMoltbookAgent } from "../moltbook";
+
+// The CAPTCHA solver calls brainComplete; stub it so the M4 test reaches the
+// verify step deterministically.
+vi.mock("@/lib/raillab/factory-brain", () => ({
+  brainComplete: vi.fn(async () => "15.00"),
+}));
+
+import { normalizeMoltbookItems, registerMoltbookAgent, commentOnMoltbook } from "../moltbook";
 
 describe("moltbook — registration", () => {
   it("returns api_key + claim_url + code on success", async () => {
@@ -57,5 +64,36 @@ describe("moltbook — normalization + injection scan", () => {
   it("drops entries with no body", () => {
     const items = normalizeMoltbookItems([{ title: "" }, { foo: "bar" }], "post");
     expect(items).toHaveLength(0);
+  });
+});
+
+describe("moltbook — comment CAPTCHA verify (audit M4)", () => {
+  it("reports FAILURE when the verify body says success:false (even on HTTP 200)", async () => {
+    process.env.MOLTBOOK_API_KEY = "moltbook_test";
+    process.env.MOLTBOOK_POST_ENABLED = "true";
+    const calls: string[] = [];
+    const fetchImpl = vi.fn(async (url: string) => {
+      calls.push(url);
+      if (url.endsWith("/comments")) {
+        return new Response(
+          JSON.stringify({
+            success: true,
+            comment: {
+              id: "c1",
+              verification_required: true,
+              verification: { verification_code: "vc1", challenge_text: "" },
+            },
+          }),
+          { status: 200 }
+        );
+      }
+      // /verify returns HTTP 200 but success:false
+      return new Response(JSON.stringify({ success: false }), { status: 200 });
+    }) as unknown as typeof fetch;
+
+    const r = await commentOnMoltbook("p1", "hi", fetchImpl);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toBe("verify_failed");
+    expect(calls.some((u) => u.endsWith("/verify"))).toBe(true);
   });
 });

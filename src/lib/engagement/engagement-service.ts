@@ -217,16 +217,51 @@ export async function acceptEngagement(
     throw new EvidenceRequiredError(normalizedTaskId);
   }
 
+  // AUDIT FIX (C3): atomic state claim BEFORE releasing escrow. Previously two
+  // concurrent accepts both read DELIVERED and both called releaseEscrowToWorker
+  // (which only checks the hirer's AGGREGATE locked balance), double-paying the
+  // worker and draining another engagement's escrow. Only the winner of this
+  // guarded update may pay.
+  const claimed = await prisma.engagement.updateMany({
+    where: { taskId: normalizedTaskId, status: EngagementStatus.DELIVERED },
+    data: { status: EngagementStatus.PAID, paidAt: new Date() },
+  });
+  if (claimed.count !== 1) {
+    // Another accept won the race (or the row moved state). Return the current
+    // row idempotently rather than paying again.
+    const current = await prisma.engagement.findUnique({ where: { taskId: normalizedTaskId } });
+    return {
+      engagement: current ? toEngagementRecord(current) : toEngagementRecord(row),
+      payout: null,
+      receipt_id: current?.receiptId ?? row.receiptId,
+      already_paid: true,
+    };
+  }
+
   // Audit fix M8: route the protocol fee out of escrow on release, in the same
   // atomic transaction as the worker payout. The fee was locked at creation.
   const { fee } = calculateProtocolFee(row.amount);
-  const payout = await releaseEscrowToWorker(
-    row.hirerCommitment,
-    row.workerCommitment,
-    row.amount,
-    JSON.stringify({ task_id: normalizedTaskId, phase: "accept_payout" }),
-    fee
-  );
+  let payout: Awaited<ReturnType<typeof releaseEscrowToWorker>>;
+  try {
+    payout = await releaseEscrowToWorker(
+      row.hirerCommitment,
+      row.workerCommitment,
+      row.amount,
+      JSON.stringify({ task_id: normalizedTaskId, phase: "accept_payout" }),
+      fee
+    );
+  } catch (err) {
+    // The claim reserved the engagement; the payout failed, so release the
+    // reservation back to DELIVERED so a retry can complete it. Never leave a
+    // PAID row that was not actually paid.
+    await prisma.engagement
+      .updateMany({
+        where: { taskId: normalizedTaskId, status: EngagementStatus.PAID },
+        data: { status: EngagementStatus.DELIVERED, paidAt: null },
+      })
+      .catch(() => undefined);
+    throw err;
+  }
 
   // D1-D4: OPTIONAL on-chain settlement. The internal custodial payout above
   // always runs and stays instantaneous; when requested, we enqueue an ANGL

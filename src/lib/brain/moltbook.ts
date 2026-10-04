@@ -161,8 +161,14 @@ export async function persistMoltbookItems(items: MoltbookItemRecord[]): Promise
         },
       });
       stored++;
-    } catch {
-      // unique contentHash → already seen; ignore.
+    } catch (err) {
+      // AUDIT FIX (L1): only a unique-constraint violation (P2002) means
+      // "already seen". Any other write error is a real failure and must not be
+      // silently swallowed as dedupe.
+      const code = (err as { code?: string })?.code;
+      if (code !== "P2002") {
+        console.warn("[moltbook] persist failed (non-dedupe):", err instanceof Error ? err.message : String(err));
+      }
     }
   }
   return stored;
@@ -419,6 +425,12 @@ export async function commentOnMoltbook(
       });
 
       if (!verifyRes.ok) return { ok: false, reason: `verify_http_${verifyRes.status}` };
+      // AUDIT FIX (M4): must check the verify BODY, not just HTTP status —
+      // otherwise a rejected CAPTCHA is reported as a successful comment.
+      const verifyData = (await verifyRes.json().catch(() => ({}))) as { success?: boolean };
+      if (verifyData.success !== true) {
+        return { ok: false, reason: "verify_failed" };
+      }
     }
 
     return { ok: true, commentId: data.comment.id };

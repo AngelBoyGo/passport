@@ -187,7 +187,10 @@ describe("compute marketplace", () => {
     );
     expect((providerCall![0] as { update: { balance: { increment: number } } }).update.balance.increment).toBe(29);
     expect(tx.agentWallet.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { subjectCommitment: "m1", staked: { gte: 1 } } })
+      expect.objectContaining({
+        where: { subjectCommitment: "m1", staked: { gte: 1 }, balance: { gte: 1 } },
+        data: { staked: { decrement: 1 }, balance: { decrement: 1 } },
+      })
     );
   });
 

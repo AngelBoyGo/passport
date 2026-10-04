@@ -285,9 +285,13 @@ async function applySettlement(
   }
   for (const b of s?.slashes ?? []) {
     if (b.amount <= 0) continue;
+    // AUDIT FIX (M2): a slash must BURN the bond, not just unstake it.
+    // Decrementing `staked` alone left `balance` untouched, so
+    // availableBalance (= balance - staked) INCREASED — the penalized juror
+    // recovered spendable funds. Burn from both staked and balance.
     await tx.agentWallet.updateMany({
-      where: { subjectCommitment: b.commitment.toLowerCase(), staked: { gte: b.amount } },
-      data: { staked: { decrement: b.amount } },
+      where: { subjectCommitment: b.commitment.toLowerCase(), staked: { gte: b.amount }, balance: { gte: b.amount } },
+      data: { staked: { decrement: b.amount }, balance: { decrement: b.amount } },
     });
   }
 }

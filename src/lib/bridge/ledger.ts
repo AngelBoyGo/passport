@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { sha256Hex } from "@/lib/receipt/canonical";
 import { computeBalances } from "@/lib/angelcoin/balances";
-import { loadJournalEntries } from "@/lib/angelcoin/ledger-service";
+import { loadJournalEntries, lockAccountForUpdate } from "@/lib/angelcoin/ledger-service";
 
 /**
  * Bridge <-> AngelCoin ledger support.
@@ -82,18 +82,15 @@ export async function burnAndPayout(opts: {
   }
 
   // M1: reserve/backing guard — never burn more ANGL than the commitment's
-  // available balance (real deposited credits), so no mint-on-paper withdraws.
+  // available balance (real deposited credits). AUDIT FIX (C4): the check is
+  // re-run INSIDE the transaction under a row lock, so two concurrent
+  // withdrawals with different references cannot both pass and overdraw.
   const account = await prisma.angelCoinAccount.findUnique({
     where: { subjectCommitment: opts.subjectCommitment },
     select: { id: true, ownerOperatorId: true },
   });
   if (!account) {
     return { applied: false, reason: "No AngelCoin account backing this commitment" };
-  }
-  const entries = await loadJournalEntries(account.id);
-  const available = computeBalances(entries).availableBalance;
-  if (available < opts.amount) {
-    return { applied: false, reason: "Withdrawal exceeds available (backed) balance" };
   }
 
   // Explicit duplicate guard (fast fail + used by the A6 test).
@@ -106,7 +103,15 @@ export async function burnAndPayout(opts: {
   }
 
   try {
-    await prisma.$transaction(async (tx) => {
+    const outcome = await prisma.$transaction(async (tx) => {
+      // Row-lock the account, then RE-CHECK available balance under the lock.
+      await lockAccountForUpdate(tx, account.id);
+      const entries = await loadJournalEntries(account.id, tx);
+      const available = computeBalances(entries).availableBalance;
+      if (available < opts.amount) {
+        return { applied: false as const, reason: "Withdrawal exceeds available (backed) balance" };
+      }
+
       await tx.externalSettlement.create({
         data: {
           rail: TRANSFER_RAIL,
@@ -115,11 +120,6 @@ export async function burnAndPayout(opts: {
           creditCredits: opts.amount,
           label: `angelcoin withdrawal ${opts.reference}`,
         },
-      });
-      const account = await tx.angelCoinAccount.upsert({
-        where: { subjectCommitment: opts.subjectCommitment },
-        create: { subjectCommitment: opts.subjectCommitment, ownerOperatorId: opts.operatorId },
-        update: { ownerOperatorId: opts.operatorId },
       });
       await tx.angelCoinJournalEntry.create({
         data: {
@@ -136,8 +136,9 @@ export async function burnAndPayout(opts: {
           metadata: JSON.stringify({ reference: opts.reference, amount: opts.amount }),
         },
       });
+      return { applied: true as const };
     });
-    return { applied: true };
+    return outcome.applied ? { applied: true } : { applied: false, reason: outcome.reason };
   } catch (err) {
     if (isUniqueViolation(err)) return { applied: false, reason: "Duplicate burn/payout (already applied)" };
     return { applied: false, reason: err instanceof Error ? err.message : "Burn failed" };

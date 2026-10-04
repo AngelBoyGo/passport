@@ -95,6 +95,9 @@ function heldEngagement() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // acceptEngagement now atomically claims DELIVERED→PAID; default the guarded
+  // updateMany to "won the claim" so the accept tests proceed to payout.
+  engagementUpdateManyMock.mockResolvedValue({ count: 1 });
   requireEnrolledMock.mockResolvedValue({
     subjectCommitment: WORKER,
     status: EnrollmentStatus.ISSUED,
@@ -216,6 +219,33 @@ describe("acceptEngagement", () => {
     );
     expect(result.engagement.status).toBe("PAID");
     expect(result.receipt_id).toBe("rcpt_1");
+  });
+
+  it("C3: a lost atomic claim (concurrent accept) does NOT pay the worker again", async () => {
+    const delivered = {
+      ...heldEngagement(),
+      status: EngagementStatus.DELIVERED,
+      deliverableDigest: "d".repeat(64),
+      evidenceEventHash: "e".repeat(64),
+    };
+    engagementFindUniqueMock.mockResolvedValue(delivered);
+    evidenceFindFirstMock.mockResolvedValue({
+      id: "ev_1",
+      sourceType: "task_deliverable",
+      agentIdentityCommitment: WORKER,
+      eventCommitmentHash: "e".repeat(64),
+      normalizedEventType: "AGENT_ARTIFACT_CREATED",
+      rawErrorClassification: "UNKNOWN",
+      validationSignalPresent: true,
+      observedAt: new Date(),
+    });
+    // Another accept already claimed DELIVERED→PAID.
+    engagementUpdateManyMock.mockResolvedValueOnce({ count: 0 });
+
+    const result = await acceptEngagement(TASK_ID);
+
+    expect(releaseEscrowToWorkerMock).not.toHaveBeenCalled();
+    expect(result.already_paid).toBe(true);
   });
 
   it("D1: enqueues an on-chain worker transfer when settleOnChain is set (non-blocking)", async () => {

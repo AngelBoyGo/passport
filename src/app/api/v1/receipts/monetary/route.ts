@@ -7,6 +7,7 @@ import { sha256 } from "@noble/hashes/sha2.js";
 import { canonicalJson } from "@/lib/receipt/canonical";
 import { MONETARY_PARAMS } from "@/lib/angelcoin/monetary";
 import { parityStatus } from "@/lib/monetary/parity";
+import { RESERVE_KINDS, fiatReserveUsdFromEntries } from "@/lib/monetary/reserve";
 import "@/lib/receipt/crypto";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +28,7 @@ export async function GET() {
   const [wallets, topups, slashes] = await Promise.all([
     prisma.agentWallet.findMany({ select: { balance: true, staked: true } }),
     prisma.operatorLedgerEntry.findMany({
-      where: { kind: { in: ["stablecoin_topup", "angelcoin_topup", "angelcoin_on_behalf", "external_revenue"] } },
+      where: { kind: { in: [...RESERVE_KINDS] } },
       select: { deltaMicros: true, createdAt: true },
     }),
     prisma.slashingLedger.findMany({ select: { penaltyCents: true } }),
@@ -35,7 +36,9 @@ export async function GET() {
 
   const circulatingSupply = wallets.reduce((sum, w) => sum + w.balance, 0);
   const stakedSupply = wallets.reduce((sum, w) => sum + w.staked, 0);
-  const reserveBalance = topups.reduce((sum, t) => sum + Math.abs(t.deltaMicros) / 10_000 / 100, 0);
+  // AUDIT FIX (C2): signed reserve (redemptions reduce it; no Math.abs, no
+  // inflow-only allowlist). Single source of truth shared with economy-health.
+  const reserveBalance = fiatReserveUsdFromEntries(topups);
   const totalSlashed = slashes.reduce((sum, s) => sum + s.penaltyCents, 0);
 
   const currentP = MONETARY_PARAMS.P0;

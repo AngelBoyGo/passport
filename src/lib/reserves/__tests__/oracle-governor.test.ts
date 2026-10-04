@@ -181,6 +181,9 @@ describe("Commodity Oracle & Basket Valuation", () => {
       ]);
 
       vi.spyOn(prisma.sovereignQuorumProposal, "findFirst").mockResolvedValue(null);
+      vi.spyOn(prisma.sovereignStateHeartbeat, "findMany").mockResolvedValue([
+        { id: "hb_ml", countryCode: "ML", nodeEndpoint: "x", lastSeenAt: new Date(), heartbeatNonce: "n", signature: "s", status: "ONLINE", updatedAt: new Date() },
+      ]);
 
       const assessment = await getLiveGovernorAssessment();
       expect(assessment.regime).toBeDefined();
@@ -200,6 +203,9 @@ describe("Commodity Oracle & Basket Valuation", () => {
         status: "EXECUTED",
         executedAt: new Date(),
       } as unknown as SovereignQuorumProposal);
+      vi.spyOn(prisma.sovereignStateHeartbeat, "findMany").mockResolvedValue([
+        { id: "hb_ml", countryCode: "ML", nodeEndpoint: "x", lastSeenAt: new Date(), heartbeatNonce: "n", signature: "s", status: "ONLINE", updatedAt: new Date() },
+      ]);
 
       const assessment = await getLiveGovernorAssessment();
       expect(assessment.regime).toBe("GHOST");

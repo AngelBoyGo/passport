@@ -144,7 +144,22 @@ async function syncWalletToLedger(commitment: string) {
     };
   }
 
-  // Create an adjustment entry to align the ledgers
+  // AUDIT FIX (C5): a POSITIVE delta would MINT ANGEL via ADJUSTMENT with no
+  // reserve and no solvency check — an unbounded mint from a mutable counter.
+  // Refuse it; only a NEGATIVE delta (ledger is ahead of the wallet) may be
+  // reconciled down, which burns surplus, never mints.
+  if (delta > 0) {
+    return {
+      subject_commitment: commitment,
+      synced: false,
+      reason: "Refused: wallet exceeds ledger (would mint unbacked ANGEL). Reconcile via a reserve-backed issuance, not an adjustment.",
+      wallet_balance: walletBalance,
+      ledger_balance: ledgerBalance,
+      delta,
+    };
+  }
+
+  // Create an adjustment entry to align the ledgers (burn-only: delta < 0).
   await prisma.angelCoinJournalEntry.create({
     data: {
       accountId: account.id,

@@ -12,6 +12,7 @@ import {
 } from "@/lib/angelcoin/monetary";
 import { generateLivePoR } from "@/lib/reserves/por-service";
 import { getCommoditySpotPrices } from "@/lib/reserves/commodity-oracle";
+import { loadFiatReserveUsd } from "@/lib/monetary/reserve";
 
 export const dynamic = "force-dynamic";
 
@@ -41,26 +42,8 @@ export async function GET() {
     goldPoR?.reserve?.unencumberedFineGrams ?? goldPoR?.reserve?.totalFineGrams ?? 0;
   const commodityReserveUsd = Number((physicalGoldGrams * goldSpotUsd).toFixed(2));
 
-  // Fiat treasury component: sum inflows and subtract redemption outflows
-  const ledgerEntries = await prisma.operatorLedgerEntry.findMany({
-    where: {
-      kind: {
-        in: [
-          "stablecoin_topup",
-          "angelcoin_topup",
-          "angelcoin_on_behalf",
-          "rwa_redemption_queued",
-          "angl_redemption",
-          "sahel_onramp",
-        ],
-      },
-    },
-    select: { deltaMicros: true },
-  });
-  const fiatReserveUsd = Math.max(
-    0,
-    ledgerEntries.reduce((sum, t) => sum + t.deltaMicros / 10_000 / 100, 0)
-  );
+  // Fiat treasury component: signed reserve (shared helper — includes outflows).
+  const fiatReserveUsd = await loadFiatReserveUsd();
 
   const reserveBalance = Number((commodityReserveUsd + fiatReserveUsd).toFixed(2));
 

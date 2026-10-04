@@ -11,9 +11,12 @@
 import { prisma } from "@/lib/db";
 import { parityStatus } from "@/lib/monetary/parity";
 import { signReportPayload } from "@/lib/raillab/report-signing";
+import { RESERVE_KINDS } from "@/lib/monetary/reserve";
 
 const DAY_MS = 24 * 3600_000;
-const TOPUP_KINDS = ["stablecoin_topup", "angelcoin_topup", "angelcoin_on_behalf", "external_revenue"];
+// AUDIT FIX (C1/M7): use the shared reserve-kind list (includes redemption
+// outflows), so economy-health, the monetary receipt, and /rate agree.
+const TOPUP_KINDS = RESERVE_KINDS;
 
 export const ECONOMY_HEALTH_MAX_SCAN = 100_000;
 
@@ -67,7 +70,13 @@ export function computeEconomyHealth(
 
   const supply = input.wallets.reduce((s, w) => s + w.balance, 0);
   const staked = input.wallets.reduce((s, w) => s + w.staked, 0);
-  const reserveUsd = input.reserveEntries.reduce((s, r) => s + Math.abs(r.deltaMicros) / 10_000 / 100, 0);
+  // AUDIT FIX (C1): signed reserve — a redemption (negative delta) REDUCES the
+  // reserve. The previous Math.abs() over an inflow-only allowlist made coverage
+  // structurally incapable of showing depletion.
+  const reserveUsd = Math.max(
+    0,
+    input.reserveEntries.reduce((s, r) => s + r.deltaMicros, 0) / 10_000 / 100
+  );
   const externalUsd = input.revenue.reduce((s, r) => s + r.grossUsdCents / 100, 0);
 
   const parity = parityStatus({ supplyAngel: supply, reserveUsd });
@@ -124,7 +133,7 @@ async function fetchInput(reasons: string[]): Promise<EconomyHealthInput> {
   const [wallets, reserveEntries, revenue, purchases, engagements, disputes, capabilities, offers, jobs] =
     await Promise.all([
       safeScan("agentWallet", () => prisma.agentWallet.findMany({ select: { balance: true, staked: true }, take: ECONOMY_HEALTH_MAX_SCAN }), reasons),
-      safeScan("operatorLedgerEntry", () => prisma.operatorLedgerEntry.findMany({ where: { kind: { in: TOPUP_KINDS } }, select: { deltaMicros: true }, take: ECONOMY_HEALTH_MAX_SCAN }), reasons),
+      safeScan("operatorLedgerEntry", () => prisma.operatorLedgerEntry.findMany({ where: { kind: { in: [...TOPUP_KINDS] } }, select: { deltaMicros: true }, take: ECONOMY_HEALTH_MAX_SCAN }), reasons),
       safeScan("agentRevenue", () => prisma.agentRevenue.findMany({ select: { grossUsdCents: true }, take: ECONOMY_HEALTH_MAX_SCAN }), reasons),
       safeScan("computePurchase", () => prisma.computePurchase.findMany({ select: { totalAngel: true, status: true, createdAt: true, verificationVerdict: true }, take: ECONOMY_HEALTH_MAX_SCAN }), reasons),
       safeScan("engagement", () => prisma.engagement.findMany({ select: { amount: true, createdAt: true, status: true }, take: ECONOMY_HEALTH_MAX_SCAN }), reasons),

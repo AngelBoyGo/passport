@@ -7,6 +7,8 @@ const { prismaMock } = vi.hoisted(() => ({
     angelCoinAccount: { upsert: vi.fn(), findUnique: vi.fn() },
     angelCoinJournalEntry: { count: vi.fn(), create: vi.fn(), findMany: vi.fn() },
     capabilityLedgerEntry: { create: vi.fn() },
+    // C4 fix uses SELECT ... FOR UPDATE via $queryRaw inside the transaction.
+    $queryRaw: vi.fn(),
     $transaction: vi.fn(async (fn: (tx: any) => Promise<void>) => fn(prismaMock)),
   },
 }));
@@ -31,6 +33,7 @@ describe("Bridge (Open Issuance) adapter — test bank A", () => {
     // defaults for happy-path ledger writes
     prismaMock.angelCoinAccount.upsert.mockResolvedValue({ id: "acc_default" });
     prismaMock.angelCoinAccount.findUnique.mockResolvedValue({ id: "acc_default", ownerOperatorId: "op_1" });
+    prismaMock.$queryRaw.mockResolvedValue([{ id: "acc_default", subjectCommitment: "c".repeat(64) }]);
     prismaMock.angelCoinJournalEntry.create.mockResolvedValue({ id: "je_default" });
     prismaMock.angelCoinJournalEntry.findMany.mockResolvedValue([
       { id: "j1", accountId: "acc_default", entryType: "OPERATOR_GRANT", amount: 10000, counterpartyCommitment: null, metadata: null, createdAt: new Date() },

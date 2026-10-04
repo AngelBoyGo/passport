@@ -17,6 +17,17 @@ import { prisma } from "@/lib/db";
 
 export type RegimeState = "SOLID" | "GHOST";
 
+/**
+ * Milliseconds since the freshest sovereign heartbeat, for the telemetry
+ * staleness circuit-breaker. No heartbeats → treat as infinitely stale (a large
+ * finite number so downstream arithmetic stays well-behaved).
+ */
+export function heartbeatsAgeMs(heartbeats: { lastSeenAt: Date }[], now: Date = new Date()): number {
+  if (heartbeats.length === 0) return Number.MAX_SAFE_INTEGER;
+  const freshest = Math.max(...heartbeats.map((h) => h.lastSeenAt.getTime()));
+  return Math.max(0, now.getTime() - freshest);
+}
+
 export interface TelemetryEvidence {
   oracleStale: boolean;
   max24hVolatilityPercent: number;
@@ -182,7 +193,7 @@ export async function getLiveGovernorAssessment(): Promise<SignedRegimeAttestati
   const spotPrices = getCommoditySpotPrices();
 
   // Inspect database batches, reserves, and sovereign emergency quorum actions
-  const [quarantinedBatches, reserves, wallets, latestEmergencyProposal] = await Promise.all([
+  const [quarantinedBatches, reserves, wallets, latestEmergencyProposal, heartbeats] = await Promise.all([
     prisma.vaultBatch.count({ where: { status: "QUARANTINED" } }),
     prisma.commodityReserve.findMany(),
     prisma.agentWallet.findMany({ select: { balance: true } }),
@@ -193,6 +204,7 @@ export async function getLiveGovernorAssessment(): Promise<SignedRegimeAttestati
       },
       orderBy: { executedAt: "desc" },
     }),
+    prisma.sovereignStateHeartbeat.findMany({ select: { lastSeenAt: true } }),
   ]);
 
   const circulatingSupply = Math.max(
@@ -228,7 +240,10 @@ export async function getLiveGovernorAssessment(): Promise<SignedRegimeAttestati
     max24hVolatilityPercent: maxVolatility,
     quarantinedBatchCount: quarantinedBatches,
     backingRatio: valuation.solvencyMetrics.backingRatio,
-    lastTelemetryHeartbeatMs: 60 * 1000, // 1 minute since last poll
+    // AUDIT FIX (H4): compute the REAL age of the freshest sovereign heartbeat.
+    // A hardcoded 60s meant the 15-minute staleness circuit-breaker could never
+    // fire. If no heartbeat exists, treat telemetry as infinitely stale.
+    lastTelemetryHeartbeatMs: heartbeatsAgeMs(heartbeats),
   };
 
   let assessment = evaluateDualState(evidence, valuation);

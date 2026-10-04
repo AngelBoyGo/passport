@@ -305,17 +305,33 @@ export async function rehydrateFleetAgent(
   }
 
   const capsule = await getResurrectionCapsule(commitment);
-  await prisma.agentInstance.update({
-    where: { commitment },
-    data: {
-      status: "active",
-      rehydratedAt: new Date(),
-      stoppedAt: null,
-      stopReason: null,
-      ...(finalTier !== currentTier ? { llmTier: finalTier } : {}),
-      ...(capsule?.payloadDigest ? { capsuleDigest: capsule.payloadDigest } : {}),
+
+  // AUDIT FIX (M1): rehydrate must respect the global fleet cap. Mint only
+  // counts live instances, so stop-all → mint-to-cap → rehydrate-all previously
+  // doubled the fleet. Enforce the cap here in a serializable transaction.
+  const cap = maxFleetAgents();
+  await prisma.$transaction(
+    async (tx) => {
+      const live = await tx.agentInstance.count({
+        where: { status: { in: ["provisioning", "active", "idle"] } },
+      });
+      if (live >= cap) {
+        throw new Error(`fleet_cap_reached:${live}/${cap}`);
+      }
+      await tx.agentInstance.update({
+        where: { commitment },
+        data: {
+          status: "active",
+          rehydratedAt: new Date(),
+          stoppedAt: null,
+          stopReason: null,
+          ...(finalTier !== currentTier ? { llmTier: finalTier } : {}),
+          ...(capsule?.payloadDigest ? { capsuleDigest: capsule.payloadDigest } : {}),
+        },
+      });
     },
-  });
+    { isolationLevel: "Serializable" }
+  );
 
   return {
     capsule,

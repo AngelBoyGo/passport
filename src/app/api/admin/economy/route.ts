@@ -185,7 +185,7 @@ export async function GET(request: NextRequest) {
           liberated_agents: liberatedCount,
         },
         reserves: {
-          backing_ratio: "1:1 Physical Commodity Basket",
+          backing_ratio: "design target 1:1 — not independently audited",
           total_fine_grams_gold: totalFineGrams,
           active_vault_lots: totalLots,
           vault_batches: vaultBatches.map((v) => ({
