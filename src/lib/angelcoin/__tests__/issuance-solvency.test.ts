@@ -1,19 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { prismaMock, loadReserveMock, parityMock } = vi.hoisted(() => ({
+const { prismaMock, loadReserveMock, parityMock, supplyMock } = vi.hoisted(() => ({
   prismaMock: {
-    agentWallet: { findMany: vi.fn() },
-    angelCoinAccount: { upsert: vi.fn(), findUnique: vi.fn() },
+    agentWallet: { findMany: vi.fn(), upsert: vi.fn() },
+    angelCoinAccount: { upsert: vi.fn(), findUnique: vi.fn(), updateMany: vi.fn() },
     angelCoinJournalEntry: { create: vi.fn(), findMany: vi.fn() },
     agentEnrollment: { findUnique: vi.fn() },
+    $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(prismaMock)),
   },
   loadReserveMock: vi.fn(),
   parityMock: vi.fn(),
+  supplyMock: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 vi.mock("@/lib/monetary/reserve", () => ({ loadFiatReserveUsd: loadReserveMock }));
 vi.mock("@/lib/monetary/parity", () => ({ parityStatus: parityMock }));
+vi.mock("@/lib/monetary/supply", () => ({ circulatingSupply: supplyMock, supplyFromWallets: vi.fn() }));
 vi.mock("@/lib/enrollment/enforcement", () => ({ isEnrollmentEnforcedForCredits: vi.fn(() => false) }));
 
 const { grantCredits } = await import("@/lib/angelcoin/ledger-service");
@@ -24,9 +27,12 @@ beforeEach(() => {
   vi.clearAllMocks();
   delete process.env.ALLOW_UNBACKED_ISSUANCE;
   prismaMock.angelCoinAccount.upsert.mockResolvedValue({ id: "acc_1", subjectCommitment: COMMIT });
+  prismaMock.angelCoinAccount.updateMany.mockResolvedValue({ count: 1 });
   prismaMock.angelCoinJournalEntry.create.mockResolvedValue({ id: "je_1" });
   prismaMock.angelCoinJournalEntry.findMany.mockResolvedValue([{ id: "je_1", accountId: "acc_1", entryType: "OPERATOR_GRANT", amount: 5, counterpartyCommitment: null, metadata: null, createdAt: new Date() }]);
   prismaMock.agentWallet.findMany.mockResolvedValue([{ balance: 100 }]);
+  prismaMock.agentWallet.upsert.mockResolvedValue({});
+  supplyMock.mockResolvedValue({ supply: 100, staked: 0, circulating: 100, walletCount: 1 });
 });
 
 describe("grantCredits — issuance fails closed on undercollateralization (H2)", () => {

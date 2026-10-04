@@ -12,6 +12,7 @@ import { prisma } from "@/lib/db";
 import { parityStatus } from "@/lib/monetary/parity";
 import { signReportPayload } from "@/lib/raillab/report-signing";
 import { RESERVE_KINDS } from "@/lib/monetary/reserve";
+import { supplyFromWallets } from "@/lib/monetary/supply";
 
 const DAY_MS = 24 * 3600_000;
 // AUDIT FIX (C1/M7): use the shared reserve-kind list (includes redemption
@@ -68,8 +69,9 @@ export function computeEconomyHealth(
   const nowMs = now.getTime();
   const since30 = nowMs - 30 * DAY_MS;
 
-  const supply = input.wallets.reduce((s, w) => s + w.balance, 0);
-  const staked = input.wallets.reduce((s, w) => s + w.staked, 0);
+  const snap = supplyFromWallets(input.wallets);
+  const supply = snap.supply;
+  const staked = snap.staked;
   // AUDIT FIX (C1): signed reserve — a redemption (negative delta) REDUCES the
   // reserve. The previous Math.abs() over an inflow-only allowlist made coverage
   // structurally incapable of showing depletion.

@@ -14,6 +14,7 @@ import { getCommoditySpotPrices } from "./commodity-oracle";
 import { computeBasketValuation, type BasketValuationResult } from "./basket-valuation";
 import { signPoRAttestation } from "./por-service";
 import { prisma } from "@/lib/db";
+import { supplyFromWallets } from "@/lib/monetary/supply";
 
 export type RegimeState = "SOLID" | "GHOST";
 
@@ -213,10 +214,7 @@ export async function getLiveGovernorAssessment(): Promise<SignedRegimeAttestati
     prisma.sovereignStateHeartbeat.findMany({ select: { lastSeenAt: true } }),
   ]);
 
-  const circulatingSupply = Math.max(
-    wallets.reduce((sum, w) => sum + w.balance, 0),
-    1
-  );
+  const circulatingSupply = Math.max(supplyFromWallets(wallets).supply, 1);
 
   const holdings = reserves.map((r) => ({
     commodityType: r.commodityType,

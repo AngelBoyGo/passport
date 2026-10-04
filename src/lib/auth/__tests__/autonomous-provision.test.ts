@@ -8,7 +8,7 @@ const { prismaMock } = vi.hoisted(() => ({
     operator: { create: vi.fn() },
     apiKey: { create: vi.fn() },
     agent: { create: vi.fn() },
-    agentEnrollment: { findUnique: vi.fn(), create: vi.fn(), upsert: vi.fn() },
+    agentEnrollment: { findUnique: vi.fn(), findFirst: vi.fn(), create: vi.fn(), upsert: vi.fn() },
     provisionChallenge: {
       create: vi.fn(),
       updateMany: vi.fn(),
@@ -35,6 +35,8 @@ describe("Autonomous Agent Self-Provisioning & Security Hardening", () => {
     process.env.INGESTION_COMMITMENT_SALT = "test-salt-123";
     process.env.AUTONOMOUS_POW_DIFFICULTY = "3";
     prismaMock.provisionChallenge.deleteMany.mockResolvedValue({ count: 0 });
+    // H3: keypair-uniqueness guard reads findFirst; default to "not enrolled".
+    prismaMock.agentEnrollment.findFirst.mockResolvedValue(null);
   });
 
   it("generates and persists a valid challenge nonce with proof-of-work target", async () => {

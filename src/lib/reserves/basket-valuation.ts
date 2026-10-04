@@ -10,6 +10,7 @@
 
 import { getCommoditySpotPrices, type CommodityPrice } from "./commodity-oracle";
 import { prisma } from "@/lib/db";
+import { supplyFromWallets } from "@/lib/monetary/supply";
 
 export interface BasketComposition {
   commodityType: string;
@@ -131,7 +132,7 @@ export async function getLiveBasketValuation(options?: {
     prisma.agentWallet.findMany({ select: { balance: true } }),
   ]);
 
-  const circulatingSupply = wallets.reduce((sum, w) => sum + w.balance, 0);
+  const circulatingSupply = supplyFromWallets(wallets).supply;
 
   const holdings = reserves.map((r) => ({
     commodityType: r.commodityType,

@@ -9,8 +9,13 @@ const { prismaMock } = vi.hoisted(() => ({
     operator: { create: vi.fn() },
     apiKey: { create: vi.fn() },
     agent: { create: vi.fn() },
-    agentEnrollment: { findUnique: vi.fn(), create: vi.fn(), upsert: vi.fn() },
+    agentEnrollment: { findUnique: vi.fn(), findFirst: vi.fn(), create: vi.fn(), upsert: vi.fn() },
     provisionChallenge: { create: vi.fn(), updateMany: vi.fn(), deleteMany: vi.fn() },
+    provisioningThrottle: {
+      updateMany: vi.fn(),
+      findUnique: vi.fn(),
+      create: vi.fn(),
+    },
   },
 }));
 
@@ -28,6 +33,10 @@ describe("Autonomous Agent Provisioning REST Endpoints", () => {
     process.env.INGESTION_COMMITMENT_SALT = "test-salt-123";
     process.env.AUTONOMOUS_POW_DIFFICULTY = "3";
     process.env.NEXT_PUBLIC_APP_URL = "https://passport.metis.gold";
+    prismaMock.agentEnrollment.findFirst.mockResolvedValue(null);
+    // Persistent throttle: first slot allowed.
+    prismaMock.provisioningThrottle.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.provisioningThrottle.findUnique.mockResolvedValue({ count: 1 });
     prismaMock.provisionChallenge.create.mockResolvedValue({ id: "pc_1" });
     prismaMock.provisionChallenge.deleteMany.mockResolvedValue({ count: 0 });
   });

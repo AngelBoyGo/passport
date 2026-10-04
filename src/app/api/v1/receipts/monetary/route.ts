@@ -8,6 +8,7 @@ import { canonicalJson } from "@/lib/receipt/canonical";
 import { MONETARY_PARAMS } from "@/lib/angelcoin/monetary";
 import { parityStatus } from "@/lib/monetary/parity";
 import { RESERVE_KINDS, fiatReserveUsdFromEntries } from "@/lib/monetary/reserve";
+import { supplyFromWallets } from "@/lib/monetary/supply";
 import "@/lib/receipt/crypto";
 
 export const dynamic = "force-dynamic";
@@ -34,8 +35,9 @@ export async function GET() {
     prisma.slashingLedger.findMany({ select: { penaltyCents: true } }),
   ]);
 
-  const circulatingSupply = wallets.reduce((sum, w) => sum + w.balance, 0);
-  const stakedSupply = wallets.reduce((sum, w) => sum + w.staked, 0);
+  const snap = supplyFromWallets(wallets);
+  const circulatingSupply = snap.supply;
+  const stakedSupply = snap.staked;
   // AUDIT FIX (C2): signed reserve (redemptions reduce it; no Math.abs, no
   // inflow-only allowlist). Single source of truth shared with economy-health.
   const reserveBalance = fiatReserveUsdFromEntries(topups);

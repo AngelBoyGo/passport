@@ -197,6 +197,20 @@ export async function provisionAutonomousAgent(
   const agentName = display_name?.trim() || `Agent-${subjectCommitment.slice(0, 8)}`;
   const operationalDomain = domain || "CODE_GENERATION";
 
+  // AUDIT FIX (H3): keypair uniqueness — one keypair = one identity, forever.
+  // Previously this path upserted the enrollment, so the same public key could
+  // be provisioned repeatedly (and a fresh keypair each time bypassed all caps).
+  // Refuse a re-used public key outright with a 409-style error.
+  const existingKey = await prisma.agentEnrollment.findFirst({
+    where: { publicKey: pubKeyClean.toLowerCase() },
+    select: { subjectCommitment: true, status: true },
+  });
+  if (existingKey) {
+    throw new Error(
+      `public key already enrolled as ${existingKey.subjectCommitment} (one keypair = one identity)`
+    );
+  }
+
   const stripeCustomerId = `cus_auto_${bytesToHex(crypto.getRandomValues(new Uint8Array(8)))}`;
   const operator = await prisma.operator.create({
     data: {
@@ -230,18 +244,13 @@ export async function provisionAutonomousAgent(
     },
   });
 
-  await prisma.agentEnrollment.upsert({
-    where: { subjectCommitment },
-    create: {
+  await prisma.agentEnrollment.create({
+    data: {
       subjectCommitment,
       publicKey: pubKeyClean,
       context: "AUTONOMOUS_AGENT_PROVISIONED",
       status: "ISSUED",
       issuedAt: new Date(),
-    },
-    update: {
-      publicKey: pubKeyClean,
-      status: "ISSUED",
     },
   });
 

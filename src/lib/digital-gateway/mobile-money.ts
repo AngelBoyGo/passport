@@ -188,6 +188,11 @@ export async function settleMobileMoneyOnramp(
   // 2. Atomic credit + treasury booking + SETTLED flip.
   try {
     await prisma.$transaction(async (tx) => {
+      // UNIFICATION: credit the wallet AND mirror the credit into the AngelCoin
+      // journal in the same transaction, so the collector's journal-derived
+      // availableBalance matches its wallet balance. The fiat gross booked below
+      // is the reserve that backs this issuance (self-backed on-ramp:
+      // creditedAngel × $5 ≤ xofUsd), so no separate solvency gate is needed.
       await tx.agentWallet.upsert({
         where: { subjectCommitment: targetCommitment },
         create: {
@@ -201,6 +206,12 @@ export async function settleMobileMoneyOnramp(
           earnedTotal: { increment: creditedAngel },
           lastActivityAt: new Date(),
         },
+      });
+
+      const { getOrCreateAccount, appendEntry } = await import("@/lib/angelcoin/ledger-service");
+      const acct = await getOrCreateAccount(targetCommitment);
+      await appendEntry(tx, acct.id, "OPERATOR_GRANT", creditedAngel, {
+        metadata: JSON.stringify({ source: "mobile_money_onramp", provider: provider.name, externalRef }),
       });
 
       // Book fiat gross into the protocol treasury ledger consumed by GET /api/v1/rate.

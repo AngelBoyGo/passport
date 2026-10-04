@@ -1811,8 +1811,7 @@ model MissionPlan {
 /// Moltbook read/learn state — dedupe + provenance for the external agent forum.
 /// Items are hashed (contentHash) and injection-scanned before persistence; the
 /// platform is treated as UNTRUSTED (trust level is never VERIFIED_SOURCE).
-model MoltbookItem {
-  id          String   @id @default(cuid())
+model MoltbookItem {  id          String   @id @default(cuid())
   contentHash String   @unique
   kind        String   // post | comment | home | heartbeat
   title       String?
@@ -1826,4 +1825,23 @@ model MoltbookItem {
   @@index([kind])
   @@index([seenAt])
 }
+
+/// Persistent provisioning throttle (Sybil resistance).
+///
+/// The autonomous-provision daily cap was previously an in-memory counter that
+/// reset on every process restart / replica — so mass identity farming was only
+/// weakly bounded. This row is the durable, cross-replica guard: one row per
+/// (scope, key, windowStart), incremented atomically under a unique constraint.
+model ProvisioningThrottle {
+  id          String   @id @default(cuid())
+  scope       String   // e.g. "autonomous_ip"
+  key         String   // e.g. the client IP
+  windowStart DateTime // floor(now / window) 
+  count       Int      @default(0)
+  updatedAt   DateTime @updatedAt
+
+  @@unique([scope, key, windowStart])
+  @@index([scope, windowStart])
+}
+
 

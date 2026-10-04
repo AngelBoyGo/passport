@@ -8,6 +8,9 @@ const { prismaMock } = vi.hoisted(() => ({
     moneySettlement: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
     agentWallet: { upsert: vi.fn() },
     operatorLedgerEntry: { create: vi.fn() },
+    // UNIFICATION: mobile-money now mirrors the credit into the AngelCoin journal.
+    angelCoinAccount: { upsert: vi.fn(), findUnique: vi.fn(), updateMany: vi.fn() },
+    angelCoinJournalEntry: { create: vi.fn(), findMany: vi.fn() },
     $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(prismaMock)),
   },
 }));
@@ -47,6 +50,9 @@ describe("Sahel Digital Money Gateway & Haven On-Ramp (Phase 18)", () => {
     vi.clearAllMocks();
     vi.restoreAllMocks();
     __clearUssdSessions();
+    prismaMock.angelCoinAccount.upsert.mockResolvedValue({ id: "acc_collector", subjectCommitment: "c", ownerOperatorId: null });
+    prismaMock.angelCoinAccount.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.angelCoinJournalEntry.create.mockResolvedValue({ id: "je_1" });
   });
 
   describe("Fiat Fix (XOF/USD oracle)", () => {
@@ -108,6 +114,13 @@ describe("Sahel Digital Money Gateway & Haven On-Ramp (Phase 18)", () => {
             operatorId: "protocol_treasury",
             deltaMicros: Math.round(6000 * (1 / 600.0) * 1_000_000), // = 10 USD in micros
           }),
+        })
+      );
+      // UNIFICATION: the credit is mirrored into the AngelCoin journal so the
+      // two ledgers agree.
+      expect(prismaMock.angelCoinJournalEntry.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ entryType: "OPERATOR_GRANT", amount: 2 }),
         })
       );
     });

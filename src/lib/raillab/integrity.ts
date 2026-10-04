@@ -16,6 +16,7 @@
  */
 
 import { prisma } from "@/lib/db";
+import { supplyFromWallets } from "@/lib/monetary/supply";
 
 export const PENDING_REVIEW_TTL_MS = 24 * 60 * 60 * 1000; // flag > 24h
 export const MILLI_UNITS_FLOAT_TOLERANCE = 1;
@@ -71,7 +72,7 @@ export async function runIntegrityCheck(input: IntegrityInput = {}): Promise<Int
   let angelSupplyObserved = 0;
   try {
     const wallets = await prisma.agentWallet.findMany({ select: { balance: true } });
-    angelSupplyObserved = wallets.reduce((sum, w) => sum + w.balance, 0);
+    angelSupplyObserved = supplyFromWallets(wallets).supply;
   } catch {
     issues.push("agentWallet read failed");
   }

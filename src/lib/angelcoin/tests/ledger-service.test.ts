@@ -38,6 +38,11 @@ vi.mock("@/lib/db", () => ({
       create: createEntryMock,
       findMany: findManyMock,
     },
+    // grantCredits now mirrors the grant into AgentWallet.balance.
+    agentWallet: {
+      findMany: vi.fn(async () => []),
+      upsert: vi.fn(async () => ({})),
+    },
     $transaction: transactionMock,
     $queryRaw: queryRawMock,
   },
@@ -140,6 +145,7 @@ beforeEach(() => {
     const tx = {
       $queryRaw: queryRawMock,
       angelCoinJournalEntry: { create: createEntryMock, findMany: findManyMock },
+      agentWallet: { upsert: vi.fn(async () => ({})) },
       angelCoinAccount: {
         findUnique: vi.fn(async (args: { where: { subjectCommitment: string } }) => {
           for (const acct of accounts.values()) {

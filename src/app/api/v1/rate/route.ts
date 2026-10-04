@@ -13,6 +13,7 @@ import {
 import { generateLivePoR } from "@/lib/reserves/por-service";
 import { getCommoditySpotPrices } from "@/lib/reserves/commodity-oracle";
 import { loadFiatReserveUsd } from "@/lib/monetary/reserve";
+import { supplyFromWallets } from "@/lib/monetary/supply";
 
 export const dynamic = "force-dynamic";
 
@@ -33,8 +34,9 @@ export async function GET() {
     Promise.resolve(getCommoditySpotPrices()),
   ]);
 
-  const circulatingSupply = wallets.reduce((sum, w) => sum + w.balance, 0);
-  const stakedSupply = wallets.reduce((sum, w) => sum + w.staked, 0);
+  const snap = supplyFromWallets(wallets);
+  const circulatingSupply = snap.supply;
+  const stakedSupply = snap.staked;
 
   // Physical commodity reserve valuation (unencumbered fine grams × live gold spot price)
   const goldSpotUsd = spotPrices.Au?.priceUsd ?? 0;

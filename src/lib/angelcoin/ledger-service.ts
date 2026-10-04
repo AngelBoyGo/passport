@@ -217,13 +217,10 @@ export async function grantCredits(
   if (String(process.env.ALLOW_UNBACKED_ISSUANCE || "").toLowerCase() !== "1") {
     const { loadFiatReserveUsd } = await import("@/lib/monetary/reserve");
     const { parityStatus } = await import("@/lib/monetary/parity");
-    const [wallets, reserveUsd] = await Promise.all([
-      prisma.agentWallet.findMany({ select: { balance: true } }),
-      loadFiatReserveUsd(),
-    ]);
-    const supply = wallets.reduce((s, w) => s + w.balance, 0);
+    const { circulatingSupply } = await import("@/lib/monetary/supply");
+    const [snap, reserveUsd] = await Promise.all([circulatingSupply(), loadFiatReserveUsd()]);
     // Would the post-grant supply still be fully backed at parity?
-    const post = parityStatus({ supplyAngel: supply + Math.max(0, amount), reserveUsd });
+    const post = parityStatus({ supplyAngel: snap.supply + Math.max(0, amount), reserveUsd });
     if (!post.reserveAdequate) {
       throw new Error(
         `issuance_refused_undercollateralized:reserve=$${reserveUsd} ` +
@@ -232,20 +229,21 @@ export async function grantCredits(
     }
   }
 
+  // UNIFICATION: write the journal entry AND credit AgentWallet.balance in one
+  // transaction, so the journal-derived balance and the canonical supply counter
+  // (Σ AgentWallet.balance) stay consistent. Previously the grant was invisible
+  // to the supply the solvency gate checks — the two ledgers could drift.
   const account = await getOrCreateAccount(subjectCommitment);
-  const entry = await appendEntry(
-    prisma,
-    account.id,
-    AngelCoinEntryType.OPERATOR_GRANT,
-    amount,
-    { metadata }
-  );
-  const entries = await loadJournalEntries(account.id);
-  return {
-    account,
-    entry,
-    balances: computeBalances(entries),
-  };
+  return prisma.$transaction(async (tx) => {
+    const entry = await appendEntry(tx, account.id, AngelCoinEntryType.OPERATOR_GRANT, amount, { metadata });
+    await tx.agentWallet.upsert({
+      where: { subjectCommitment },
+      create: { subjectCommitment, balance: amount, earnedTotal: 0, spentTotal: 0, lastActivityAt: new Date() },
+      update: { balance: { increment: amount }, lastActivityAt: new Date() },
+    });
+    const entries = await loadJournalEntries(account.id, tx);
+    return { account, entry, balances: computeBalances(entries) };
+  });
 }
 
 /**

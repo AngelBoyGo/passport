@@ -22,6 +22,8 @@ const { prismaMock } = vi.hoisted(() => ({
     moneySettlement: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
     agentWallet: { upsert: vi.fn() },
     operatorLedgerEntry: { create: vi.fn() },
+    angelCoinAccount: { upsert: vi.fn(), findUnique: vi.fn(), updateMany: vi.fn() },
+    angelCoinJournalEntry: { create: vi.fn(), findMany: vi.fn() },
     $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(prismaMock)),
   },
 }));
@@ -67,6 +69,10 @@ describe("Autonomous Rail Factory (Phase 19)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.restoreAllMocks();
+    // mobile-money now mirrors the credit into the AngelCoin journal.
+    prismaMock.angelCoinAccount.upsert.mockResolvedValue({ id: "acc_mm", subjectCommitment: "c", ownerOperatorId: null });
+    prismaMock.angelCoinAccount.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.angelCoinJournalEntry.create.mockResolvedValue({ id: "je_mm" });
   });
 
   describe("state machine (a)", () => {

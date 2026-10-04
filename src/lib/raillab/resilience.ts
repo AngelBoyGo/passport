@@ -22,6 +22,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { prisma } from "@/lib/db";
 import { MONETARY_PARAMS } from "@/lib/angelcoin/monetary";
+import { supplyFromWallets } from "@/lib/monetary/supply";
 import {
   SETTLEMENT_VELOCITY_BURST_THRESHOLD,
   SETTLEMENT_VELOCITY_WINDOW_MS,
@@ -140,8 +141,9 @@ export function computeReserveUsd(topups: { deltaMicros: number }[]): number {
 // ── Baseline snapshot (pure) ──
 
 export function computeBaseline(input: BaselineInput): ResilienceBaseline {
-  const angelSupply = input.wallets.reduce((s, w) => s + w.balance, 0);
-  const staked = input.wallets.reduce((s, w) => s + w.staked, 0);
+  const snap = supplyFromWallets(input.wallets);
+  const angelSupply = snap.supply;
+  const staked = snap.staked;
   const reserveUsd = computeReserveUsd(input.topups);
   const commodityValue = input.reserves.reduce(
     (s, r) => s + (r.totalFineGrams ?? 0) * (RESILIENCE_COMMODITY_SPOT_USD_PER_GRAM[r.symbol] ?? 0),

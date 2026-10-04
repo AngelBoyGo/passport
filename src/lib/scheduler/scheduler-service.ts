@@ -18,6 +18,7 @@
  */
 
 import type { DecisionOutcome } from "@/lib/think-tank/kernel";
+import { supplyFromWallets } from "@/lib/monetary/supply";
 
 export interface TickResult {
   tick_id: string;
@@ -114,7 +115,7 @@ export async function runTick(deps: SchedulerDeps): Promise<TickResult> {
 
   // 1. Gather system state
   const state = await deps.getSystemState();
-  const totalSupply = state.wallets.reduce((sum, w) => sum + w.balance, 0);
+  const totalSupply = supplyFromWallets(state.wallets).supply;
   const treasuryBalance = totalSupply;
   const recent30dCount = state.recentEvidence.length;
 
