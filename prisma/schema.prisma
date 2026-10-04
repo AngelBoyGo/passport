@@ -1811,7 +1811,8 @@ model MissionPlan {
 /// Moltbook read/learn state — dedupe + provenance for the external agent forum.
 /// Items are hashed (contentHash) and injection-scanned before persistence; the
 /// platform is treated as UNTRUSTED (trust level is never VERIFIED_SOURCE).
-model MoltbookItem {  id          String   @id @default(cuid())
+model MoltbookItem {
+  id          String   @id @default(cuid())
   contentHash String   @unique
   kind        String   // post | comment | home | heartbeat
   title       String?
