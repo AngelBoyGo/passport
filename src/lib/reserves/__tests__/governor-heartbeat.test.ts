@@ -15,8 +15,11 @@ describe("governor telemetry heartbeat age (audit H4)", () => {
     expect(ages).toBe(10 * 60_000);
   });
 
-  it("returns a large value when there are NO heartbeats (treat as stale)", () => {
-    expect(heartbeatsAgeMs([], now)).toBe(Number.MAX_SAFE_INTEGER);
+  it("returns 0 (neutral) when there are NO heartbeats configured", () => {
+    // Unconfigured is not the same as stale: returning MAX_SAFE_INTEGER pinned
+    // the telemetry-silence breaker forever whenever a deployment had no
+    // sovereign keys. Neutral 0 avoids a permanent false GHOST.
+    expect(heartbeatsAgeMs([], now)).toBe(0);
   });
 
   it("a heartbeat older than the 15-minute window is detectably stale", () => {

@@ -763,8 +763,12 @@ model OperatorLedgerEntry {
   deltaMicros Int
   kind        String // 'fiat_topup' | 'stablecoin_topup' | 'refund' | 'burn'
   metadata    String?
+  /// Optional idempotency key. When set it is UNIQUE, so a duplicate insert
+  /// (retry / concurrent request) fails with P2002 instead of double-crediting.
+  idempotencyKey String?
   createdAt   DateTime @default(now())
 
+  @@unique([idempotencyKey])
   @@index([operatorId, createdAt])
 }
 

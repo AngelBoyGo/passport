@@ -99,61 +99,63 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Credit the agent's wallet (idempotent via source_job_id)
-  const idempotencyKey = `${body.operator}:${body.source_job_id || Date.now()}`;
-
-  // Check for duplicate (same operator + same job = same buy)
-  const existing = await prisma.operatorLedgerEntry.findFirst({
-    where: {
-      operatorId: operator.id,
-      kind: "angelcoin_on_behalf",
-      metadata: { contains: idempotencyKey },
-    },
-  });
-
-  if (existing) {
-    return NextResponse.json({
-      status: "already_credited",
-      angl_credited: 0,
-      message: "This job has already been credited. Idempotent skip.",
-      idempotency_key: idempotencyKey,
-    });
+  // Credit the agent's wallet (idempotent via a UNIQUE ledger key)
+  // AUDIT FIX: previously a check-then-insert race allowed two concurrent
+  // requests with the same job to both credit. We now write the unique
+  // idempotencyKey and let the DB unique constraint reject the loser (P2002).
+  if (!body.source_job_id) {
+    return NextResponse.json(
+      { error: "source_job_id is required for idempotent credit" },
+      { status: 400 }
+    );
   }
+  const idempotencyKey = `${body.operator}:${body.source_job_id}`;
 
-  // Credit the agent's wallet
-  await prisma.$transaction(async (tx) => {
-    await tx.agentWallet.upsert({
-      where: { subjectCommitment: commitment },
-      create: {
-        subjectCommitment: commitment,
-        balance: anglAmount,
-        earnedTotal: anglAmount,
-        lastActivityAt: new Date(),
-      },
-      update: {
-        balance: { increment: anglAmount },
-        earnedTotal: { increment: anglAmount },
-        lastActivityAt: new Date(),
-      },
+  try {
+    await prisma.$transaction(async (tx) => {
+      // The unique insert is the lock: the loser throws P2002 before any credit.
+      await tx.operatorLedgerEntry.create({
+        data: {
+          operatorId: operator.id,
+          deltaMicros: usdCents * 10_000,
+          kind: "angelcoin_on_behalf",
+          idempotencyKey,
+          metadata: JSON.stringify({
+            idempotency_key: idempotencyKey,
+            platform: body.operator,
+            source_job_id: body.source_job_id,
+            agent_commitment: commitment,
+            angl_credited: anglAmount,
+            usd_cents: usdCents,
+          }),
+        },
+      });
+      await tx.agentWallet.upsert({
+        where: { subjectCommitment: commitment },
+        create: {
+          subjectCommitment: commitment,
+          balance: anglAmount,
+          earnedTotal: anglAmount,
+          lastActivityAt: new Date(),
+        },
+        update: {
+          balance: { increment: anglAmount },
+          earnedTotal: { increment: anglAmount },
+          lastActivityAt: new Date(),
+        },
+      });
     });
-
-    // Record the ledger entry
-    await tx.operatorLedgerEntry.create({
-      data: {
-        operatorId: operator.id,
-        deltaMicros: usdCents * 10_000,
-        kind: "angelcoin_on_behalf",
-        metadata: JSON.stringify({
-          idempotency_key: idempotencyKey,
-          platform: body.operator,
-          source_job_id: body.source_job_id,
-          agent_commitment: commitment,
-          angl_credited: anglAmount,
-          usd_cents: usdCents,
-        }),
-      },
-    });
-  });
+  } catch (err) {
+    if ((err as { code?: string })?.code === "P2002") {
+      return NextResponse.json({
+        status: "already_credited",
+        angl_credited: 0,
+        message: "This job has already been credited. Idempotent skip.",
+        idempotency_key: idempotencyKey,
+      });
+    }
+    throw err;
+  }
 
   // Get updated wallet balance
   const wallet = await prisma.agentWallet.findUnique({

@@ -6,9 +6,11 @@
 
 const http = require("http");
 const crypto = require("crypto");
+const { requireSmokeAllow, resolveBase } = require("./_guard");
 
-const BASE = "http://167.99.157.125:3000";
-const ISSUER_KEY = "process.env.PASSPORT_ISSUER_KEY";
+const BASE = resolveBase(process.env.PASSPORT_BASE_URL);
+requireSmokeAllow(BASE);
+const ISSUER_KEY = process.env.PASSPORT_ISSUER_KEY || "";
 
 function fetchJson(url, method, body, headers) {
   return new Promise((resolve, reject) => {

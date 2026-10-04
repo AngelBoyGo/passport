@@ -93,6 +93,10 @@ beforeEach(() => {
   accountCounter = 0;
   journalStore = [];
   vi.clearAllMocks();
+  // grantCredits now fails closed on undercollateralization; these tests cover
+  // journal mechanics, so opt out of the solvency gate (the gate itself is
+  // covered by issuance-solvency.test.ts).
+  process.env.ALLOW_UNBACKED_ISSUANCE = "1";
 
   findUniqueMock.mockImplementation(async (args: { where: { subjectCommitment?: string; id?: string } }) => {
     if (args.where.subjectCommitment) {

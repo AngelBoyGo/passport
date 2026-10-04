@@ -10,13 +10,15 @@ const { sha256 } = require("@noble/hashes/sha2.js");
 const { bytesToHex, hexToBytes, utf8ToBytes } = require("@noble/hashes/utils.js");
 const http = require("http");
 const fs = require("fs");
+const { requireSmokeAllow, resolveBase } = require("./_guard");
 
 // Configure @noble/ed25519 sha512 (required for Node.js)
 const { sha512 } = require("@noble/hashes/sha2.js");
 noble.hashes.sha512 = sha512;
 noble.hashes.sha512Async = (msg) => Promise.resolve(sha512(msg));
 
-const BASE = "http://localhost:3000";
+const BASE = resolveBase(process.env.PASSPORT_BASE_URL);
+requireSmokeAllow(BASE);
 const ISSUER_KEY = process.env.PASSPORT_ISSUER_KEY;
 const NUM = 5;
 

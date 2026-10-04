@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { completeTierResilient, type TierCompleteOptions } from "../gateway-client";
+import { completeTierResilient, completeTierResilientParsed, type TierCompleteOptions } from "../gateway-client";
 import { TIER_MODEL_ALLOWLIST } from "../tiers";
 
 /** Builds a fake fetch that returns queued responses in order. */
@@ -100,5 +100,43 @@ describe("completeTierResilient — retry + same-tier fallback", () => {
     const { fn, calls } = fakeFetch([ok("x")]);
     await completeTierResilient("neuron", { ...opts, model: "gpt-4o-mini" }, { config: CFG, fetchImpl: fn });
     expect(calls[0]).toBe("gpt-4o-mini");
+  });
+});
+
+describe("completeTierResilientParsed — malformed JSON is retried/fallen back", () => {
+  it("retries when the parse throws (malformed JSON), then succeeds", async () => {
+    // First raw is malformed JSON; second is valid.
+    const { fn } = fakeFetch([ok("not json"), ok('{"a":1}')]);
+    const parsed = await completeTierResilientParsed(
+      "neuron",
+      opts,
+      (raw) => JSON.parse(raw) as { a: number },
+      { config: CFG, fetchImpl: fn, attemptsPerModel: 2, retryDelayMs: 0 }
+    );
+    expect(parsed.a).toBe(1);
+  });
+
+  it("falls back to another model when the primary keeps emitting malformed JSON", async () => {
+    const { fn, calls } = fakeFetch([ok("nope"), ok("nope"), ok('{"ok":true}')]);
+    const parsed = await completeTierResilientParsed(
+      "neuron",
+      opts,
+      (raw) => JSON.parse(raw) as { ok: boolean },
+      { config: CFG, fetchImpl: fn, attemptsPerModel: 2, retryDelayMs: 0 }
+    );
+    expect(parsed.ok).toBe(true);
+    expect(new Set(calls).size).toBe(2); // primary then fallback model
+  });
+
+  it("throws fail-closed when every model keeps returning malformed JSON", async () => {
+    const { fn } = fakeFetch([ok("x"), ok("x"), ok("x"), ok("x")]);
+    await expect(
+      completeTierResilientParsed("neuron", opts, (raw) => JSON.parse(raw), {
+        config: CFG,
+        fetchImpl: fn,
+        attemptsPerModel: 2,
+        retryDelayMs: 0,
+      })
+    ).rejects.toThrow(/parsed/i);
   });
 });

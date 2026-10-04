@@ -183,4 +183,50 @@ export async function completeTierResilient(
   );
 }
 
+/**
+ * Parse-aware resilient completion.
+ *
+ * AUDIT FIX: the plain `completeTierResilient` only retries when `completeTier`
+ * itself throws (non-2xx/timeout/empty). Malformed JSON is parsed by the CALLER,
+ * after the wrapper returns — so a model that consistently emits broken JSON
+ * never triggered the fallback. This variant takes the parse function so a parse
+ * failure is treated as a retryable/fallback-able failure too.
+ */
+export async function completeTierResilientParsed<T>(
+  tier: LlmTier,
+  opts: TierCompleteOptions,
+  parse: (raw: string) => T,
+  resilient: ResilientOptions = {}
+): Promise<T> {
+  requireLlmTier(tier);
+  const attemptsPerModel = Math.max(1, resilient.attemptsPerModel ?? 2);
+  const retryDelayMs = Math.max(0, resilient.retryDelayMs ?? 250);
+
+  const allowed = TIER_MODEL_ALLOWLIST[tier];
+  const primary = opts.model ?? DEFAULT_TIER_MODEL[tier];
+  if (!allowed.includes(primary)) {
+    throw new Error(`tier_model_not_allowed:${tier}:${primary}`);
+  }
+  const chain = [primary, ...allowed.filter((m) => m !== primary)];
+
+  let lastErr: unknown = null;
+  for (const model of chain) {
+    for (let attempt = 0; attempt < attemptsPerModel; attempt++) {
+      try {
+        const raw = await completeTier(tier, { ...opts, model }, resilient.config ?? null, resilient.fetchImpl);
+        return parse(raw); // a malformed-JSON throw here is retryable
+      } catch (err) {
+        lastErr = err;
+        if (attempt < attemptsPerModel - 1 && retryDelayMs > 0) {
+          await new Promise((r) => setTimeout(r, retryDelayMs));
+        }
+      }
+    }
+  }
+  throw new Error(
+    `LLM gateway (parsed) failed after ${chain.length} model(s) × ${attemptsPerModel} attempt(s): ` +
+      `${lastErr instanceof Error ? lastErr.message : String(lastErr)}`
+  );
+}
+
 export { DEFAULT_TIER_MODEL, TIER_MODEL_ALLOWLIST, TIER_MODEL_ENV };

@@ -12,7 +12,7 @@
  */
 
 import { prisma } from "@/lib/db";
-import { completeTierResilient, type ChatMessage } from "@/lib/llm/gateway-client";
+import { completeTierResilient, completeTierResilientParsed, type ChatMessage } from "@/lib/llm/gateway-client";
 import { resolveAllowlistedModel } from "@/lib/llm/tiers";
 import type { LlmTier } from "@/lib/llm/tiers";
 
@@ -59,7 +59,46 @@ export async function brainComplete(opts: {
     throw new Error(`brain_tier_violation:${tier}`);
   }
   const model = opts.model ? resolveAllowlistedModel(tier, opts.model) : undefined;
+  // When the caller requests a JSON response, use the parse-aware resilient path
+  // so a malformed-JSON completion is retried / fallen back (previously the
+  // parse happened at the call site, outside the retry, so broken JSON was not
+  // retried). We return the RAW text after validating it parses, so existing
+  // callers still do their own parseJsonObject without behavior change.
+  if (opts.json) {
+    return completeTierResilientParsed(
+      tier,
+      { ...opts, model, json: true },
+      (raw) => {
+        parseJsonObject(raw); // throws on malformed → retryable
+        return raw;
+      }
+    );
+  }
   return completeTierResilient(tier, { ...opts, model });
+}
+
+/**
+ * Parse-aware resilient brain call: a malformed-JSON response is retryable and
+ * falls back to the next same-tier model. Use this whenever the caller expects
+ * a strict JSON object, so a model that emits broken JSON does not drop a cycle.
+ */
+export async function brainCompleteJson<T>(
+  opts: {
+    system: string;
+    user: string;
+    temperature?: number;
+    tier?: LlmTier;
+    model?: string;
+    messages?: ChatMessage[];
+  },
+  parse: (raw: string) => T
+): Promise<T> {
+  const tier = opts.tier ?? "neuron";
+  if (tier === "money") {
+    throw new Error(`brain_tier_violation:${tier}`);
+  }
+  const model = opts.model ? resolveAllowlistedModel(tier, opts.model) : undefined;
+  return completeTierResilientParsed(tier, { ...opts, model, json: true }, parse);
 }
 
 /** Parses model output, tolerating ```json fences; throws on invalid/absent object. */

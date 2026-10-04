@@ -57,6 +57,9 @@ const OTHER_COMMITMENT = "b".repeat(64);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Grants now fail closed on undercollateralization; these tests cover
+  // enrollment enforcement, so opt out of the solvency gate.
+  process.env.ALLOW_UNBACKED_ISSUANCE = "1";
   isEnrollmentEnforcedForCreditsMock.mockReturnValue(false);
   requireEnrolledMock.mockResolvedValue({
     subjectCommitment: VALID_COMMITMENT,

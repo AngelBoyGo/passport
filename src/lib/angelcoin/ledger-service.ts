@@ -199,6 +199,12 @@ async function assertEnrollmentIfRequired(subjectCommitment: string): Promise<vo
 
 /**
  * Grants operator credits via OPERATOR_GRANT entry.
+ *
+ * AUDIT FIX (H2): issuance now fails CLOSED on undercollateralization. A grant
+ * increases circulating ANGEL; the stability contract says reserve >= supply ×
+ * parity. We refuse a grant that would push coverage below 1 unless the operator
+ * explicitly sets ALLOW_UNBACKED_ISSUANCE=1 (a deliberate, auditable override,
+ * e.g. a dev sandbox or a treasury with a non-fiat reserve not yet booked).
  */
 export async function grantCredits(
   subjectCommitment: string,
@@ -207,6 +213,25 @@ export async function grantCredits(
 ) {
   assertValidSubjectCommitment(subjectCommitment);
   await assertEnrollmentIfRequired(subjectCommitment);
+
+  if (String(process.env.ALLOW_UNBACKED_ISSUANCE || "").toLowerCase() !== "1") {
+    const { loadFiatReserveUsd } = await import("@/lib/monetary/reserve");
+    const { parityStatus } = await import("@/lib/monetary/parity");
+    const [wallets, reserveUsd] = await Promise.all([
+      prisma.agentWallet.findMany({ select: { balance: true } }),
+      loadFiatReserveUsd(),
+    ]);
+    const supply = wallets.reduce((s, w) => s + w.balance, 0);
+    // Would the post-grant supply still be fully backed at parity?
+    const post = parityStatus({ supplyAngel: supply + Math.max(0, amount), reserveUsd });
+    if (!post.reserveAdequate) {
+      throw new Error(
+        `issuance_refused_undercollateralized:reserve=$${reserveUsd} ` +
+          `need=$${(post.requiredReserveUsd ?? 0).toFixed(2)} coverage=${post.coverageRatio}`
+      );
+    }
+  }
+
   const account = await getOrCreateAccount(subjectCommitment);
   const entry = await appendEntry(
     prisma,
@@ -474,26 +499,32 @@ export async function unlockCredits(
   amount: number,
   metadata?: string
 ) {
+  // AUDIT FIX: mirror lockCredits — read-then-append inside a row-locked
+  // transaction so two concurrent unlocks cannot both pass the lockedBalance
+  // check and over-unlock (which corrupts the escrow invariant).
   const account = await getOrCreateAccount(subjectCommitment);
-  const entries = await loadJournalEntries(account.id);
-  const current = computeBalances(entries);
-  if (amount > current.lockedBalance) {
-    throw new InvalidUnlockAmountError();
-  }
+  return prisma.$transaction(async (tx) => {
+    await lockAccountForUpdate(tx, account.id);
+    const entries = await loadJournalEntries(account.id, tx);
+    const current = computeBalances(entries);
+    if (amount > current.lockedBalance) {
+      throw new InvalidUnlockAmountError();
+    }
 
-  const entry = await appendEntry(
-    prisma,
-    account.id,
-    AngelCoinEntryType.UNLOCK,
-    amount,
-    { metadata }
-  );
-  const updatedEntries = await loadJournalEntries(account.id);
-  return {
-    account,
-    entry,
-    balances: computeBalances(updatedEntries),
-  };
+    const entry = await appendEntry(
+      tx,
+      account.id,
+      AngelCoinEntryType.UNLOCK,
+      amount,
+      { metadata }
+    );
+    const updatedEntries = await loadJournalEntries(account.id, tx);
+    return {
+      account,
+      entry,
+      balances: computeBalances(updatedEntries),
+    };
+  });
 }
 
 /**

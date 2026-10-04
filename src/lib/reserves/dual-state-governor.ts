@@ -19,11 +19,17 @@ export type RegimeState = "SOLID" | "GHOST";
 
 /**
  * Milliseconds since the freshest sovereign heartbeat, for the telemetry
- * staleness circuit-breaker. No heartbeats → treat as infinitely stale (a large
- * finite number so downstream arithmetic stays well-behaved).
+ * staleness circuit-breaker.
+ *
+ * AUDIT FIX (H4 follow-up): "no heartbeat CONFIGURED" (zero rows) must be
+ * NEUTRAL (0), not infinitely stale. Previously it returned MAX_SAFE_INTEGER,
+ * which permanently pinned the staleness factor, always suppressed programmatic
+ * revival, and serialized an absurd value into the signed assessment whenever
+ * prod had no sovereign keys. A heartbeat that EXISTS but is old still surfaces
+ * as stale.
  */
 export function heartbeatsAgeMs(heartbeats: { lastSeenAt: Date }[], now: Date = new Date()): number {
-  if (heartbeats.length === 0) return Number.MAX_SAFE_INTEGER;
+  if (heartbeats.length === 0) return 0; // unconfigured → neutral, not stale
   const freshest = Math.max(...heartbeats.map((h) => h.lastSeenAt.getTime()));
   return Math.max(0, now.getTime() - freshest);
 }
