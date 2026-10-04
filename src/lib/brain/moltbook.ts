@@ -192,9 +192,10 @@ export async function moltbookRead(
   ];
   const stored = await persistMoltbookItems(items);
 
-  // Record what was learned in the brain's own memory so its cycles and the
-  // two-persona dialogue see fresh external intelligence, not just a raw table.
-  if (stored > 0) {
+  // Record the read in the brain's own memory so its cycles and the dialogue
+  // see fresh external intelligence. Fires whenever items were fetched (even if
+  // all were already-seen) so active reading is visible, not just the delta.
+  if (items.length > 0) {
     const titles = items
       .slice(0, 4)
       .map((i) => (i.title || i.body).slice(0, 80))
@@ -203,7 +204,7 @@ export async function moltbookRead(
       .create({
         data: {
           kind: "OBSERVATION",
-          summary: `moltbook: learned ${stored} new item(s) — ${titles}`.slice(0, 500),
+          summary: `moltbook: read ${items.length} item(s) (${stored} new) — ${titles}`.slice(0, 500),
           data: { source: "moltbook", stored, fetched: items.length } as never,
         },
       })

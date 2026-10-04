@@ -292,7 +292,7 @@ export function summarizePlaybook(
   return map;
 }
 
-async function defaultAct(action: BrainAction, params: Record<string, unknown>): Promise<string> {
+export async function defaultAct(action: BrainAction, params: Record<string, unknown>): Promise<string> {
   switch (action) {
     case "NOOP":
       return "ok";
@@ -373,6 +373,33 @@ async function defaultAct(action: BrainAction, params: Record<string, unknown>):
         `ok: ranked=${r.ranked_count ?? 0} top=${r.top_job ? `${r.top_job.job_id}@$${r.top_job.rate_usd_hourly}/hr` : "none"} ` +
         `played=${r.played ? "yes" : "no"} queued=${r.queued ?? 0} drift=${r.drift ? "DRIFT" : "none"}`
       );
+    }
+    case "ADVANCE_MISSION_PLAN": {
+      // Executes the next committed step of a mission by RE-DISPATCHING to that
+      // step's existing action. Grants NO new authority: the target action must
+      // be in the allowlist (else it was dropped at plan-commit time) and its
+      // params are re-validated here. The plan is authoritative ONLY about WHICH
+      // allowlisted action to run next — never about bypassing a gate.
+      const missionId = String(params.mission_id ?? "").trim();
+      const stepIndex = params.step_index != null ? Number(params.step_index) : undefined;
+      if (!missionId) return "error: mission_id required";
+      const { getCurrentPlan, markStepDone } = await import("@/lib/brain/mission-service");
+      const plan = await getCurrentPlan(missionId);
+      if (!plan) return "error: no_committed_plan";
+      const open = plan.steps.filter((s) => !s.done);
+      const target = stepIndex != null ? open.find((s) => s.step === stepIndex) : open[0];
+      if (!target) return "error: no_open_step";
+      if (target.action === "ADVANCE_MISSION_PLAN") return "error: recursive_mission_step";
+      if (!(BRAIN_ACTIONS as readonly string[]).includes(target.action)) {
+        return `error: step_action_not_allowlisted:${target.action}`;
+      }
+      const check = validateActionParams(target.action as BrainAction, target.params);
+      if (!check.ok) return `error: step_params_invalid:${check.error}`;
+      const result = await defaultAct(target.action as BrainAction, check.params);
+      if (isOutcomeSuccessful(result)) {
+        await markStepDone(plan.planId, target.step);
+      }
+      return `ok: mission=${missionId} step=${target.step} action=${target.action} result=${result}`;
     }
     default:
       return "error: unknown action";
