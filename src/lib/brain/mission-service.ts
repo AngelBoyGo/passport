@@ -253,7 +253,7 @@ export async function getCurrentPlan(missionId: string): Promise<MissionPlanReco
   };
 }
 
-/** Marks a step done and, if all steps are done, completes the plan. */
+/** Marks a step done and, if all steps are done, completes the plan AND the mission. */
 export async function markStepDone(planId: string, stepNumber: number): Promise<void> {
   const row = await prisma.missionPlan.findUnique({ where: { planId } });
   if (!row || row.status !== "COMMITTED") return;
@@ -265,4 +265,24 @@ export async function markStepDone(planId: string, stepNumber: number): Promise<
     where: { planId },
     data: { steps: steps as never, status: allDone ? "COMPLETED" : "COMMITTED" },
   });
+  // A completed plan means the mission's committed work is finished: mark the
+  // mission ACHIEVED so it leaves the ACTIVE set (otherwise the cap fills up
+  // forever and the same mission is re-planned every cycle).
+  if (allDone) {
+    await prisma.mission
+      .update({ where: { missionId: row.missionId }, data: { status: "ACHIEVED" } })
+      .catch(() => undefined);
+  }
+}
+
+/**
+ * True when a mission should be (re-)planned this cycle. We only re-plan when
+ * there is NO committed plan or the current one has no open steps — otherwise a
+ * 10-minute dialogue would supersede + recreate a plan every cycle (unbounded
+ * MissionPlan growth and reset progress each time).
+ */
+export async function missionNeedsPlan(missionId: string): Promise<boolean> {
+  const plan = await getCurrentPlan(missionId).catch(() => null);
+  if (!plan) return true;
+  return plan.steps.every((s) => s.done) || plan.steps.length === 0;
 }

@@ -63,4 +63,20 @@ describe("defaultAct — ADVANCE_MISSION_PLAN dispatches to the step's real acti
     const out = await defaultAct("ADVANCE_MISSION_PLAN" as never, { mission_id: "msn_1" });
     expect(out).toBe("error: recursive_mission_step");
   });
+
+  it("surfaces an inner failure returned as a string (does NOT mask it as ok)", async () => {
+    // RUN_LOCUM_SEARCH returns "error: <reason>" (a string, not a throw) when
+    // the capability is disabled. The wrapper must NOT report success or mark
+    // the step done — this was the masking bug.
+    getCurrentPlanMock.mockResolvedValue({
+      planId: "plan_1",
+      missionId: "msn_1",
+      steps: [{ step: 1, action: "RUN_LOCUM_SEARCH", params: { candidate_id: "c1" }, rationale: "x", done: false }],
+    });
+    const out = await defaultAct("ADVANCE_MISSION_PLAN" as never, { mission_id: "msn_1" });
+    // The locum capability is not configured in the test env, so the inner
+    // action returns an error string. Assert it is surfaced (not masked).
+    expect(out).toMatch(/^error: step_failed:/);
+    expect(markStepDoneMock).not.toHaveBeenCalled();
+  });
 });

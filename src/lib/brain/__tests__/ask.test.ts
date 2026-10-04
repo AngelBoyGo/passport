@@ -24,7 +24,7 @@ vi.mock("@/lib/brain/mission-service", () => ({
 }));
 vi.mock("@/lib/brain/moltbook", () => ({ recentMoltbookItems: moltbookMock }));
 
-const { askBrain, assignTask, gatherBrainResources } = await import("@/lib/brain/ask");
+const { askBrain, assignTask, gatherBrainResources, askPersona } = await import("@/lib/brain/ask");
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -98,5 +98,30 @@ describe("gatherBrainResources", () => {
     expect(bundle.missions[0].nextStep).toMatch(/RUN_DISCOVERY/);
     expect(bundle.moltbook[0].title).toBe("T");
     expect(bundle.recentMemory[0].kind).toBe("DECISION");
+  });
+});
+
+describe("askPersona", () => {
+  it("MARS answers in its own voice and is audit-logged as brain_ask_mars", async () => {
+    completeMock.mockResolvedValue("Attack the weakest assumption first.");
+    const r = await askPersona("mars", "what should we do?");
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.persona).toBe("MARS");
+    expect(prismaMock.adminAuditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ action: "brain_ask_mars" }) })
+    );
+  });
+
+  it("MUSE is audit-logged as brain_ask_muse", async () => {
+    completeMock.mockResolvedValue("Let's try something nobody has tried.");
+    await askPersona("muse", "any wild ideas?");
+    expect(prismaMock.adminAuditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ action: "brain_ask_muse" }) })
+    );
+  });
+
+  it("rejects an empty question", async () => {
+    const r = await askPersona("mars", "  ");
+    expect(r.ok).toBe(false);
   });
 });

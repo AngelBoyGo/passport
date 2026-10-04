@@ -1,8 +1,14 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("brain-scheduler", () => {
+  beforeEach(() => {
+    // The shared guard blocks schedulers under VITEST by default; opt in so we
+    // can exercise the scheduling/validation logic.
+    vi.stubEnv("SCHEDULERS_ENABLED", "true");
+  });
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.restoreAllMocks();
   });
 
   it("startBrainScheduler validates the cron expression and logs on invalid", async () => {
@@ -28,6 +34,9 @@ describe("brain-scheduler", () => {
 });
 
 describe("revenue-runner", () => {
+  beforeEach(() => {
+    vi.stubEnv("SCHEDULERS_ENABLED", "true");
+  });
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.restoreAllMocks();

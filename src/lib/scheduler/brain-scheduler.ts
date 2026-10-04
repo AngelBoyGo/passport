@@ -10,6 +10,7 @@
  */
 import cron, { ScheduledTask } from "node-cron";
 import { runBrainCycle } from "@/lib/brain/command-brain";
+import { schedulersAllowed } from "@/lib/scheduler/guard";
 
 const DEFAULT_SCHEDULE = "*/10 * * * *";
 
@@ -18,6 +19,12 @@ let task: ScheduledTask | null = null;
 export function startBrainScheduler(customSchedule?: string): void {
   if (task) {
     console.warn("[brain-scheduler] Already running; ignoring duplicate start.");
+    return;
+  }
+
+  const gate = schedulersAllowed();
+  if (!gate.allowed) {
+    console.log(`[brain-scheduler] Not started: ${gate.reason}`);
     return;
   }
 

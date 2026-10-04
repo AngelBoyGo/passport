@@ -19,6 +19,7 @@
  *   FLEET_DISPATCH_ENABLED  — set "false" to disable (default: enabled)
  */
 import cron, { ScheduledTask } from "node-cron";
+import { schedulersAllowed } from "@/lib/scheduler/guard";
 
 const DEFAULT_SCHEDULE = "*/15 * * * *"; // every 15 minutes
 
@@ -27,6 +28,11 @@ let task: ScheduledTask | null = null;
 export function startFleetDispatchScheduler(customSchedule?: string): void {
   if (task) {
     console.warn("[fleet-dispatch] Already running; ignoring duplicate start.");
+    return;
+  }
+  const gate = schedulersAllowed();
+  if (!gate.allowed) {
+    console.log(`[fleet-dispatch] Not started: ${gate.reason}`);
     return;
   }
   if (String(process.env.FLEET_DISPATCH_ENABLED || "").toLowerCase() === "false") {

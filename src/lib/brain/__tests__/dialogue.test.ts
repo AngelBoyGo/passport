@@ -13,7 +13,14 @@ vi.mock("@/lib/raillab/factory-brain", () => ({
   },
 }));
 
-const { runMissionDialogue, vetSteps } = await import("@/lib/brain/dialogue");
+const { runMissionDialogue, vetSteps, ALLOWED_ACTIONS } = await import("@/lib/brain/dialogue");
+const { BRAIN_ACTIONS } = await import("@/lib/brain/command-brain");
+
+describe("dialogue allowlist drift guard", () => {
+  it("ALLOWED_ACTIONS is exactly BRAIN_ACTIONS (no silent drift)", () => {
+    expect([...ALLOWED_ACTIONS].sort()).toEqual([...BRAIN_ACTIONS].sort());
+  });
+});
 
 const CTX = { missionId: "msn_1", title: "Earn a first dollar", objective: "Land a paid engagement" };
 

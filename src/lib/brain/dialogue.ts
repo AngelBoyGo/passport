@@ -116,7 +116,7 @@ function isAllowedAction(action: string): action is BrainAction {
  * imports this dialogue module). This mirrors BRAIN_ACTIONS; a unit test asserts
  * the two lists are identical, so drift is caught rather than silently allowed.
  */
-const ALLOWED_ACTIONS: readonly string[] = [
+export const ALLOWED_ACTIONS: readonly string[] = [
   "NOOP",
   "RECORD_NOTE",
   "RUN_DISCOVERY",

@@ -9,6 +9,7 @@ import {
   sendTelegramMessage,
   commanderChatIds,
   telegramConfigured,
+  verifyTelegramSecret,
   COMMANDER_HELP,
 } from "@/lib/telegram/commander";
 
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "telegram_not_configured" }, { status: 503, headers: NO_STORE });
   }
   const secret = request.headers.get("x-telegram-bot-api-secret-token");
-  if (secret !== process.env.TELEGRAM_WEBHOOK_SECRET) {
+  if (!verifyTelegramSecret(secret, process.env.TELEGRAM_WEBHOOK_SECRET)) {
     return NextResponse.json({ ok: false, error: "bad_secret" }, { status: 401, headers: NO_STORE });
   }
 
@@ -301,6 +302,21 @@ async function handleCommand(command: string, args: string[], from: string): Pro
         "",
         "The two-persona dialogue will plan it on the next cycle; use `/plan` to force planning now, `/missions` to track.",
       ].join("\n");
+    }
+
+    case "mars":
+    case "muse": {
+      // Talk to ONE persona directly (its own voice + model).
+      const personaId = command === "mars" ? "mars" : "muse";
+      const question = args.join(" ").trim();
+      if (!question) {
+        return `Usage: \`/${command} <question>\` — ask ${personaId.toUpperCase()} directly.`;
+      }
+      const { askPersona } = await import("@/lib/brain/ask");
+      const r = await askPersona(personaId, question);
+      if (!r.ok) return `⚠️ ${personaId.toUpperCase()} could not answer: ${r.reason}`;
+      const glyph = personaId === "mars" ? "⚔️" : "🎨";
+      return `${glyph} *${r.persona}* ${r.answer}`;
     }
 
     case "directives": {

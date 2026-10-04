@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sessionFromRequest } from "@/lib/auth/cookies";
+import { isExecutiveAdmin } from "@/lib/admin/admin-auth";
 import { listActiveMissions, getCurrentPlan } from "@/lib/brain/mission-service";
 import { prisma } from "@/lib/db";
 
@@ -8,11 +9,11 @@ const NO_STORE = { "Cache-Control": "no-store, max-age=0" };
 
 /**
  * GET /api/admin/brain/missions — active missions + their committed plans.
- * Session-authenticated (operator console).
+ * Executive-admin only (mission objectives/theses are sensitive strategy).
  */
 export async function GET(request: NextRequest) {
   const session = await sessionFromRequest(request);
-  if (!session) {
+  if (!session || !isExecutiveAdmin(session.operator)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: NO_STORE });
   }
   const active = await listActiveMissions(20);

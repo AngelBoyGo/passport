@@ -134,11 +134,50 @@ export async function assignTask(
   return { ok: true, missionId: created.mission.missionId, title: created.mission.title };
 }
 
+/**
+ * The operator addresses ONE persona directly (MARS or MUSE). The persona
+ * answers in its own voice on its own model, grounded in the same live
+ * resources. This is how you talk to each half of the brain separately.
+ */
+export async function askPersona(
+  personaId: "mars" | "muse",
+  question: string
+): Promise<{ ok: true; answer: string; persona: string } | { ok: false; reason: string }> {
+  const q = question.trim();
+  if (!q) return { ok: false, reason: "empty_question" };
+
+  const resources = await gatherBrainResources();
+
+  try {
+    const { PERSONAS, PERSONA_TIER, personaModel } = await import("@/lib/brain/personas");
+    const { resolveAllowlistedModel } = await import("@/lib/llm/tiers");
+    const persona = PERSONAS[personaId];
+    const model = resolveAllowlistedModel(PERSONA_TIER, personaModel(persona));
+    const raw = await brainComplete({
+      system:
+        persona.systemPrompt +
+        " The operator (your owner) is speaking to YOU directly. Answer in your own voice, " +
+        "grounded ONLY in the resources given. Be concise (2-5 sentences). Plain text.",
+      user: JSON.stringify({ question: q, resources }),
+      tier: PERSONA_TIER,
+      model,
+      temperature: persona.temperature,
+      json: false,
+    });
+    const answer = raw.trim();
+    if (!answer) return { ok: false, reason: "empty_completion" };
+    await audit(`brain_ask_${personaId}`, q.slice(0, 200), answer.slice(0, 400));
+    return { ok: true, answer, persona: persona.name };
+  } catch (err) {
+    return { ok: false, reason: String(err instanceof Error ? err.message : err).slice(0, 200) };
+  }
+}
+
 /** Recent operator directives (asks + tasks) for the admin/audit view. */
 export async function recentOperatorDirectives(limit = 10) {
   return prisma.adminAuditLog
     .findMany({
-      where: { action: { in: ["brain_ask", "brain_task_assigned"] } },
+      where: { action: { in: ["brain_ask", "brain_ask_mars", "brain_ask_muse", "brain_task_assigned"] } },
       orderBy: { createdAt: "desc" },
       take: limit,
       select: { action: true, targetId: true, details: true, createdAt: true },

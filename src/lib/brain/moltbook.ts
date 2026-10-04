@@ -244,7 +244,11 @@ export async function recentMoltbookItems(limit = 10): Promise<MoltbookItemRecor
     body: r.body,
     author: r.author,
     sourceUrl: r.sourceUrl,
-    injectionScan: (r.injectionScan as { safe: boolean; matched: string[] }) ?? { safe: true, matched: [] },
+    // A NULL/absent scan is treated as UNSAFE (fail-closed): only confirmed-clean
+    // items may influence prompts. Rows written by persistMoltbookItems always
+    // carry a scan; this guards any backfill/legacy writer.
+    injectionScan:
+      (r.injectionScan as { safe: boolean; matched: string[] } | null) ?? { safe: false, matched: ["unscanned"] },
     trustLevel: "UNKNOWN",
   }));
 }

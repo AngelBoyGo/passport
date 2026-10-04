@@ -1,6 +1,9 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("fleet-dispatch-scheduler", () => {
+  beforeEach(() => {
+    vi.stubEnv("SCHEDULERS_ENABLED", "true");
+  });
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.restoreAllMocks();

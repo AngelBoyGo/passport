@@ -11,6 +11,7 @@
  *   MOLTBOOK_ENABLED        — "false" to disable (default enabled)
  */
 import cron, { ScheduledTask } from "node-cron";
+import { schedulersAllowed } from "@/lib/scheduler/guard";
 
 const DEFAULT_SCHEDULE = "*/30 * * * *"; // every 30 minutes
 
@@ -19,6 +20,11 @@ let task: ScheduledTask | null = null;
 export function startMoltbookScheduler(customSchedule?: string): void {
   if (task) {
     console.warn("[moltbook] Already running; ignoring duplicate start.");
+    return;
+  }
+  const gate = schedulersAllowed();
+  if (!gate.allowed) {
+    console.log(`[moltbook] Not started: ${gate.reason}`);
     return;
   }
   if (String(process.env.MOLTBOOK_ENABLED || "").toLowerCase() === "false") {

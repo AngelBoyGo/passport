@@ -15,6 +15,18 @@
  */
 
 const API = "https://api.telegram.org";
+import { timingSafeEqual } from "node:crypto";
+
+/**
+ * Constant-time comparison of the Telegram webhook secret. Fails closed when
+ * either side is empty. Prevents a timing oracle on the shared secret.
+ */
+export function verifyTelegramSecret(provided: string | null, expected: string | undefined): boolean {
+  const a = provided ?? "";
+  const b = expected ?? "";
+  if (!a || !b || a.length !== b.length) return false;
+  return timingSafeEqual(Buffer.from(a, "utf8"), Buffer.from(b, "utf8"));
+}
 
 export type TelegramUpdate = {
   message?: {
@@ -81,6 +93,8 @@ export const COMMANDER_HELP = [
   "`/market` — the Marketplace (Metis) job/fleet/escrow digest",
   "`/fleet` — roster summary (active/stopped, earned)",
   "`/ask <question>` — ask the brain directly; it answers from its live resources",
+  "`/mars <question>` — ask MARS (aggressive/calculating half) directly",
+  "`/muse <question>` — ask MUSE (creative/experimental half) directly",
   "`/task <instruction>` — assign the brain a top-priority mission",
   "`/directives` — recent operator asks/tasks the brain has been given",
   "`/brain` — run one autonomous Command Brain cycle now",
