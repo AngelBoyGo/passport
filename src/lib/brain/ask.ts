@@ -140,7 +140,7 @@ export async function assignTask(
  * resources. This is how you talk to each half of the brain separately.
  */
 export async function askPersona(
-  personaId: "mars" | "muse",
+  personaId: "mars" | "muse" | "more",
   question: string
 ): Promise<{ ok: true; answer: string; persona: string } | { ok: false; reason: string }> {
   const q = question.trim();
@@ -149,17 +149,17 @@ export async function askPersona(
   const resources = await gatherBrainResources();
 
   try {
-    const { PERSONAS, PERSONA_TIER, personaModel } = await import("@/lib/brain/personas");
+    const { PERSONAS, personaModel } = await import("@/lib/brain/personas");
     const { resolveAllowlistedModel } = await import("@/lib/llm/tiers");
     const persona = PERSONAS[personaId];
-    const model = resolveAllowlistedModel(PERSONA_TIER, personaModel(persona));
+    const model = resolveAllowlistedModel(persona.tier, personaModel(persona));
     const raw = await brainComplete({
       system:
         persona.systemPrompt +
         " The operator (your owner) is speaking to YOU directly. Answer in your own voice, " +
         "grounded ONLY in the resources given. Be concise (2-5 sentences). Plain text.",
       user: JSON.stringify({ question: q, resources }),
-      tier: PERSONA_TIER,
+      tier: persona.tier,
       model,
       temperature: persona.temperature,
       json: false,

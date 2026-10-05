@@ -11,8 +11,8 @@ import {
 } from "../tiers";
 
 describe("llm tiers — cortex expansion", () => {
-  it("has neuron, cortex, and money tiers", () => {
-    expect(LLM_TIERS).toEqual(["neuron", "cortex", "money"]);
+  it("has the 4 tiers: local, cortex, neuron, money", () => {
+    expect(LLM_TIERS).toEqual(["local", "cortex", "neuron", "money"]);
   });
 
   it("cortex admits only cheap, allowlisted models", () => {
@@ -47,6 +47,14 @@ describe("llm tiers — cortex expansion", () => {
 
   it("isLlmTier recognizes the new tier", () => {
     expect(isLlmTier("cortex")).toBe(true);
+    expect(isLlmTier("local")).toBe(true);
     expect(isLlmTier("nope")).toBe(false);
+  });
+
+  it("local tier never admits the money model; rank is below money", () => {
+    expect(TIER_MODEL_ALLOWLIST.local).not.toContain("deepseek-v4-pro");
+    expect(rankOf("local")).toBeLessThan(rankOf("money"));
+    expect(tierSatisfies("money", "local")).toBe(true);
+    expect(tierSatisfies("local", "money")).toBe(false);
   });
 });

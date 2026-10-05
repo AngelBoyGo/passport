@@ -24,7 +24,7 @@
  * gpt-4o-mini, claude-3-haiku-20240307) are all present.
  */
 
-export const LLM_TIERS = ["neuron", "cortex", "money"] as const;
+export const LLM_TIERS = ["local", "cortex", "neuron", "money"] as const;
 
 export type LlmTier = (typeof LLM_TIERS)[number];
 
@@ -34,12 +34,19 @@ export type LlmTier = (typeof LLM_TIERS)[number];
  * enforcement point for "money moves only through Pro".
  */
 export const TIER_MODEL_ALLOWLIST: Record<LlmTier, readonly string[]> = {
+  // `local` is a self-hosted endpoint (e.g. gemma-4 on the owner's Atlanta PC
+  // over Tailscale). It carries the same authority ceiling as cortex/neuron —
+  // it can NEVER touch money — and its endpoint is configured separately
+  // (LOCAL_LLM_BASE_URL). The model allowlist is env-extendable so the owner
+  // can name their own local model without a rebuild.
+  local: ["gemma-4", "gemma-3", "llama3.1", "qwen2.5", "mistral"],
   neuron: ["deepseek-v4-flash", "gpt-4o-mini"],
   cortex: ["deepseek-v4-flash", "gpt-4o-mini"],
   money: ["deepseek-v4-pro"],
 };
 
 export const DEFAULT_TIER_MODEL: Record<LlmTier, string> = {
+  local: "gemma-4",
   neuron: "deepseek-v4-flash",
   cortex: "gpt-4o-mini",
   money: "deepseek-v4-pro",
@@ -47,17 +54,19 @@ export const DEFAULT_TIER_MODEL: Record<LlmTier, string> = {
 
 /** Env var name per tier (overrides must still be on the tier allowlist). */
 export const TIER_MODEL_ENV: Record<LlmTier, string> = {
+  local: "LLM_MODEL_LOCAL",
   neuron: "LLM_MODEL_NEURON",
   cortex: "LLM_MODEL_CORTEX",
   money: "LLM_MODEL_MONEY",
 };
 
 /**
- * Tier rank. cortex sits BELOW neuron: it is a cheaper reasoning tier with the
- * same authority ceiling as neuron (it can never touch money). Upgrade-only
- * still holds — a money-tier agent may run cortex/neuron work, never the reverse.
+ * Tier rank. local/cortex sit BELOW neuron: cheaper reasoning tiers with the
+ * same authority ceiling as neuron (they can never touch money). Upgrade-only
+ * still holds — a money-tier agent may run local/cortex/neuron work, never the
+ * reverse.
  */
-const TIER_RANK: Record<LlmTier, number> = { cortex: 0, neuron: 1, money: 2 };
+const TIER_RANK: Record<LlmTier, number> = { local: 0, cortex: 0, neuron: 1, money: 2 };
 
 export function rankOf(tier: LlmTier): number {
   return TIER_RANK[tier];

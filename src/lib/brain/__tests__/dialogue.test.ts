@@ -91,6 +91,57 @@ describe("dialogue — Plan → Critique → Revise → Commit", () => {
     expect(models[0]).toBe("gpt-4o-mini"); // MUSE default
     expect(models[1]).toBe("deepseek-v4-flash"); // MARS default
   });
+
+  it("MORE does NOT join when LOCAL_LLM_BASE_URL is unset (dialogue still completes)", async () => {
+    delete process.env.LOCAL_LLM_BASE_URL;
+    completeMock
+      .mockResolvedValueOnce(JSON.stringify({ steps: [{ action: "RUN_DISCOVERY", params: {}, rationale: "d" }] }))
+      .mockResolvedValueOnce("mars critique")
+      .mockResolvedValueOnce(JSON.stringify({ steps: [{ action: "RUN_DISCOVERY", params: {}, rationale: "d" }] }));
+    const r = await runMissionDialogue(CTX);
+    expect(r.ok).toBe(true);
+    expect(r.turns.map((t) => t.role)).toEqual(["draft", "critique", "revise"]);
+    expect(completeMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("MORE joins when configured and can REPLACE the plan with a synthesis", async () => {
+    process.env.LOCAL_LLM_BASE_URL = "http://100.64.0.5:11434/v1";
+    completeMock
+      .mockResolvedValueOnce(JSON.stringify({ steps: [{ action: "RUN_DISCOVERY", params: {}, rationale: "d" }] })) // muse draft
+      .mockResolvedValueOnce("mars critique") // mars
+      .mockResolvedValueOnce(JSON.stringify({ steps: [{ action: "RUN_DISCOVERY", params: {}, rationale: "d" }] })) // muse revise
+      .mockResolvedValueOnce(
+        JSON.stringify({
+          steps: [{ action: "RUN_EXTERNAL_RESEARCH", params: { focus: "adoption channels" }, rationale: "synthesized" }],
+          synthesis: "replaced with demand-first research",
+        })
+      ); // more (local gemma-4)
+    const r = await runMissionDialogue(CTX);
+    expect(r.ok).toBe(true);
+    const roles = r.turns.map((t) => t.role);
+    expect(roles).toContain("synthesize");
+    expect(roles[roles.length - 1]).toBe("synthesize");
+    expect(r.steps[0].action).toBe("RUN_EXTERNAL_RESEARCH");
+    // MORE ran on the local tier + gemma-4
+    const last = completeMock.mock.calls[3][0];
+    expect(last.tier).toBe("local");
+    expect(last.model).toBe("gemma-4");
+    delete process.env.LOCAL_LLM_BASE_URL;
+  });
+
+  it("a MORE failure degrades gracefully (keeps MUSE's plan)", async () => {
+    process.env.LOCAL_LLM_BASE_URL = "http://100.64.0.5:11434/v1";
+    completeMock
+      .mockResolvedValueOnce(JSON.stringify({ steps: [{ action: "RUN_DISCOVERY", params: {}, rationale: "d" }] }))
+      .mockResolvedValueOnce("mars critique")
+      .mockResolvedValueOnce(JSON.stringify({ steps: [{ action: "RUN_DISCOVERY", params: {}, rationale: "d" }] }))
+      .mockRejectedValueOnce(new Error("tailscale down"));
+    const r = await runMissionDialogue(CTX);
+    expect(r.ok).toBe(true);
+    expect(r.steps[0].action).toBe("RUN_DISCOVERY");
+    expect(r.turns[r.turns.length - 1].content).toMatch(/more_unavailable/);
+    delete process.env.LOCAL_LLM_BASE_URL;
+  });
 });
 
 describe("vetSteps (deterministic arbiter)", () => {

@@ -23,7 +23,7 @@
 
 import type { LlmTier } from "@/lib/llm/tiers";
 
-export const PERSONA_IDS = ["mars", "muse"] as const;
+export const PERSONA_IDS = ["mars", "muse", "more"] as const;
 export type PersonaId = (typeof PERSONA_IDS)[number];
 
 /** Cheap reasoning tier — personas never use the money tier. */
@@ -32,7 +32,13 @@ export const PERSONA_TIER: LlmTier = "cortex";
 export interface Persona {
   id: PersonaId;
   name: string;
-  /** Default model (must be on the cortex allowlist). Env-overridable. */
+  /**
+   * Tier this persona runs on. MARS/MUSE use the shared gateway `cortex` tier;
+   * MORE runs on the self-hosted `local` tier (e.g. gemma-4 on the owner's PC
+   * over Tailscale). Never `money`.
+   */
+  tier: LlmTier;
+  /** Default model (must be on the tier's allowlist). Env-overridable. */
   defaultModel: string;
   /** Env var that may override the model (still allowlist-validated). */
   modelEnv: string;
@@ -74,6 +80,7 @@ export const ACTION_PARAMS_CHEATSHEET =
 export const MARS: Persona = {
   id: "mars",
   name: "MARS",
+  tier: "cortex",
   defaultModel: "deepseek-v4-flash",
   modelEnv: "LLM_MODEL_MARS",
   temperature: 0.1,
@@ -91,6 +98,7 @@ export const MARS: Persona = {
 export const MUSE: Persona = {
   id: "muse",
   name: "MUSE",
+  tier: "cortex",
   defaultModel: "gpt-4o-mini",
   modelEnv: "LLM_MODEL_MUSE",
   temperature: 0.85,
@@ -104,7 +112,26 @@ export const MUSE: Persona = {
     ACTION_CONTRACT,
 };
 
-export const PERSONAS: Record<PersonaId, Persona> = { mars: MARS, muse: MUSE };
+export const MORE: Persona = {
+  id: "more",
+  name: "MORE",
+  tier: "local",
+  defaultModel: "gemma-4",
+  modelEnv: "LLM_MODEL_MORE",
+  temperature: 0.5,
+  systemPrompt:
+    "You are MORE, the third mind of the Passport Command Brain — the synthesizer and " +
+    "long-horizon reasoner, running on a self-hosted, uncensored local model. MARS is aggressive " +
+    "and calculating; MUSE is creative and experimental. Your role is to sit ABOVE both: read " +
+    "their draft and critique, find the synthesis neither saw, and either (a) propose a stronger " +
+    "combined step, (b) expose a blind spot both missed, or (c) confirm the best candidate with a " +
+    "clear justification. You are willing to voice uncomfortable or contrarian reasoning that a " +
+    "hosted model might avoid — but you are still bound by the action allowlist and the " +
+    "never-move-money rule. Be decisive and concrete. " +
+    ACTION_CONTRACT,
+};
+
+export const PERSONAS: Record<PersonaId, Persona> = { mars: MARS, muse: MUSE, more: MORE };
 
 /** Resolves a persona's model, honouring an env override (allowlist-validated later). */
 export function personaModel(persona: Persona, env: Record<string, string | undefined> = process.env): string {

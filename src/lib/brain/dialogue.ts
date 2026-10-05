@@ -36,8 +36,13 @@ import type { MissionStep } from "@/lib/brain/mission-service";
 
 export interface DialogueTurn {
   persona: PersonaId;
-  role: "draft" | "critique" | "revise";
+  role: "draft" | "critique" | "revise" | "synthesize";
   content: string;
+}
+
+/** MORE (local gemma-4) only joins when its endpoint is configured. */
+function isMoreEnabled(): boolean {
+  return Boolean(process.env.LOCAL_LLM_BASE_URL?.trim());
 }
 
 export interface MissionContext {
@@ -71,17 +76,17 @@ const llmDeps = {
   complete: brainComplete,
 };
 
-/** Calls one persona on its own model. Fail-closed: any throw ends the dialogue. */
+/** Calls one persona on its own model + tier. Fail-closed: any throw ends the dialogue. */
 async function askPersona(
   personaId: PersonaId,
   opts: { user: string; json?: boolean }
 ): Promise<string> {
   const persona = PERSONAS[personaId];
-  const model = resolveAllowlistedModel(PERSONA_TIER, personaModel(persona));
+  const model = resolveAllowlistedModel(persona.tier, personaModel(persona));
   return llmDeps.complete({
     system: persona.systemPrompt,
     user: opts.user,
-    tier: PERSONA_TIER,
+    tier: persona.tier,
     model,
     temperature: persona.temperature,
     json: opts.json ?? true,
@@ -231,6 +236,37 @@ export async function runMissionDialogue(ctx: MissionContext): Promise<DialogueR
     turns.push({ persona: DRAFTER, role: "revise", content: JSON.stringify(revised) });
   } catch (err) {
     turns.push({ persona: DRAFTER, role: "revise", content: `revise_unavailable:${msg(err)}` });
+  }
+
+  // ── 3b. SYNTHESIZE (MORE, local gemma-4) — best-effort ─────────────────────
+  // MORE reads both minds and may replace the plan with a stronger synthesis.
+  // Best-effort: if MORE is unconfigured/down (e.g. the Tailscale link is up but
+  // the local server is off), the dialogue proceeds with MUSE's revised plan.
+  if (isMoreEnabled()) {
+    try {
+      const synthRaw = await askPersona("more", {
+        user:
+          "MARS critiqued and MUSE revised. As the synthesizer, either keep the revised plan, " +
+          "replace it with a stronger COMBINED plan, or expose a blind spot. Use ONLY the exact " +
+          "params allowed:\n" +
+          ACTION_PARAMS_CHEATSHEET +
+          "\n" +
+          `Return STRICT JSON: {"steps":[{"action":"<ALLOWLIST>","params":{},"rationale":"..."}],` +
+          `"synthesis":"<1-2 sentences: what you changed and why>"}.\n\n` +
+          `mission=${JSON.stringify({ title: ctx.title, objective: ctx.objective })}\n` +
+          `revised_plan=${JSON.stringify(revised)}\nmars_critique=${critiqueText}`,
+      });
+      const parsed = parseJsonObject(synthRaw);
+      const synthSteps = parseCandidateSteps(parsed);
+      if (synthSteps.length > 0) {
+        revised = synthSteps;
+        turns.push({ persona: "more", role: "synthesize", content: JSON.stringify(synthSteps) });
+      } else {
+        turns.push({ persona: "more", role: "synthesize", content: `kept_muse_plan:${String(parsed.synthesis ?? "").slice(0, 200)}` });
+      }
+    } catch (err) {
+      turns.push({ persona: "more", role: "synthesize", content: `more_unavailable:${msg(err)}` });
+    }
   }
 
   // ── 4. COMMIT (deterministic arbiter) ──────────────────────────────────────

@@ -95,6 +95,7 @@ export const COMMANDER_HELP = [
   "`/ask <question>` — ask the brain directly; it answers from its live resources",
   "`/mars <question>` — ask MARS (aggressive/calculating half) directly",
   "`/muse <question>` — ask MUSE (creative/experimental half) directly",
+  "`/more <question>` — ask MORE (self-hosted synthesizer, gemma-4) directly",
   "`/task <instruction>` — assign the brain a top-priority mission",
   "`/directives` — recent operator asks/tasks the brain has been given",
   "`/brain` — run one autonomous Command Brain cycle now",

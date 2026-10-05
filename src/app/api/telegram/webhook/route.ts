@@ -305,17 +305,25 @@ async function handleCommand(command: string, args: string[], from: string): Pro
     }
 
     case "mars":
-    case "muse": {
-      // Talk to ONE persona directly (its own voice + model).
-      const personaId = command === "mars" ? "mars" : "muse";
+    case "muse":
+    case "more": {
+      // Talk to ONE persona directly (its own voice + model). MORE runs on the
+      // owner's self-hosted gemma-4 over Tailscale.
+      const personaId = command as "mars" | "muse" | "more";
       const question = args.join(" ").trim();
       if (!question) {
         return `Usage: \`/${command} <question>\` — ask ${personaId.toUpperCase()} directly.`;
       }
       const { askPersona } = await import("@/lib/brain/ask");
       const r = await askPersona(personaId, question);
-      if (!r.ok) return `⚠️ ${personaId.toUpperCase()} could not answer: ${r.reason}`;
-      const glyph = personaId === "mars" ? "⚔️" : "🎨";
+      if (!r.ok) {
+        const hint =
+          personaId === "more" && /not configured|local/i.test(r.reason)
+            ? "MORE needs LOCAL_LLM_BASE_URL set on the droplet (the Tailscale-reachable gemma-4 endpoint)."
+            : "";
+        return `⚠️ ${personaId.toUpperCase()} could not answer: ${r.reason}${hint ? `\n${hint}` : ""}`;
+      }
+      const glyph = personaId === "mars" ? "⚔️" : personaId === "muse" ? "🎨" : "🧩";
       return `${glyph} *${r.persona}* ${r.answer}`;
     }
 

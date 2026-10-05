@@ -35,6 +35,32 @@ export function getGatewayConfig(env: Record<string, string | undefined> = proce
   return { baseUrl, apiKey };
 }
 
+/**
+ * Per-tier endpoint resolution.
+ *
+ * The `local` tier may point at a SELF-HOSTED OpenAI-compatible server (e.g. a
+ * gemma-4 instance on the owner's machine, reachable over Tailscale) instead of
+ * the KeyForge gateway. Configured via LOCAL_LLM_BASE_URL (+ optional
+ * LOCAL_LLM_API_KEY; defaults to a placeholder key since many local servers
+ * ignore it). All other tiers use the shared gateway. The money tier is NEVER
+ * routable to a local endpoint — a local model must never move money.
+ */
+export function getTierGatewayConfig(
+  tier: LlmTier,
+  env: Record<string, string | undefined> = process.env
+): LlmGatewayConfig {
+  if (tier === "local") {
+    const baseUrl = env.LOCAL_LLM_BASE_URL?.trim();
+    if (!baseUrl) {
+      throw new Error(
+        "local tier not configured (set LOCAL_LLM_BASE_URL to the Tailscale-reachable endpoint, e.g. http://<atlanta-tailscale-ip>:11434/v1)"
+      );
+    }
+    return { baseUrl, apiKey: env.LOCAL_LLM_API_KEY?.trim() || "local" };
+  }
+  return getGatewayConfig(env);
+}
+
 export type ChatRole = "system" | "user" | "assistant";
 export interface ChatMessage {
   role: ChatRole;
@@ -69,7 +95,7 @@ export async function completeTier(
   fetchImpl: typeof fetch = fetch
 ): Promise<string> {
   requireLlmTier(tier);
-  const cfg = config ?? getGatewayConfig();
+  const cfg = config ?? getTierGatewayConfig(tier);
 
   let model = resolveTierModel(tier);
   if (opts.model) {
