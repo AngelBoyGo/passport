@@ -37,6 +37,7 @@ import { runExternalResearchScan } from "@/lib/brain/external-research";
 import { isOutcomeSuccessful } from "@/lib/brain/outcomes";
 import { evaluateRecentOutcomes } from "@/lib/brain/attribution";
 import { DEFAULT_STRATEGIC_FOCUS } from "@/lib/brain/strategy";
+import { CONFIDENCE_FLOOR } from "@/lib/brain/personas";
 import { createProposalsFromScan, getCanaryPolicy } from "@/lib/brain/proposal-service";
 import { decideFromPolicy } from "@/lib/brain/policy";
 import { getFleetStatus } from "@/lib/fleet/fleet-service";
@@ -711,6 +712,18 @@ export async function runBrainCycle(now: Date = new Date(), deps: BrainDeps = {}
       if (!rationale) rationale = String(parsed.rationale ?? "");
       const c = Number(parsed.confidence);
       confidence = Number.isFinite(c) ? Math.max(0, Math.min(1, c)) : 0;
+      // AUDIT FIX (F4): apply the owner-directed confidence floor to the PRIMARY
+      // decision too (the dialogue already enforces it). The cycle's confidence
+      // is 0..1, so scale to 0..100 and, if below CONFIDENCE_FLOOR, downgrade a
+      // non-NOOP action to NOOP — low-confidence/hallucinated actions must not
+      // reach execution.
+      if (action !== "NOOP" && confidence * 100 < CONFIDENCE_FLOOR) {
+        rationale =
+          `Downgraded '${action}' to NOOP: self-rated confidence ${(confidence * 100).toFixed(0)}% ` +
+          `< floor ${CONFIDENCE_FLOOR}%. ` + rationale;
+        action = "NOOP";
+        params = {};
+      }
     } catch (err) {
       error = err instanceof Error ? err.message : String(err);
       rationale = `Brain LLM unavailable (${error}); failing closed to NOOP.`;

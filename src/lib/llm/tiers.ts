@@ -97,7 +97,7 @@ export function requireLlmTier(value: unknown): LlmTier {
 export function resolveTierModel(tier: LlmTier, env: Record<string, string | undefined> = process.env): string {
   const override = env[TIER_MODEL_ENV[tier]]?.trim();
   if (!override) return DEFAULT_TIER_MODEL[tier];
-  if (!TIER_MODEL_ALLOWLIST[tier].includes(override)) {
+  if (!tierAllowlist(tier, env).includes(override)) {
     throw new Error(`tier_model_not_allowed:${tier}:${override}`);
   }
   return override;
@@ -124,14 +124,24 @@ export function resolveAllowlistedModel(tier: LlmTier, model: string): string {
  * owner's ollama tag (e.g. `gemma4-31b-heretic-64k`) changes on their machine,
  * not in this repo. LOCAL_MODEL_ALLOWLIST is a comma-separated extension of the
  * built-in local list; every other tier stays code-pinned.
+ *
+ * HARD RULE: the money-tier model(s) are excluded from EVERY non-money tier,
+ * including the env extension. An operator can never smuggle `deepseek-v4-pro`
+ * into LOCAL_MODEL_ALLOWLIST to get a money-capable model on a cheap tier.
  */
-export function tierAllowlist(tier: LlmTier): readonly string[] {
+export function tierAllowlist(
+  tier: LlmTier,
+  env: Record<string, string | undefined> = process.env
+): readonly string[] {
+  const moneyModels = TIER_MODEL_ALLOWLIST.money;
+  if (tier === "money") return moneyModels;
+  const base = TIER_MODEL_ALLOWLIST[tier];
   if (tier === "local") {
-    const extra = (process.env.LOCAL_MODEL_ALLOWLIST || "")
+    const extra = (env.LOCAL_MODEL_ALLOWLIST || "")
       .split(",")
       .map((m) => m.trim())
-      .filter(Boolean);
-    return [...TIER_MODEL_ALLOWLIST.local, ...extra];
+      .filter((m) => m && !moneyModels.includes(m));
+    return [...base, ...extra];
   }
-  return TIER_MODEL_ALLOWLIST[tier];
+  return base;
 }

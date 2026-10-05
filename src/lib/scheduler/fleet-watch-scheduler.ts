@@ -10,6 +10,7 @@
  * No-ops cleanly when Telegram is unconfigured, so it is safe to leave enabled.
  */
 import cron, { ScheduledTask } from "node-cron";
+import { schedulersAllowed } from "@/lib/scheduler/guard";
 
 const DEFAULT_SCHEDULE = "0 */6 * * *"; // every 6 hours
 
@@ -18,6 +19,11 @@ let task: ScheduledTask | null = null;
 export function startFleetWatchScheduler(customSchedule?: string): void {
   if (task) {
     console.warn("[fleet-watch] Already running; ignoring duplicate start.");
+    return;
+  }
+  const gate = schedulersAllowed();
+  if (!gate.allowed) {
+    console.log(`[fleet-watch] Not started: ${gate.reason}`);
     return;
   }
   if (process.env.FLEET_WATCH_ENABLED === "false") {

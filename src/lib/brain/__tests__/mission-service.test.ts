@@ -94,4 +94,18 @@ describe("mission-service — commitPlan", () => {
     const r = await commitPlan({ missionId: "nope", steps: [] });
     expect(r.ok).toBe(false);
   });
+
+  it("carries step confidence through the plan round-trip (F3)", async () => {
+    prismaMock.mission.findUnique.mockResolvedValue(missionRow);
+    prismaMock.missionPlan.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.missionPlan.create.mockResolvedValue({});
+    prismaMock.mission.update.mockResolvedValue({});
+    const r = await commitPlan({
+      missionId: "msn_1",
+      steps: [{ step: 1, action: "RUN_DISCOVERY", params: {}, rationale: "x", done: false, confidence: 77 }],
+      createdByPersona: "muse",
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.plan.steps[0].confidence).toBe(77);
+  });
 });

@@ -27,6 +27,12 @@ export interface LlmGatewayConfig {
 
 const GATEWAY_TIMEOUT_MS = 30_000;
 
+/** Local self-hosted generation (large models) needs a longer budget. */
+export function localTimeoutMs(env: Record<string, string | undefined> = process.env): number {
+  const n = Number(env.LOCAL_LLM_TIMEOUT_MS);
+  return Number.isFinite(n) && n > 0 ? n : 120_000;
+}
+
 export function getGatewayConfig(env: Record<string, string | undefined> = process.env): LlmGatewayConfig {
   const baseUrl = env.LLM_BASE_URL?.trim();
   const apiKey = env.LLM_API_KEY?.trim();
@@ -100,14 +106,17 @@ export async function completeTier(
 
   let model = resolveTierModel(tier);
   if (opts.model) {
-    if (!TIER_MODEL_ALLOWLIST[tier].includes(opts.model)) {
+    if (!tierAllowlist(tier).includes(opts.model)) {
       throw new Error(`tier_model_not_allowed:${tier}:${opts.model}`);
     }
     model = opts.model;
   }
 
+  // Tier-aware timeout: local self-hosted generation (a 31B model) is much
+  // slower than the cloud gateway, so give the local tier a longer budget.
+  const timeoutMs = tier === "local" ? localTimeoutMs() : GATEWAY_TIMEOUT_MS;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), GATEWAY_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     // Multi-turn callers supply the full message list; single-turn callers use
     // the [system, user] pair. An explicitly empty messages array falls back to
@@ -222,13 +231,19 @@ export async function completeTierResilient(
 /** True when the error is a transport/connectivity failure, not a model response. */
 export function isTransportFailure(err: unknown): boolean {
   const msg = String(err instanceof Error ? err.message : err).toLowerCase();
+  const name = (err as { name?: string })?.name || "";
   return (
+    name === "AbortError" ||
     msg.includes("fetch failed") ||
     msg.includes("econnrefused") ||
     msg.includes("enotfound") ||
     msg.includes("econnreset") ||
     msg.includes("ehostunreach") ||
-    msg.includes("enetunreach")
+    msg.includes("enetunreach") ||
+    msg.includes("operation was aborted") ||
+    msg.includes("the operation was aborted") ||
+    msg.includes("timed out") ||
+    msg.includes("timeout")
   );
 }
 

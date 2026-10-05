@@ -180,9 +180,11 @@ export function vetSteps(steps: MissionStep[]): MissionStep[] {
     // step — it must never itself be stored as a plan step (that would be a
     // self-referential step). Reject it here so plans contain only real work.
     if (action === "ADVANCE_MISSION_PLAN") continue;
-    // Confidence gate (owner-directed): a step below the floor is rejected —
-    // missing confidence counts as 0.
-    if ((s.confidence ?? 0) < CONFIDENCE_FLOOR) continue;
+    // Confidence gate (owner-directed): a step below the floor is rejected.
+    // AUDIT FIX (F5): normalize first — NaN/strings must NOT slip through
+    // (`NaN < 51` is false, which previously failed OPEN). Missing/invalid = 0.
+    const c = typeof s.confidence === "number" && Number.isFinite(s.confidence) ? s.confidence : 0;
+    if (c < CONFIDENCE_FLOOR) continue;
     const check = validateActionParams(action, s.params);
     if (!check.ok) continue;
     vetted.push({ ...s, step: vetted.length + 1, action, params: check.params });

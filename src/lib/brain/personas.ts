@@ -55,7 +55,7 @@ export interface Persona {
 export const CONFIDENCE_FLOOR = 51;
 
 /** The action contract both personas must honour. */
-const ACTION_CONTRACT =
+export const ACTION_CONTRACT =
   "You may reference ONLY these actions: NOOP, RECORD_NOTE, RUN_DISCOVERY, RUN_TICK, " +
   "TRIGGER_ATTESTATION, QUARANTINE_RAIL, INVESTIGATE_DISPUTE, RUN_RESEARCH_SCAN, " +
   "RUN_EXTERNAL_RESEARCH, SCALE_FLEET_UP, RETIRE_AGENT, REQUEST_MONEY_INTENT, RUN_LOCUM_SEARCH, " +

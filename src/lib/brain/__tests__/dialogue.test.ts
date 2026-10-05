@@ -267,6 +267,14 @@ describe("vetSteps (deterministic arbiter)", () => {
     expect(out).toHaveLength(0);
   });
 
+  it("rejects NaN / non-numeric confidence (F5: must not fail OPEN)", () => {
+    const out = vetSteps([
+      { step: 1, action: "RUN_DISCOVERY", params: {}, rationale: "a", done: false, confidence: NaN },
+      { step: 2, action: "RUN_TICK", params: {}, rationale: "b", done: false, confidence: "abc" as unknown as number },
+    ]);
+    expect(out).toHaveLength(0);
+  });
+
   it("rejects ADVANCE_MISSION_PLAN as a stored step (it is a meta-action)", () => {
     const out = vetSteps([{ step: 1, action: "ADVANCE_MISSION_PLAN", params: { mission_id: "m1" }, rationale: "x", done: false, confidence: 90 }]);
     expect(out).toHaveLength(0);

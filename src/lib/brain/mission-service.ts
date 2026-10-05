@@ -180,6 +180,9 @@ function normalizeSteps(raw: unknown): MissionStep[] {
       params: (s.params && typeof s.params === "object" ? s.params : {}) as Record<string, unknown>,
       rationale: String(s.rationale ?? ""),
       done: Boolean(s.done),
+      // AUDIT FIX (F3): carry the persona's self-rated confidence through the
+      // JSON round-trip (commitPlan + getCurrentPlan) — it was silently dropped.
+      confidence: typeof s.confidence === "number" && Number.isFinite(s.confidence) ? s.confidence : null,
     }));
 }
 

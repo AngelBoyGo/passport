@@ -157,12 +157,18 @@ export async function askPersona(
     const { resolveAllowlistedModel } = await import("@/lib/llm/tiers");
     const persona = PERSONAS[personaId];
     const model = resolveAllowlistedModel(persona.tier, personaModel(persona));
+    // AUDIT FIX (F7): direct asks must NOT inherit the strict-JSON action
+    // contract — it contradicts the plain-text + confidence-marker request and
+    // made models return raw JSON (so confidence was always null). Strip the
+    // contract for this path.
+    const { ACTION_CONTRACT } = await import("@/lib/brain/personas");
+    const plainSystem = persona.systemPrompt.replace(ACTION_CONTRACT, "").trim();
     const raw = await brainComplete({
       system:
-        persona.systemPrompt +
+        plainSystem +
         " The operator (your owner) is speaking to YOU directly. Answer in your own voice, " +
-        "grounded ONLY in the resources given. Be concise (2-5 sentences). Plain text. " +
-        "End your reply with exactly: CONFIDENCE: <0-100>.",
+        "grounded ONLY in the resources given. Be concise (2-5 sentences). Reply in PLAIN TEXT " +
+        "(no JSON). End your reply with exactly: CONFIDENCE: <0-100>.",
       user: JSON.stringify({ question: q, resources }),
       tier: persona.tier,
       model,
@@ -182,7 +188,7 @@ export async function askPersona(
 export async function recentOperatorDirectives(limit = 10) {
   return prisma.adminAuditLog
     .findMany({
-      where: { action: { in: ["brain_ask", "brain_ask_mars", "brain_ask_muse", "brain_task_assigned"] } },
+      where: { action: { in: ["brain_ask", "brain_ask_mars", "brain_ask_muse", "brain_ask_more", "brain_task_assigned"] } },
       orderBy: { createdAt: "desc" },
       take: limit,
       select: { action: true, targetId: true, details: true, createdAt: true },

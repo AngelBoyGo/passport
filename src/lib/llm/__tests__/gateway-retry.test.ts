@@ -1,6 +1,15 @@
-import { describe, expect, it, vi } from "vitest";
-import { completeTierResilient, completeTierResilientParsed, type TierCompleteOptions } from "../gateway-client";
-import { TIER_MODEL_ALLOWLIST } from "../tiers";
+import { describe, expect, it, vi, afterEach } from "vitest";
+import {
+  completeTierResilient,
+  completeTierResilientParsed,
+  isTransportFailure,
+  type TierCompleteOptions,
+} from "../gateway-client";
+import { TIER_MODEL_ALLOWLIST, tierAllowlist } from "../tiers";
+
+afterEach(() => {
+  delete process.env.LOCAL_MODEL_ALLOWLIST;
+});
 
 /** Builds a fake fetch that returns queued responses in order. */
 function fakeFetch(queue: Array<{ status?: number; body?: unknown; text?: string; throws?: boolean | Error }>) {
@@ -119,6 +128,29 @@ describe("completeTierResilient — retry + same-tier fallback", () => {
       completeTierResilientParsed("neuron", opts, (raw) => JSON.parse(raw), { config: CFG, fetchImpl: fn })
     ).rejects.toThrow(/unreachable/);
     expect(calls).toHaveLength(1);
+  });
+
+  it("treats an AbortError (timeout) as a transport failure (no retry storm)", () => {
+    // A slow-but-alive local server aborts; this must NOT retry across the
+    // whole same-host model chain (was ~5 min per mission).
+    expect(isTransportFailure(new DOMException("This operation was aborted", "AbortError"))).toBe(true);
+    expect(isTransportFailure(new Error("The operation timed out"))).toBe(true);
+    expect(isTransportFailure(new Error("LLM gateway returned 500: oops"))).toBe(false);
+  });
+});
+
+describe("local tier model routing (audit F1)", () => {
+  it("uses the env-extended LOCAL_MODEL_ALLOWLIST model (not silently swapped)", async () => {
+    process.env.LOCAL_MODEL_ALLOWLIST = "my-custom-gemma";
+    const { fn, calls } = fakeFetch([ok("x")]);
+    await completeTierResilient("local", { ...opts, model: "my-custom-gemma" }, { config: CFG, fetchImpl: fn });
+    expect(calls[0]).toBe("my-custom-gemma");
+  });
+
+  it("cannot smuggle a money-tier model into the local allowlist", () => {
+    process.env.LOCAL_MODEL_ALLOWLIST = "deepseek-v4-pro";
+    expect(tierAllowlist("local")).not.toContain("deepseek-v4-pro");
+    expect(TIER_MODEL_ALLOWLIST.local).not.toContain("deepseek-v4-pro");
   });
 });
 

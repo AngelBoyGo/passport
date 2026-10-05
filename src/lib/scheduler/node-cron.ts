@@ -7,6 +7,7 @@ import cron from "node-cron";
 import { prisma } from "@/lib/db";
 import { runTick, type SchedulerDeps } from "@/lib/scheduler/scheduler-service";
 import { acquireLease, type LeaseHandle } from "@/lib/scheduler/lease";
+import { schedulersAllowed } from "@/lib/scheduler/guard";
 
 let initialized = false;
 
@@ -50,15 +51,18 @@ export function startScheduler(): void {
   if (initialized) return;
   initialized = true;
 
-  const isDev = process.env.NODE_ENV === "development";
-  const isTest = process.env.NODE_ENV === "test" || process.env.VITEST === "true";
-
-  if (isTest) {
-    console.log("[scheduler] Skipping cron startup in test mode");
+  // AUDIT FIX (F6): use the central scheduler guard so `next dev` does not run
+  // a 5-minute tick that writes agentEvidence to the real DATABASE_URL. The
+  // guard blocks test/development (unless SCHEDULERS_ENABLED=true) and honors
+  // the SCHEDULERS_ENABLED=false kill switch.
+  const gate = schedulersAllowed();
+  if (!gate.allowed) {
+    console.log(`[scheduler] Not started: ${gate.reason}`);
     return;
   }
 
-  // Run every hour in production, every 5 minutes in dev
+  const isDev = process.env.NODE_ENV === "development";
+  // Run every hour in production, every 5 minutes in dev.
   const schedule = isDev ? "*/5 * * * *" : "0 * * * *";
 
   console.log(`[scheduler] Starting with schedule: "${schedule}" (${isDev ? "dev" : "production"} mode)`);
