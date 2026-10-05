@@ -111,8 +111,27 @@ export function resolveTierModel(tier: LlmTier, env: Record<string, string | und
 export function resolveAllowlistedModel(tier: LlmTier, model: string): string {
   const trimmed = model?.trim();
   if (!trimmed) return DEFAULT_TIER_MODEL[tier];
-  if (!TIER_MODEL_ALLOWLIST[tier].includes(trimmed)) {
+  if (!tierAllowlist(tier).includes(trimmed)) {
     throw new Error(`tier_model_not_allowed:${tier}:${trimmed}`);
   }
   return trimmed;
+}
+
+/**
+ * Tier allowlist with an env-extendable `local` tier.
+ *
+ * The local (self-hosted) tier must be re-configurable WITHOUT a rebuild — the
+ * owner's ollama tag (e.g. `gemma4-31b-heretic-64k`) changes on their machine,
+ * not in this repo. LOCAL_MODEL_ALLOWLIST is a comma-separated extension of the
+ * built-in local list; every other tier stays code-pinned.
+ */
+export function tierAllowlist(tier: LlmTier): readonly string[] {
+  if (tier === "local") {
+    const extra = (process.env.LOCAL_MODEL_ALLOWLIST || "")
+      .split(",")
+      .map((m) => m.trim())
+      .filter(Boolean);
+    return [...TIER_MODEL_ALLOWLIST.local, ...extra];
+  }
+  return TIER_MODEL_ALLOWLIST[tier];
 }

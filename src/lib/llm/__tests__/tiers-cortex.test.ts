@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, afterEach } from "vitest";
 import {
   LLM_TIERS,
   TIER_MODEL_ALLOWLIST,
@@ -7,8 +7,11 @@ import {
   resolveAllowlistedModel,
   isLlmTier,
   tierSatisfies,
+  tierAllowlist,
   rankOf,
 } from "../tiers";
+
+afterEach(() => { delete process.env.LOCAL_MODEL_ALLOWLIST; });
 
 describe("llm tiers — cortex expansion", () => {
   it("has the 4 tiers: local, cortex, neuron, money", () => {
@@ -56,5 +59,15 @@ describe("llm tiers — cortex expansion", () => {
     expect(rankOf("local")).toBeLessThan(rankOf("money"));
     expect(tierSatisfies("money", "local")).toBe(true);
     expect(tierSatisfies("local", "money")).toBe(false);
+  });
+
+  it("local allowlist is env-extendable WITHOUT a rebuild; other tiers are not", () => {
+    process.env.LOCAL_MODEL_ALLOWLIST = "gemma4-31b-heretic-64k";
+    expect(tierAllowlist("local")).toContain("gemma4-31b-heretic-64k");
+    expect(resolveAllowlistedModel("local", "gemma4-31b-heretic-64k")).toBe("gemma4-31b-heretic-64k");
+    // env extension cannot leak into other tiers
+    expect(tierAllowlist("neuron")).not.toContain("gemma4-31b-heretic-64k");
+    expect(() => resolveAllowlistedModel("neuron", "gemma4-31b-heretic-64k")).toThrow(/tier_model_not_allowed/);
+    delete process.env.LOCAL_MODEL_ALLOWLIST;
   });
 });

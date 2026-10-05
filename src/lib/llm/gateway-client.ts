@@ -14,6 +14,7 @@ import {
   DEFAULT_TIER_MODEL,
   TIER_MODEL_ALLOWLIST,
   TIER_MODEL_ENV,
+  tierAllowlist,
   type LlmTier,
   requireLlmTier,
   resolveTierModel,
@@ -181,7 +182,7 @@ export async function completeTierResilient(
   const attemptsPerModel = Math.max(1, resilient.attemptsPerModel ?? 2);
   const retryDelayMs = Math.max(0, resilient.retryDelayMs ?? 250);
 
-  const allowed = TIER_MODEL_ALLOWLIST[tier];
+  const allowed = tierAllowlist(tier);
   // Primary = caller's explicit allowlisted model, else the tier default.
   const primary = opts.model ?? DEFAULT_TIER_MODEL[tier];
   if (!allowed.includes(primary)) {
@@ -228,7 +229,7 @@ export async function completeTierResilientParsed<T>(
   const attemptsPerModel = Math.max(1, resilient.attemptsPerModel ?? 2);
   const retryDelayMs = Math.max(0, resilient.retryDelayMs ?? 250);
 
-  const allowed = TIER_MODEL_ALLOWLIST[tier];
+  const allowed = tierAllowlist(tier);
   const primary = opts.model ?? DEFAULT_TIER_MODEL[tier];
   if (!allowed.includes(primary)) {
     throw new Error(`tier_model_not_allowed:${tier}:${primary}`);
