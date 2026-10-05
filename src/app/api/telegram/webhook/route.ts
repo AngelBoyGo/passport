@@ -318,13 +318,14 @@ async function handleCommand(command: string, args: string[], from: string): Pro
       const r = await askPersona(personaId, question);
       if (!r.ok) {
         const hint =
-          personaId === "more" && /not configured|local/i.test(r.reason)
+          personaId === "more" && /not configured|local tier/i.test(r.reason)
             ? "MORE needs LOCAL_LLM_BASE_URL set on the droplet (the Tailscale-reachable gemma-4 endpoint)."
             : "";
         return `⚠️ ${personaId.toUpperCase()} could not answer: ${r.reason}${hint ? `\n${hint}` : ""}`;
       }
       const glyph = personaId === "mars" ? "⚔️" : personaId === "muse" ? "🎨" : "🧩";
-      return `${glyph} *${r.persona}* ${r.answer}`;
+      const conf = r.confidence != null ? ` _(confidence ${r.confidence}%)_` : "";
+      return `${glyph} *${r.persona}*${conf}\n${r.answer}`;
     }
 
     case "directives": {

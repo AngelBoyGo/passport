@@ -3,14 +3,14 @@ import { completeTierResilient, completeTierResilientParsed, type TierCompleteOp
 import { TIER_MODEL_ALLOWLIST } from "../tiers";
 
 /** Builds a fake fetch that returns queued responses in order. */
-function fakeFetch(queue: Array<{ status?: number; body?: unknown; text?: string; throws?: boolean }>) {
+function fakeFetch(queue: Array<{ status?: number; body?: unknown; text?: string; throws?: boolean | Error }>) {
   const calls: string[] = [];
   const fn = vi.fn(async (_url: string, init: { body: string }) => {
     const model = JSON.parse(init.body).model as string;
     calls.push(model);
     const next = queue.shift();
     if (!next) throw new Error("fakeFetch queue exhausted");
-    if (next.throws) throw new Error("network error");
+    if (next.throws) throw next.throws === true ? new Error("network error") : next.throws;
     const status = next.status ?? 200;
     return {
       ok: status >= 200 && status < 300,
@@ -100,6 +100,25 @@ describe("completeTierResilient — retry + same-tier fallback", () => {
     const { fn, calls } = fakeFetch([ok("x")]);
     await completeTierResilient("neuron", { ...opts, model: "gpt-4o-mini" }, { config: CFG, fetchImpl: fn });
     expect(calls[0]).toBe("gpt-4o-mini");
+  });
+
+  it("TRANSPORT FAILURE fails on the FIRST request (no 12-attempt burn on a dead host)", async () => {
+    // e.g. droplet cannot reach the Tailscale endpoint: "fetch failed" means the
+    // host is down — every model on the tier shares that host, so fallback is
+    // pointless. Exactly ONE call, immediate fail-closed throw.
+    const { fn, calls } = fakeFetch([{ throws: new TypeError("fetch failed") }]);
+    await expect(
+      completeTierResilient("neuron", opts, { config: CFG, fetchImpl: fn, attemptsPerModel: 2, retryDelayMs: 0 })
+    ).rejects.toThrow(/unreachable/);
+    expect(calls).toHaveLength(1);
+  });
+
+  it("the parsed wrapper also fast-fails on transport errors", async () => {
+    const { fn, calls } = fakeFetch([{ throws: new Error("ECONNREFUSED 1.2.3.4:11434") }]);
+    await expect(
+      completeTierResilientParsed("neuron", opts, (raw) => JSON.parse(raw), { config: CFG, fetchImpl: fn })
+    ).rejects.toThrow(/unreachable/);
+    expect(calls).toHaveLength(1);
   });
 });
 

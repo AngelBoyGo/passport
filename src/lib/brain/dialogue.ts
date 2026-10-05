@@ -25,9 +25,9 @@ import { validateActionParams } from "@/lib/brain/param-schemas";
 import type { BrainAction } from "@/lib/brain/command-brain";
 import {
   PERSONAS,
-  PERSONA_TIER,
   DRAFTER,
   CRITIC,
+  CONFIDENCE_FLOOR,
   personaModel,
   ACTION_PARAMS_CHEATSHEET,
   type PersonaId,
@@ -38,6 +38,8 @@ export interface DialogueTurn {
   persona: PersonaId;
   role: "draft" | "critique" | "revise" | "synthesize";
   content: string;
+  /** Self-rated confidence 0-100 (null = the mind did not provide one). */
+  confidence: number | null;
 }
 
 /** MORE (local gemma-4) only joins when its endpoint is configured. */
@@ -94,7 +96,7 @@ async function askPersona(
 }
 
 /** Parses a persona's JSON into candidate steps, dropping anything malformed. */
-function parseCandidateSteps(raw: Record<string, unknown>): MissionStep[] {
+function parseCandidateSteps(raw: Record<string, unknown>, confidence: number | null): MissionStep[] {
   const arr = Array.isArray(raw.steps) ? raw.steps : [];
   const out: MissionStep[] = [];
   for (const entry of arr.slice(0, MAX_DIALOGUE_STEPS + 1)) {
@@ -107,9 +109,35 @@ function parseCandidateSteps(raw: Record<string, unknown>): MissionStep[] {
       params: (o.params && typeof o.params === "object" ? o.params : {}) as Record<string, unknown>,
       rationale: String(o.rationale ?? "").slice(0, 600),
       done: false,
+      // The step inherits the self-rated confidence of the turn that produced it.
+      confidence,
     });
   }
   return out.slice(0, MAX_STEPS);
+}
+
+/**
+ * Extracts the turn's self-rated confidence from a persona JSON response.
+ * Missing/invalid confidence counts as 0 (fail-closed per the owner's gate).
+ */
+export function extractConfidence(raw: Record<string, unknown>): number {
+  const c = Number(raw.confidence);
+  if (!Number.isFinite(c)) return 0;
+  return Math.max(0, Math.min(100, Math.round(c)));
+}
+
+/**
+ * Extracts a trailing "CONFIDENCE: <0-100>" marker from free-form prose
+ * (used by MARS's critique). Returns the cleaned text + parsed confidence
+ * (null when no valid marker was present — advisory only, never a gate here).
+ */
+export function parseConfidenceMarker(text: string): { text: string; confidence: number | null } {
+  const re = /CONFIDENCE:\s*(\d{1,3})\s*%?\s*$/i;
+  const m = text.trim().match(re);
+  if (!m) return { text: text.trim(), confidence: null };
+  const n = Number(m[1]);
+  const confidence = Number.isFinite(n) ? Math.max(0, Math.min(100, Math.round(n))) : null;
+  return { text: text.trim().replace(re, "").trim(), confidence };
 }
 
 function isAllowedAction(action: string): action is BrainAction {
@@ -152,6 +180,9 @@ export function vetSteps(steps: MissionStep[]): MissionStep[] {
     // step — it must never itself be stored as a plan step (that would be a
     // self-referential step). Reject it here so plans contain only real work.
     if (action === "ADVANCE_MISSION_PLAN") continue;
+    // Confidence gate (owner-directed): a step below the floor is rejected —
+    // missing confidence counts as 0.
+    if ((s.confidence ?? 0) < CONFIDENCE_FLOOR) continue;
     const check = validateActionParams(action, s.params);
     if (!check.ok) continue;
     vetted.push({ ...s, step: vetted.length + 1, action, params: check.params });
@@ -160,8 +191,15 @@ export function vetSteps(steps: MissionStep[]): MissionStep[] {
 }
 
 /**
- * Runs one full Plan → Critique → Revise → Commit dialogue for a mission.
- * Returns the vetted steps and the full transcript. Never throws.
+ * Runs one full Plan → Critique → Revise → (Synthesize) → Commit dialogue.
+ *
+ * CONFIDENCE SYSTEM (owner-directed): every persona JSON response must carry
+ * "confidence" (0-100). Each later turn SEES the earlier turns' confidences;
+ * the deterministic arbiter rejects any artifact below CONFIDENCE_FLOOR (51):
+ *   - draft  < 51 → the dialogue aborts (no plan this cycle);
+ *   - revise < 51 → MUSE's higher-confidence draft is kept instead;
+ *   - synthesize < 51 → the revised plan is kept (MORE's synthesis ignored).
+ * A missing confidence counts as 0 (fail-closed). Never throws.
  */
 export async function runMissionDialogue(ctx: MissionContext): Promise<DialogueResult> {
   const turns: DialogueTurn[] = [];
@@ -177,6 +215,7 @@ export async function runMissionDialogue(ctx: MissionContext): Promise<DialogueR
 
   // ── 1. DRAFT (MUSE) ────────────────────────────────────────────────────────
   let draft: MissionStep[];
+  let draftConfidence = 0;
   try {
     const draftRaw = await askPersona(DRAFTER, {
       user:
@@ -184,41 +223,60 @@ export async function runMissionDialogue(ctx: MissionContext): Promise<DialogueR
         "allowlisted action and its params. Be concrete and novel.\n" +
         ACTION_PARAMS_CHEATSHEET +
         "\n" +
-        `Return STRICT JSON: {"steps":[{"action":"<ALLOWLIST>","params":{},"rationale":"..."}]}.\n\n` +
+        `Return STRICT JSON: {"steps":[{"action":"<ALLOWLIST>","params":{},"rationale":"..."}],"confidence":<0-100>}.\n\n` +
         sharedContext,
     });
-    draft = parseCandidateSteps(parseJsonObject(draftRaw));
-    turns.push({ persona: DRAFTER, role: "draft", content: JSON.stringify(draft) });
+    const parsedRaw = parseJsonObject(draftRaw);
+    draftConfidence = extractConfidence(parsedRaw);
+    draft = parseCandidateSteps(parsedRaw, draftConfidence);
+    turns.push({ persona: DRAFTER, role: "draft", content: JSON.stringify(draft), confidence: draftConfidence });
   } catch (err) {
     return { ok: false, reason: `draft_failed:${msg(err)}`, steps: [], committedStep: null, turns, summary: "draft failed", draftedBy: DRAFTER };
   }
   if (draft.length === 0) {
     return { ok: false, reason: "draft_empty", steps: [], committedStep: null, turns, summary: "no candidate steps", draftedBy: DRAFTER };
   }
+  if (draftConfidence < CONFIDENCE_FLOOR) {
+    return {
+      ok: false,
+      reason: `low_confidence_draft:${draftConfidence}`,
+      steps: [],
+      committedStep: null,
+      turns,
+      summary: `MUSE draft rejected at confidence ${draftConfidence} (< ${CONFIDENCE_FLOOR})`,
+      draftedBy: DRAFTER,
+    };
+  }
 
-  // ── 2. CRITIQUE (MARS) ─────────────────────────────────────────────────────
+  // ── 2. CRITIQUE (MARS) — sees MUSE's confidence ────────────────────────────
   let critiqueText = "";
+  let critiqueConfidence: number | null = null;
   try {
     // Free-form critique (no JSON mode): ranking is prose, and some providers
-    // return empty completions under strict JSON mode at high temperature.
+    // return empty completions under strict JSON mode at high temperature. MARS
+    // appends a CONFIDENCE: NN marker, which we parse out for cross-visibility.
     critiqueText = await askPersona(CRITIC, {
       json: false,
       user:
         "Adversarially critique these candidate steps for this mission. Attack cost, risk, " +
         "distraction, unproven assumptions, and expected value. Rank them best→worst in 2-4 " +
-        "short sentences.\n\n" +
+        "short sentences. End your reply with exactly: CONFIDENCE: <0-100>.\n\n" +
         `mission=${JSON.stringify({ title: ctx.title, objective: ctx.objective })}\n` +
+        `muse_confidence=${draftConfidence}\n` +
         `candidates=${JSON.stringify(draft)}`,
     });
-    turns.push({ persona: CRITIC, role: "critique", content: critiqueText });
+    const { text, confidence } = parseConfidenceMarker(critiqueText);
+    critiqueText = text;
+    critiqueConfidence = confidence;
+    turns.push({ persona: CRITIC, role: "critique", content: critiqueText, confidence: critiqueConfidence });
   } catch (err) {
     // A failed critique does not abort the dialogue — the arbiter still vets the
     // draft. Record the failure so it is visible.
     critiqueText = `critique_unavailable:${msg(err)}`;
-    turns.push({ persona: CRITIC, role: "critique", content: critiqueText });
+    turns.push({ persona: CRITIC, role: "critique", content: critiqueText, confidence: null });
   }
 
-  // ── 3. REVISE (MUSE) ───────────────────────────────────────────────────────
+  // ── 3. REVISE (MUSE) — sees its own draft confidence + MARS's ──────────────
   let revised = draft;
   try {
     const reviseRaw = await askPersona(DRAFTER, {
@@ -227,21 +285,32 @@ export async function runMissionDialogue(ctx: MissionContext): Promise<DialogueR
         "strongest, and return the FINAL ordered plan. Use ONLY the exact params allowed:\n" +
         ACTION_PARAMS_CHEATSHEET +
         "\n" +
-        `Return STRICT JSON: {"steps":[{"action":"<ALLOWLIST>","params":{},"rationale":"..."}]}.\n\n` +
+        `Return STRICT JSON: {"steps":[{"action":"<ALLOWLIST>","params":{},"rationale":"..."}],"confidence":<0-100>}.\n\n` +
         `mission=${JSON.stringify({ title: ctx.title, objective: ctx.objective })}\n` +
+        `your_draft_confidence=${draftConfidence}\nmars_confidence=${critiqueConfidence ?? "unrated"}\n` +
         `draft=${JSON.stringify(draft)}\ncritique=${critiqueText}`,
     });
-    const parsed = parseCandidateSteps(parseJsonObject(reviseRaw));
-    if (parsed.length > 0) revised = parsed;
-    turns.push({ persona: DRAFTER, role: "revise", content: JSON.stringify(revised) });
+    const parsedRaw = parseJsonObject(reviseRaw);
+    const reviseConfidence = extractConfidence(parsedRaw);
+    const parsed = parseCandidateSteps(parsedRaw, reviseConfidence);
+    if (parsed.length > 0 && reviseConfidence >= CONFIDENCE_FLOOR) {
+      revised = parsed;
+    }
+    turns.push({
+      persona: DRAFTER,
+      role: "revise",
+      content: revised === parsed ? JSON.stringify(revised) : `kept_draft_confidence_${reviseConfidence}`,
+      confidence: reviseConfidence,
+    });
   } catch (err) {
-    turns.push({ persona: DRAFTER, role: "revise", content: `revise_unavailable:${msg(err)}` });
+    turns.push({ persona: DRAFTER, role: "revise", content: `revise_unavailable:${msg(err)}`, confidence: null });
   }
 
   // ── 3b. SYNTHESIZE (MORE, local gemma-4) — best-effort ─────────────────────
-  // MORE reads both minds and may replace the plan with a stronger synthesis.
-  // Best-effort: if MORE is unconfigured/down (e.g. the Tailscale link is up but
-  // the local server is off), the dialogue proceeds with MUSE's revised plan.
+  // MORE reads both minds (and their confidences) and may replace the plan with
+  // a stronger synthesis. Best-effort: if MORE is unconfigured/down (e.g. the
+  // Tailscale link is up but the local server is off), the dialogue proceeds
+  // with the revised plan.
   if (isMoreEnabled()) {
     try {
       const synthRaw = await askPersona("more", {
@@ -252,20 +321,27 @@ export async function runMissionDialogue(ctx: MissionContext): Promise<DialogueR
           ACTION_PARAMS_CHEATSHEET +
           "\n" +
           `Return STRICT JSON: {"steps":[{"action":"<ALLOWLIST>","params":{},"rationale":"..."}],` +
-          `"synthesis":"<1-2 sentences: what you changed and why>"}.\n\n` +
+          `"confidence":<0-100>,"synthesis":"<1-2 sentences: what you changed and why>"}.\n\n` +
           `mission=${JSON.stringify({ title: ctx.title, objective: ctx.objective })}\n` +
+          `muse_confidence=${draftConfidence}\nmars_confidence=${critiqueConfidence ?? "unrated"}\n` +
           `revised_plan=${JSON.stringify(revised)}\nmars_critique=${critiqueText}`,
       });
-      const parsed = parseJsonObject(synthRaw);
-      const synthSteps = parseCandidateSteps(parsed);
-      if (synthSteps.length > 0) {
+      const parsedRaw = parseJsonObject(synthRaw);
+      const synthConfidence = extractConfidence(parsedRaw);
+      const synthSteps = parseCandidateSteps(parsedRaw, synthConfidence);
+      if (synthSteps.length > 0 && synthConfidence >= CONFIDENCE_FLOOR) {
         revised = synthSteps;
-        turns.push({ persona: "more", role: "synthesize", content: JSON.stringify(synthSteps) });
+        turns.push({ persona: "more", role: "synthesize", content: JSON.stringify(synthSteps), confidence: synthConfidence });
       } else {
-        turns.push({ persona: "more", role: "synthesize", content: `kept_muse_plan:${String(parsed.synthesis ?? "").slice(0, 200)}` });
+        turns.push({
+          persona: "more",
+          role: "synthesize",
+          content: `kept_revised_plan (confidence ${synthConfidence}):${String(parsedRaw.synthesis ?? "").slice(0, 200)}`,
+          confidence: synthConfidence,
+        });
       }
     } catch (err) {
-      turns.push({ persona: "more", role: "synthesize", content: `more_unavailable:${msg(err)}` });
+      turns.push({ persona: "more", role: "synthesize", content: `more_unavailable:${msg(err)}`, confidence: null });
     }
   }
 

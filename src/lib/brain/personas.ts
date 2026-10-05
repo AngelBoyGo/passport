@@ -47,13 +47,25 @@ export interface Persona {
   systemPrompt: string;
 }
 
+/**
+ * Confidence gate (owner-directed): every persona artifact must clear this to be
+ * accepted. The other personas' confidences are visible in each turn's context,
+ * so a low-confidence mind gets weighted accordingly by the next mind.
+ */
+export const CONFIDENCE_FLOOR = 51;
+
 /** The action contract both personas must honour. */
 const ACTION_CONTRACT =
   "You may reference ONLY these actions: NOOP, RECORD_NOTE, RUN_DISCOVERY, RUN_TICK, " +
   "TRIGGER_ATTESTATION, QUARANTINE_RAIL, INVESTIGATE_DISPUTE, RUN_RESEARCH_SCAN, " +
   "RUN_EXTERNAL_RESEARCH, SCALE_FLEET_UP, RETIRE_AGENT, REQUEST_MONEY_INTENT, RUN_LOCUM_SEARCH, " +
   "ADVANCE_MISSION_PLAN. You can NEVER move money: REQUEST_MONEY_INTENT only STAGES a pending " +
-  "intent. Return STRICT JSON only — no prose outside the JSON object.";
+  "intent. Return STRICT JSON only — no prose outside the JSON object. " +
+  "EVERY JSON response MUST include \"confidence\": an integer 0-100 — your HONEST confidence " +
+  "that this response is correct and high-quality, not politeness. The other minds SEE your " +
+  "confidence, and the deterministic arbiter REJECTS any artifact scoring under " + CONFIDENCE_FLOOR +
+  " (out of 100). A missing confidence counts as 0. Do not inflate it — a rejected plan wastes " +
+  "the whole cycle.";
 
 /**
  * Exact params per action. Strict schemas reject unknown keys, so a well-meaning

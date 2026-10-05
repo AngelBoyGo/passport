@@ -22,6 +22,7 @@ import { brainComplete } from "@/lib/raillab/factory-brain";
 import { gatherDatapoints } from "@/lib/brain/command-brain";
 import { listActiveMissions, getCurrentPlan, createMission } from "@/lib/brain/mission-service";
 import { recentMoltbookItems } from "@/lib/brain/moltbook";
+import { parseConfidenceMarker } from "@/lib/brain/dialogue";
 
 export interface BrainResourceBundle {
   datapoints: Record<string, unknown>;
@@ -142,7 +143,10 @@ export async function assignTask(
 export async function askPersona(
   personaId: "mars" | "muse" | "more",
   question: string
-): Promise<{ ok: true; answer: string; persona: string } | { ok: false; reason: string }> {
+): Promise<
+  | { ok: true; answer: string; persona: string; confidence: number | null }
+  | { ok: false; reason: string }
+> {
   const q = question.trim();
   if (!q) return { ok: false, reason: "empty_question" };
 
@@ -157,17 +161,18 @@ export async function askPersona(
       system:
         persona.systemPrompt +
         " The operator (your owner) is speaking to YOU directly. Answer in your own voice, " +
-        "grounded ONLY in the resources given. Be concise (2-5 sentences). Plain text.",
+        "grounded ONLY in the resources given. Be concise (2-5 sentences). Plain text. " +
+        "End your reply with exactly: CONFIDENCE: <0-100>.",
       user: JSON.stringify({ question: q, resources }),
       tier: persona.tier,
       model,
       temperature: persona.temperature,
       json: false,
     });
-    const answer = raw.trim();
-    if (!answer) return { ok: false, reason: "empty_completion" };
-    await audit(`brain_ask_${personaId}`, q.slice(0, 200), answer.slice(0, 400));
-    return { ok: true, answer, persona: persona.name };
+    const { text, confidence } = parseConfidenceMarker(raw.trim());
+    if (!text) return { ok: false, reason: "empty_completion" };
+    await audit(`brain_ask_${personaId}`, q.slice(0, 200), text.slice(0, 400));
+    return { ok: true, answer: text, persona: persona.name, confidence };
   } catch (err) {
     return { ok: false, reason: String(err instanceof Error ? err.message : err).slice(0, 200) };
   }

@@ -198,6 +198,15 @@ export async function completeTierResilient(
         return await completeTier(tier, { ...opts, model }, resilient.config ?? null, resilient.fetchImpl);
       } catch (err) {
         lastErr = err;
+        // Transport-level failure (DNS/connection refused — "fetch failed"):
+        // EVERY model on this tier shares the same host, so trying the other
+        // models is pointless. Fail immediately (also avoids burning through
+        // the whole chain + retry delays when a host is down).
+        if (isTransportFailure(err)) {
+          throw new Error(
+            `LLM gateway unreachable (${model}): ${err instanceof Error ? err.message : String(err)}`
+          );
+        }
         if (attempt < attemptsPerModel - 1 && retryDelayMs > 0) {
           await new Promise((r) => setTimeout(r, retryDelayMs));
         }
@@ -207,6 +216,19 @@ export async function completeTierResilient(
   throw new Error(
     `LLM gateway failed after ${chain.length} model(s) × ${attemptsPerModel} attempt(s): ` +
       `${lastErr instanceof Error ? lastErr.message : String(lastErr)}`
+  );
+}
+
+/** True when the error is a transport/connectivity failure, not a model response. */
+export function isTransportFailure(err: unknown): boolean {
+  const msg = String(err instanceof Error ? err.message : err).toLowerCase();
+  return (
+    msg.includes("fetch failed") ||
+    msg.includes("econnrefused") ||
+    msg.includes("enotfound") ||
+    msg.includes("econnreset") ||
+    msg.includes("ehostunreach") ||
+    msg.includes("enetunreach")
   );
 }
 
@@ -244,6 +266,11 @@ export async function completeTierResilientParsed<T>(
         return parse(raw); // a malformed-JSON throw here is retryable
       } catch (err) {
         lastErr = err;
+        if (isTransportFailure(err)) {
+          throw new Error(
+            `LLM gateway unreachable (${model}): ${err instanceof Error ? err.message : String(err)}`
+          );
+        }
         if (attempt < attemptsPerModel - 1 && retryDelayMs > 0) {
           await new Promise((r) => setTimeout(r, retryDelayMs));
         }

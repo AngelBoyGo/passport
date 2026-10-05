@@ -36,6 +36,8 @@ export interface MissionStep {
   params: Record<string, unknown>;
   rationale: string;
   done: boolean;
+  /** Self-rated confidence (0-100) of the persona turn that produced this step. */
+  confidence?: number | null;
 }
 
 export interface MissionRecord {
