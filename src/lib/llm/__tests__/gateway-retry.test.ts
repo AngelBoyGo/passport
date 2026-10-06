@@ -152,6 +152,21 @@ describe("local tier model routing (audit F1)", () => {
     expect(tierAllowlist("local")).not.toContain("deepseek-v4-pro");
     expect(TIER_MODEL_ALLOWLIST.local).not.toContain("deepseek-v4-pro");
   });
+
+  it("local tier retries the SAME model only (no cross-model reload storm)", async () => {
+    process.env.LOCAL_MODEL_ALLOWLIST = "my-custom-gemma";
+    // primary keeps returning empty; must NOT try other local models
+    const { fn, calls } = fakeFetch([empty(), empty()]);
+    await expect(
+      completeTierResilient("local", { ...opts, model: "my-custom-gemma" }, {
+        config: CFG,
+        fetchImpl: fn,
+        attemptsPerModel: 2,
+        retryDelayMs: 0,
+      })
+    ).rejects.toThrow();
+    expect(calls.every((m) => m === "my-custom-gemma")).toBe(true);
+  });
 });
 
 describe("completeTierResilientParsed — malformed JSON is retried/fallen back", () => {

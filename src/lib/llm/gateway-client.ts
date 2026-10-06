@@ -203,8 +203,11 @@ export async function completeTierResilient(
   if (!allowed.includes(primary)) {
     throw new Error(`tier_model_not_allowed:${tier}:${primary}`);
   }
-  // Fallback chain = the other allowlisted models for this tier (never another tier).
-  const chain = [primary, ...allowed.filter((m) => m !== primary)];
+  // Fallback chain = the other allowlisted models for this tier (never another
+  // tier). EXCEPTION: the local tier retries the SAME model only — the owner's
+  // GPU fits exactly one large model (~532 MiB headroom), so trying another
+  // local model would force a 21.9 GB unload/reload storm.
+  const chain = tier === "local" ? [primary] : [primary, ...allowed.filter((m) => m !== primary)];
 
   let lastErr: unknown = null;
   for (const model of chain) {
@@ -277,7 +280,8 @@ export async function completeTierResilientParsed<T>(
   if (!allowed.includes(primary)) {
     throw new Error(`tier_model_not_allowed:${tier}:${primary}`);
   }
-  const chain = [primary, ...allowed.filter((m) => m !== primary)];
+  // Local tier: same model only (only one large model fits in VRAM).
+  const chain = tier === "local" ? [primary] : [primary, ...allowed.filter((m) => m !== primary)];
 
   let lastErr: unknown = null;
   for (const model of chain) {
