@@ -27,10 +27,16 @@ export interface LlmGatewayConfig {
 
 const GATEWAY_TIMEOUT_MS = 30_000;
 
-/** Local self-hosted generation (large models) needs a longer budget. */
+/**
+ * Local self-hosted generation needs a much longer budget: the owner's
+ * gemma4-31b-heretic-64k runs ~5.8 tok/s (partial CPU offload) and shares only
+ * 2 parallel slots, so a legitimate response can take minutes — especially when
+ * another opencode instance holds a slot. Default 300s (5 min); override with
+ * LOCAL_LLM_TIMEOUT_MS.
+ */
 export function localTimeoutMs(env: Record<string, string | undefined> = process.env): number {
   const n = Number(env.LOCAL_LLM_TIMEOUT_MS);
-  return Number.isFinite(n) && n > 0 ? n : 120_000;
+  return Number.isFinite(n) && n > 0 ? n : 300_000;
 }
 
 export function getGatewayConfig(env: Record<string, string | undefined> = process.env): LlmGatewayConfig {
