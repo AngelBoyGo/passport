@@ -144,6 +144,36 @@ export function parseConfidenceMarker(text: string): { text: string; confidence:
   return { text: text.trim().replace(re, "").trim(), confidence };
 }
 
+/**
+ * Extracts the critique's text + confidence from EITHER shape a critic returns.
+ *
+ * MARS's system prompt demands strict JSON, but the critique prompt asks for
+ * prose + a trailing marker — models split. Accept both so MARS's confidence is
+ * actually visible to the other minds (previously a JSON reply left it null):
+ *   1. trailing "CONFIDENCE: NN" marker, else
+ *   2. a JSON body with a `confidence` field (fences stripped).
+ */
+export function parseCritique(text: string): { text: string; confidence: number | null } {
+  const marker = parseConfidenceMarker(text);
+  if (marker.confidence !== null) return marker;
+
+  const cleaned = text
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+  try {
+    const obj = JSON.parse(cleaned) as Record<string, unknown>;
+    const c = Number(obj.confidence);
+    const body = String(obj.critique ?? obj.notes ?? obj.ranking ?? "").trim();
+    return {
+      text: body || cleaned,
+      confidence: Number.isFinite(c) ? Math.max(0, Math.min(100, Math.round(c))) : null,
+    };
+  } catch {
+    return { text: text.trim(), confidence: null };
+  }
+}
+
 function isAllowedAction(action: string): action is BrainAction {
   return ALLOWED_ACTIONS.includes(action);
 }
@@ -271,7 +301,9 @@ export async function runMissionDialogue(ctx: MissionContext): Promise<DialogueR
         `muse_confidence=${draftConfidence}\n` +
         `candidates=${JSON.stringify(draft)}`,
     });
-    const { text, confidence } = parseConfidenceMarker(critiqueText);
+    // Accept either a trailing marker OR a JSON body (MARS's system prompt
+    // demands strict JSON), so its confidence is visible to the other minds.
+    const { text, confidence } = parseCritique(critiqueText);
     critiqueText = text;
     critiqueConfidence = confidence;
     turns.push({ persona: CRITIC, role: "critique", content: critiqueText, confidence: critiqueConfidence });

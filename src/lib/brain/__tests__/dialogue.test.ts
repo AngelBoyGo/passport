@@ -13,7 +13,7 @@ vi.mock("@/lib/raillab/factory-brain", () => ({
   },
 }));
 
-const { runMissionDialogue, vetSteps, ALLOWED_ACTIONS, parseConfidenceMarker, extractConfidence } =
+const { runMissionDialogue, vetSteps, ALLOWED_ACTIONS, parseConfidenceMarker, parseCritique, extractConfidence } =
   await import("@/lib/brain/dialogue");
 const { BRAIN_ACTIONS } = await import("@/lib/brain/command-brain");
 const { CONFIDENCE_FLOOR } = await import("@/lib/brain/personas");
@@ -244,6 +244,26 @@ describe("parseConfidenceMarker (MARS prose)", () => {
   it("returns null when no marker is present (advisory, not a gate)", () => {
     const { text, confidence } = parseConfidenceMarker("No marker here.");
     expect(text).toBe("No marker here.");
+    expect(confidence).toBeNull();
+  });
+});
+
+describe("parseCritique (accepts marker OR JSON body)", () => {
+  it("parses a fenced JSON critique with a confidence field (MARS's actual shape)", () => {
+    const raw =
+      '```json\n{"confidence": 85, "critique": "DISCOVERY is best.", "ranking": ["RUN_DISCOVERY"]}\n```';
+    const { text, confidence } = parseCritique(raw);
+    expect(confidence).toBe(85);
+    expect(text).toBe("DISCOVERY is best.");
+  });
+  it("still parses a plain trailing marker", () => {
+    const { text, confidence } = parseCritique("Watch cost. CONFIDENCE: 60");
+    expect(confidence).toBe(60);
+    expect(text).toBe("Watch cost.");
+  });
+  it("falls back to the raw text with null confidence on unparseable prose", () => {
+    const { text, confidence } = parseCritique("just some prose");
+    expect(text).toBe("just some prose");
     expect(confidence).toBeNull();
   });
 });
