@@ -91,6 +91,10 @@ async function askPersona(
     tier: persona.tier,
     model,
     temperature: persona.temperature,
+    // Gemma 4 heretic emits a long private reasoning trace before `content`.
+    // Ollama's OpenAI-compatible endpoint honors reasoning_effort=none; without
+    // it, MORE spends minutes reasoning and can hit the completion timeout.
+    ...(persona.tier === "local" ? { reasoningEffort: "none" as const, maxTokens: 256 } : {}),
     json: opts.json ?? true,
   });
 }

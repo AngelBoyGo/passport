@@ -14,8 +14,11 @@ afterEach(() => {
 /** Builds a fake fetch that returns queued responses in order. */
 function fakeFetch(queue: Array<{ status?: number; body?: unknown; text?: string; throws?: boolean | Error }>) {
   const calls: string[] = [];
+  const payloads: Array<Record<string, unknown>> = [];
   const fn = vi.fn(async (_url: string, init: { body: string }) => {
-    const model = JSON.parse(init.body).model as string;
+    const payload = JSON.parse(init.body) as Record<string, unknown>;
+    payloads.push(payload);
+    const model = payload.model as string;
     calls.push(model);
     const next = queue.shift();
     if (!next) throw new Error("fakeFetch queue exhausted");
@@ -28,7 +31,7 @@ function fakeFetch(queue: Array<{ status?: number; body?: unknown; text?: string
       json: async () => next.body ?? {},
     } as unknown as Response;
   });
-  return { fn: fn as unknown as typeof fetch, calls };
+  return { fn: fn as unknown as typeof fetch, calls, payloads };
 }
 
 const ok = (content: string) => ({ status: 200, body: { choices: [{ message: { content } }] } });
@@ -166,6 +169,18 @@ describe("local tier model routing (audit F1)", () => {
       })
     ).rejects.toThrow();
     expect(calls.every((m) => m === "my-custom-gemma")).toBe(true);
+  });
+
+  it("can disable local reasoning and cap output tokens for MORE", async () => {
+    process.env.LOCAL_MODEL_ALLOWLIST = "gemma4-31b-heretic-64k";
+    const { fn, payloads } = fakeFetch([ok("MORE confidence 80")]);
+    await completeTierResilient(
+      "local",
+      { ...opts, model: "gemma4-31b-heretic-64k", reasoningEffort: "none", maxTokens: 256 },
+      { config: CFG, fetchImpl: fn }
+    );
+    expect(payloads[0].reasoning_effort).toBe("none");
+    expect(payloads[0].max_tokens).toBe(256);
   });
 });
 

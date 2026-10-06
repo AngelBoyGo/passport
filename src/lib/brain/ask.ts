@@ -173,6 +173,7 @@ export async function askPersona(
       tier: persona.tier,
       model,
       temperature: persona.temperature,
+      ...(persona.tier === "local" ? { reasoningEffort: "none" as const, maxTokens: 256 } : {}),
       json: false,
     });
     const { text, confidence } = parseConfidenceMarker(raw.trim());

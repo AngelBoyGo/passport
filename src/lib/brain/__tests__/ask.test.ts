@@ -120,6 +120,22 @@ describe("askPersona", () => {
     );
   });
 
+  it("MORE uses local tier, disables reasoning trace and bounds output tokens", async () => {
+    process.env.LOCAL_LLM_BASE_URL = "http://100.64.0.5:11434/v1";
+    completeMock.mockResolvedValue("Synthesize carefully. CONFIDENCE: 87");
+    const r = await askPersona("more", "What is our priority?");
+    expect(r.ok).toBe(true);
+    expect(completeMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tier: "local",
+        model: "gemma-4",
+        reasoningEffort: "none",
+        maxTokens: 256,
+      })
+    );
+    delete process.env.LOCAL_LLM_BASE_URL;
+  });
+
   it("rejects an empty question", async () => {
     const r = await askPersona("mars", "  ");
     expect(r.ok).toBe(false);
