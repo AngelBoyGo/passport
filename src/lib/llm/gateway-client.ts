@@ -75,6 +75,7 @@ export function getTierGatewayConfig(
 }
 
 export type ChatRole = "system" | "user" | "assistant";
+export type ReasoningEffort = "none" | "low" | "medium" | "high" | "max";
 export interface ChatMessage {
   role: ChatRole;
   content: string;
@@ -94,6 +95,10 @@ export interface TierCompleteOptions {
    * and behave exactly as before.
    */
   messages?: ChatMessage[];
+  /** OpenAI-compatible reasoning control (Ollama maps `none` to think=false). */
+  reasoningEffort?: ReasoningEffort;
+  /** Bounded output tokens; useful for the local persona on constrained VRAM. */
+  maxTokens?: number;
 }
 
 /**
@@ -144,6 +149,8 @@ export async function completeTier(
         model,
         messages,
         temperature: opts.temperature ?? 0.2,
+        ...(opts.reasoningEffort ? { reasoning_effort: opts.reasoningEffort } : {}),
+        ...(opts.maxTokens != null ? { max_tokens: opts.maxTokens } : {}),
         ...(opts.json ? { response_format: { type: "json_object" } } : {}),
       }),
       signal: controller.signal,
