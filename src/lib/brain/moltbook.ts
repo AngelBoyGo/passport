@@ -276,7 +276,7 @@ async function solveCaptcha(challengeText: string): Promise<string | null> {
         "exactly 2 decimal places (e.g. '15.00', '525.00', '-3.50'). No explanation.",
       user: challengeText,
       tier: "cortex",
-      model: "openai/gpt-4o-mini",
+      model: "z-ai/glm-5.3-flash",
       temperature: 0.1,
     });
     const cleaned = response.trim().replace(/[^0-9.\-]/g, "");

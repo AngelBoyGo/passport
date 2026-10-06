@@ -103,7 +103,7 @@ describe("dialogue — Plan → Critique → Revise → Commit", () => {
       .mockResolvedValueOnce(draftJson(85));
     await runMissionDialogue(CTX);
     const models = completeMock.mock.calls.map((c) => c[0].model);
-    expect(models[0]).toBe("openai/gpt-4o-mini"); // MUSE default
+    expect(models[0]).toBe("z-ai/glm-5.3-flash"); // MUSE default
     expect(models[1]).toBe("deepseek/deepseek-chat-v3.1"); // MARS default
   });
 

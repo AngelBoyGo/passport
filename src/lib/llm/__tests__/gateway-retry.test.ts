@@ -110,8 +110,8 @@ describe("completeTierResilient — retry + same-tier fallback", () => {
 
   it("honours an explicit allowlisted model as the primary", async () => {
     const { fn, calls } = fakeFetch([ok("x")]);
-    await completeTierResilient("neuron", { ...opts, model: "openai/gpt-4o-mini" }, { config: CFG, fetchImpl: fn });
-    expect(calls[0]).toBe("openai/gpt-4o-mini");
+    await completeTierResilient("neuron", { ...opts, model: "z-ai/glm-5.3-flash" }, { config: CFG, fetchImpl: fn });
+    expect(calls[0]).toBe("z-ai/glm-5.3-flash");
   });
 
   it("TRANSPORT FAILURE fails on the FIRST request (no 12-attempt burn on a dead host)", async () => {

@@ -111,7 +111,7 @@ export const MUSE: Persona = {
   id: "muse",
   name: "MUSE",
   tier: "cortex",
-  defaultModel: "openai/gpt-4o-mini",
+  defaultModel: "z-ai/glm-5.3-flash",
   modelEnv: "LLM_MODEL_MUSE",
   temperature: 0.85,
   systemPrompt:

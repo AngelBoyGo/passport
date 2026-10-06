@@ -28,7 +28,7 @@ describe("tiers — table + resolution", () => {
     ).toThrow(/tier_model_not_allowed/);
     // A model that is allowlisted on cortex but NOT on money cannot be forced
     // onto the money tier; and an arbitrary unknown id is refused everywhere.
-    expect(() => resolveTierModel("money", { LLM_MODEL_MONEY: "openai/gpt-4o-mini" })).toThrow(
+    expect(() => resolveTierModel("money", { LLM_MODEL_MONEY: "z-ai/glm-5.3-flash" })).toThrow(
       /tier_model_not_allowed/
     );
     expect(() => resolveTierModel("neuron", { LLM_MODEL_NEURON: "totally-made-up" })).toThrow(
@@ -37,7 +37,7 @@ describe("tiers — table + resolution", () => {
   });
 
   it("rejects unknown tiers outright", () => {
-    expect(() => requireLlmTier("openai/gpt-4o-mini")).toThrow(/unknown_llm_tier/);
+    expect(() => requireLlmTier("z-ai/glm-5.3-flash")).toThrow(/unknown_llm_tier/);
     expect(() => requireLlmTier(undefined)).toThrow(/unknown_llm_tier/);
     expect(() => requireLlmTier("")).toThrow(/unknown_llm_tier/);
   });
@@ -64,7 +64,7 @@ describe("gateway-client — authorization before transport", () => {
   it("throws on unknown tier BEFORE touching the network", async () => {
     await expect(
       // @ts-expect-error deliberate runtime tier violation
-      completeTier("openai/gpt-4o-mini", { system: "s", user: "u" }, cfg)
+      completeTier("z-ai/glm-5.3-flash", { system: "s", user: "u" }, cfg)
     ).rejects.toThrow(/unknown_llm_tier/);
   });
 

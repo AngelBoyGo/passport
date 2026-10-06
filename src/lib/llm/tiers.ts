@@ -11,17 +11,16 @@
  *      (never silently degrades to a cheaper path).
  *
  * Tiers:
- *   - `neuron`  — default reasoning brain (deepseek-v4-flash).
- *   - `cortex`  — cheap reasoning tier for the two-persona dialogue loop
+ *   - `neuron`  — default reasoning brain (deepseek/deepseek-chat-v3.1).
+ *   - `cortex`  — cheap reasoning tier for the persona dialogue loop
  *                 (MARS/MUSE). Same authority as neuron (never money); its
  *                 allowlist admits the cheaper models so a sustained
  *                 self-dialogue loop does not burn the primary model budget.
- *   - `money`   — the sole tier permitted to move money (deepseek-v4-pro).
+ *   - `money`   — the sole tier permitted to move money (deepseek/deepseek-r1).
  *
- * Model IDs verified live against the api.metis.gold (KeyForge) gateway on
- * 2026-10-03: `deepseek-v4-flash`, `deepseek-v4-pro`, and the cheap set used by
- * `cortex` (llama-3.1-8b-instant, gemini-1.5-flash, mistral-small-latest,
- * gpt-4o-mini, claude-3-haiku-20240307) are all present.
+ * Provider: OpenRouter (https://openrouter.ai/api/v1). IDs verified live with
+ * the account key on 2026-10-06: `deepseek/deepseek-chat-v3.1`,
+ * `deepseek/deepseek-r1`, and `z-ai/glm-5.3-flash` all respond.
  */
 
 export const LLM_TIERS = ["local", "cortex", "neuron", "money"] as const;
@@ -41,8 +40,8 @@ export const TIER_MODEL_ALLOWLIST: Record<LlmTier, readonly string[]> = {
   // can name their own local model without a rebuild.
   local: ["gemma-4", "gemma-3", "llama3.1", "qwen2.5", "mistral"],
   // Provider: OpenRouter (https://openrouter.ai/api/v1). IDs are namespaced.
-  neuron: ["deepseek/deepseek-chat-v3.1", "openai/gpt-4o-mini"],
-  cortex: ["deepseek/deepseek-chat-v3.1", "openai/gpt-4o-mini"],
+  neuron: ["deepseek/deepseek-chat-v3.1", "z-ai/glm-5.3-flash"],
+  cortex: ["deepseek/deepseek-chat-v3.1", "z-ai/glm-5.3-flash"],
   // Money is CODE-PINNED (never env-extendable): the strongest reasoning model
   // is the only one permitted to move money.
   money: ["deepseek/deepseek-r1"],
@@ -51,7 +50,7 @@ export const TIER_MODEL_ALLOWLIST: Record<LlmTier, readonly string[]> = {
 export const DEFAULT_TIER_MODEL: Record<LlmTier, string> = {
   local: "gemma-4",
   neuron: "deepseek/deepseek-chat-v3.1",
-  cortex: "openai/gpt-4o-mini",
+  cortex: "z-ai/glm-5.3-flash",
   money: "deepseek/deepseek-r1",
 };
 
