@@ -53,7 +53,7 @@ describe("fleet-service — mint / stop / rehydrate against a real Passport", ()
     commitments.push(minted.commitment);
 
     expect(minted.tier).toBe("neuron");
-    expect(minted.resolvedModel).toBe("deepseek-v4-flash");
+    expect(minted.resolvedModel).toBe("deepseek/deepseek-chat-v3.1");
     expect(minted.rawApiKey).toMatch(/^pp_flt_/);
 
     const enrollment = await prisma.agentEnrollment.findUnique({
@@ -151,7 +151,7 @@ describe("fleet-service — mint / stop / rehydrate against a real Passport", ()
 
       const re = await fleet.rehydrateFleetAgent(minted.commitment, "money");
       expect(re.upgraded).toBe(false); // money -> money is same-tier, not an upgrade
-      expect(re.resolvedModel).toBe("deepseek-v4-pro");
+      expect(re.resolvedModel).toBe("deepseek/deepseek-r1");
     } finally {
       if (previous === undefined) delete process.env.FLEET_MINT_MONEY_ENABLED;
       else process.env.FLEET_MINT_MONEY_ENABLED = previous;

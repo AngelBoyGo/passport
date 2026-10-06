@@ -93,7 +93,7 @@ export const MARS: Persona = {
   id: "mars",
   name: "MARS",
   tier: "cortex",
-  defaultModel: "deepseek-v4-flash",
+  defaultModel: "deepseek/deepseek-chat-v3.1",
   modelEnv: "LLM_MODEL_MARS",
   temperature: 0.1,
   systemPrompt:
@@ -111,7 +111,7 @@ export const MUSE: Persona = {
   id: "muse",
   name: "MUSE",
   tier: "cortex",
-  defaultModel: "gpt-4o-mini",
+  defaultModel: "openai/gpt-4o-mini",
   modelEnv: "LLM_MODEL_MUSE",
   temperature: 0.85,
   systemPrompt:

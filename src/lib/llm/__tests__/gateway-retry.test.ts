@@ -63,7 +63,7 @@ describe("completeTierResilient — retry + same-tier fallback", () => {
   });
 
   it("falls back to a DIFFERENT allowlisted model after exhausting the primary", async () => {
-    // primary (deepseek-v4-flash) fails twice; fallback (gpt-4o-mini) succeeds.
+    // primary (deepseek/deepseek-chat-v3.1) fails twice; fallback succeeds.
     const { fn, calls } = fakeFetch([empty(), empty(), ok("fallback model")]);
     const out = await completeTierResilient("neuron", opts, {
       config: CFG,
@@ -110,8 +110,8 @@ describe("completeTierResilient — retry + same-tier fallback", () => {
 
   it("honours an explicit allowlisted model as the primary", async () => {
     const { fn, calls } = fakeFetch([ok("x")]);
-    await completeTierResilient("neuron", { ...opts, model: "gpt-4o-mini" }, { config: CFG, fetchImpl: fn });
-    expect(calls[0]).toBe("gpt-4o-mini");
+    await completeTierResilient("neuron", { ...opts, model: "openai/gpt-4o-mini" }, { config: CFG, fetchImpl: fn });
+    expect(calls[0]).toBe("openai/gpt-4o-mini");
   });
 
   it("TRANSPORT FAILURE fails on the FIRST request (no 12-attempt burn on a dead host)", async () => {
@@ -151,9 +151,9 @@ describe("local tier model routing (audit F1)", () => {
   });
 
   it("cannot smuggle a money-tier model into the local allowlist", () => {
-    process.env.LOCAL_MODEL_ALLOWLIST = "deepseek-v4-pro";
-    expect(tierAllowlist("local")).not.toContain("deepseek-v4-pro");
-    expect(TIER_MODEL_ALLOWLIST.local).not.toContain("deepseek-v4-pro");
+    process.env.LOCAL_MODEL_ALLOWLIST = "deepseek/deepseek-r1";
+    expect(tierAllowlist("local")).not.toContain("deepseek/deepseek-r1");
+    expect(TIER_MODEL_ALLOWLIST.local).not.toContain("deepseek/deepseek-r1");
   });
 
   it("local tier retries the SAME model only (no cross-model reload storm)", async () => {

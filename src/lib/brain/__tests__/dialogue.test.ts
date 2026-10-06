@@ -103,8 +103,8 @@ describe("dialogue — Plan → Critique → Revise → Commit", () => {
       .mockResolvedValueOnce(draftJson(85));
     await runMissionDialogue(CTX);
     const models = completeMock.mock.calls.map((c) => c[0].model);
-    expect(models[0]).toBe("gpt-4o-mini"); // MUSE default
-    expect(models[1]).toBe("deepseek-v4-flash"); // MARS default
+    expect(models[0]).toBe("openai/gpt-4o-mini"); // MUSE default
+    expect(models[1]).toBe("deepseek/deepseek-chat-v3.1"); // MARS default
   });
 
   it("MORE does NOT join when LOCAL_LLM_BASE_URL is unset (dialogue still completes)", async () => {

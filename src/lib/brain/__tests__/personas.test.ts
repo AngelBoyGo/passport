@@ -40,7 +40,7 @@ describe("brain personas", () => {
   });
 
   it("personaModel honours an env override", () => {
-    expect(personaModel(PERSONAS.muse, { LLM_MODEL_MUSE: "deepseek-v4-flash" })).toBe("deepseek-v4-flash");
+    expect(personaModel(PERSONAS.muse, { LLM_MODEL_MUSE: "deepseek/deepseek-chat-v3.1" })).toBe("deepseek/deepseek-chat-v3.1");
     expect(personaModel(PERSONAS.more, { LLM_MODEL_MORE: "gemma-3" })).toBe("gemma-3");
     expect(personaModel(PERSONAS.muse, {})).toBe(PERSONAS.muse.defaultModel);
   });

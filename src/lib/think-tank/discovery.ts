@@ -67,7 +67,7 @@ export const DISCOVERY_AGENT_CONFIGS: Record<string, DiscoveryAgentConfig> = {
   market_scanner: {
     sources: ["marketplace_api", "price_feed"],
     scanIntervalMinutes: 60,
-    model: "gpt-4o-mini",
+    model: "openai/gpt-4o-mini",
     maxQueriesPerScan: 5,
   },
   trend_scanner: {

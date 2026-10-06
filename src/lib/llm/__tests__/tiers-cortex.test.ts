@@ -11,7 +11,11 @@ import {
   rankOf,
 } from "../tiers";
 
-afterEach(() => { delete process.env.LOCAL_MODEL_ALLOWLIST; });
+afterEach(() => {
+  delete process.env.LOCAL_MODEL_ALLOWLIST;
+  delete process.env.LLM_MODEL_ALLOWLIST_CORTEX;
+  delete process.env.LLM_MODEL_ALLOWLIST_NEURON;
+});
 
 describe("llm tiers — cortex expansion", () => {
   it("has the 4 tiers: local, cortex, neuron, money", () => {
@@ -19,14 +23,14 @@ describe("llm tiers — cortex expansion", () => {
   });
 
   it("cortex admits only cheap, allowlisted models", () => {
-    expect(TIER_MODEL_ALLOWLIST.cortex).toContain("gpt-4o-mini");
-    expect(TIER_MODEL_ALLOWLIST.cortex).toContain("deepseek-v4-flash");
+    expect(TIER_MODEL_ALLOWLIST.cortex).toContain("openai/gpt-4o-mini");
+    expect(TIER_MODEL_ALLOWLIST.cortex).toContain("deepseek/deepseek-chat-v3.1");
     // money-tier model is never admitted on cortex
-    expect(TIER_MODEL_ALLOWLIST.cortex).not.toContain("deepseek-v4-pro");
+    expect(TIER_MODEL_ALLOWLIST.cortex).not.toContain("deepseek/deepseek-r1");
   });
 
-  it("money tier admits only the pro model", () => {
-    expect(TIER_MODEL_ALLOWLIST.money).toEqual(["deepseek-v4-pro"]);
+  it("money tier admits only the pinned strongest model", () => {
+    expect(TIER_MODEL_ALLOWLIST.money).toEqual(["deepseek/deepseek-r1"]);
   });
 
   it("resolveTierModel returns the default when no override", () => {
@@ -38,7 +42,7 @@ describe("llm tiers — cortex expansion", () => {
   });
 
   it("resolveAllowlistedModel accepts allowlisted, rejects unknown", () => {
-    expect(resolveAllowlistedModel("cortex", "gpt-4o-mini")).toBe("gpt-4o-mini");
+    expect(resolveAllowlistedModel("cortex", "openai/gpt-4o-mini")).toBe("openai/gpt-4o-mini");
     expect(() => resolveAllowlistedModel("cortex", "bogus-model")).toThrow(/tier_model_not_allowed/);
   });
 
@@ -55,7 +59,7 @@ describe("llm tiers — cortex expansion", () => {
   });
 
   it("local tier never admits the money model; rank is below money", () => {
-    expect(TIER_MODEL_ALLOWLIST.local).not.toContain("deepseek-v4-pro");
+    expect(TIER_MODEL_ALLOWLIST.local).not.toContain("deepseek/deepseek-r1");
     expect(rankOf("local")).toBeLessThan(rankOf("money"));
     expect(tierSatisfies("money", "local")).toBe(true);
     expect(tierSatisfies("local", "money")).toBe(false);
@@ -69,5 +73,14 @@ describe("llm tiers — cortex expansion", () => {
     expect(tierAllowlist("neuron")).not.toContain("gemma4-31b-heretic-64k");
     expect(() => resolveAllowlistedModel("neuron", "gemma4-31b-heretic-64k")).toThrow(/tier_model_not_allowed/);
     delete process.env.LOCAL_MODEL_ALLOWLIST;
+  });
+
+  it("non-money tiers are env-extendable via LLM_MODEL_ALLOWLIST_<TIER>", () => {
+    process.env.LLM_MODEL_ALLOWLIST_CORTEX = "openai/gpt-4.1-mini";
+    expect(tierAllowlist("cortex")).toContain("openai/gpt-4.1-mini");
+    // money stays code-pinned and cannot be env-widened
+    process.env.LLM_MODEL_ALLOWLIST_CORTEX = "deepseek/deepseek-r1";
+    expect(tierAllowlist("cortex")).not.toContain("deepseek/deepseek-r1");
+    delete process.env.LLM_MODEL_ALLOWLIST_CORTEX;
   });
 });

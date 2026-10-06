@@ -40,16 +40,19 @@ export const TIER_MODEL_ALLOWLIST: Record<LlmTier, readonly string[]> = {
   // (LOCAL_LLM_BASE_URL). The model allowlist is env-extendable so the owner
   // can name their own local model without a rebuild.
   local: ["gemma-4", "gemma-3", "llama3.1", "qwen2.5", "mistral"],
-  neuron: ["deepseek-v4-flash", "gpt-4o-mini"],
-  cortex: ["deepseek-v4-flash", "gpt-4o-mini"],
-  money: ["deepseek-v4-pro"],
+  // Provider: OpenRouter (https://openrouter.ai/api/v1). IDs are namespaced.
+  neuron: ["deepseek/deepseek-chat-v3.1", "openai/gpt-4o-mini"],
+  cortex: ["deepseek/deepseek-chat-v3.1", "openai/gpt-4o-mini"],
+  // Money is CODE-PINNED (never env-extendable): the strongest reasoning model
+  // is the only one permitted to move money.
+  money: ["deepseek/deepseek-r1"],
 };
 
 export const DEFAULT_TIER_MODEL: Record<LlmTier, string> = {
   local: "gemma-4",
-  neuron: "deepseek-v4-flash",
-  cortex: "gpt-4o-mini",
-  money: "deepseek-v4-pro",
+  neuron: "deepseek/deepseek-chat-v3.1",
+  cortex: "openai/gpt-4o-mini",
+  money: "deepseek/deepseek-r1",
 };
 
 /** Env var name per tier (overrides must still be on the tier allowlist). */
@@ -118,16 +121,17 @@ export function resolveAllowlistedModel(tier: LlmTier, model: string): string {
 }
 
 /**
- * Tier allowlist with an env-extendable `local` tier.
+ * Tier allowlist with env-extendable non-money tiers.
  *
- * The local (self-hosted) tier must be re-configurable WITHOUT a rebuild — the
- * owner's ollama tag (e.g. `gemma4-31b-heretic-64k`) changes on their machine,
- * not in this repo. LOCAL_MODEL_ALLOWLIST is a comma-separated extension of the
- * built-in local list; every other tier stays code-pinned.
+ * Provider swaps (KeyForge → OpenRouter → …) and self-hosted model tags must be
+ * re-configurable WITHOUT a rebuild. Each non-money tier reads a comma-separated
+ * extension from `LLM_MODEL_ALLOWLIST_<TIER>` (local also honors the legacy
+ * `LOCAL_MODEL_ALLOWLIST`). The money tier is NEVER env-extendable — its model
+ * set is code-pinned so "money moves only through the audited model" can never
+ * be widened by configuration.
  *
  * HARD RULE: the money-tier model(s) are excluded from EVERY non-money tier,
- * including the env extension. An operator can never smuggle `deepseek-v4-pro`
- * into LOCAL_MODEL_ALLOWLIST to get a money-capable model on a cheap tier.
+ * including any env extension, so they can never be smuggled onto a cheap tier.
  */
 export function tierAllowlist(
   tier: LlmTier,
@@ -136,12 +140,11 @@ export function tierAllowlist(
   const moneyModels = TIER_MODEL_ALLOWLIST.money;
   if (tier === "money") return moneyModels;
   const base = TIER_MODEL_ALLOWLIST[tier];
-  if (tier === "local") {
-    const extra = (env.LOCAL_MODEL_ALLOWLIST || "")
-      .split(",")
-      .map((m) => m.trim())
-      .filter((m) => m && !moneyModels.includes(m));
-    return [...base, ...extra];
-  }
-  return base;
+  const generic = env[`LLM_MODEL_ALLOWLIST_${tier.toUpperCase()}`] || "";
+  const legacyLocal = tier === "local" ? env.LOCAL_MODEL_ALLOWLIST || "" : "";
+  const extra = `${generic},${legacyLocal}`
+    .split(",")
+    .map((m) => m.trim())
+    .filter((m) => m && !moneyModels.includes(m));
+  return [...base, ...extra];
 }
