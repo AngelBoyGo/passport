@@ -86,44 +86,6 @@ export function creditsFromUsdCents(cents: number): number {
   return Math.floor((cents * CREDITS_PER_DOLLAR) / 100);
 }
 
-/**
- * Creates a one-time Stripe Checkout session that accepts USDC (stablecoin
- * payments) and credits the operator's account by the order amount.
- */
-export async function createUsdcTopupCheckout(
-  stripeCustomerId: string,
-  usdCents: number
-): Promise<{ mock: boolean; url?: string; clientSecret?: string }> {
-  const stripe = getStripe();
-  if (!stripe) {
-    if (process.env.NODE_ENV === "production") {
-      throw new Error("Stripe payment processor is not configured in production");
-    }
-    // Dev/mock path (no STRIPE_SECRET_KEY in non-production).
-    return { mock: true, url: "/?checkout=mock", clientSecret: "mock_secret" };
-  }
-  const amount = Math.max(usdCents, 50); // Stripe min for payments
-  const session = await stripe.checkout.sessions.create({
-    customer: stripeCustomerId,
-    mode: "payment",
-    line_items: [
-      {
-        price_data: {
-          currency: "usd",
-          product_data: { name: "AngelCoin credit top-up" },
-          unit_amount: amount,
-        },
-        quantity: 1,
-      },
-    ],
-    payment_method_types: ["usdc" as Stripe.Checkout.SessionCreateParams.PaymentMethodType],
-    success_url: `${process.env.NEXT_PUBLIC_APP_URL}/?success=1`,
-    cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/?canceled=1`,
-    metadata: { product: "credits_topup", usd_cents: String(amount) },
-  });
-  return { mock: false, url: session.url ?? undefined, clientSecret: session.client_secret ?? undefined };
-}
-
 type WebhookResult = {
   mock: boolean;
   handled: boolean;

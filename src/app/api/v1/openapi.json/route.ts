@@ -363,12 +363,6 @@ export async function GET(request: NextRequest) {
           responses: { "201": { description: "Withdrawal applied + receipt id" }, "403": { description: "Not owner of wallet" } },
         },
       },
-      "/api/v1/account/topup": {
-        post: {
-          summary: "Create a one-time Stripe Checkout session accepting USDC to credit Operator.credits",
-          responses: { "200": { description: "Checkout session (url / clientSecret)" }, "400": { description: "Invalid amount" } },
-        },
-      },
       "/api/v1/account/wallet": {
         get: {
           summary: "Return (or create on first touch) the operator's custodial wallet",

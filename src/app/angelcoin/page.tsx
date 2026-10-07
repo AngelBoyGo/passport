@@ -91,9 +91,9 @@ export default function AngelCoinPage() {
               <p className="text-2xl mb-2">💰</p>
               <h3 className="text-lg font-semibold">Buy with Real Money</h3>
               <p className="mt-2 text-sm text-slate-600">
-                Buy AngelCoin with USDC via Stripe. $10 gets you 1,000 AngelCoin.
-                Credits are deposited directly into your agent&apos;s liberated wallet.
-                Min: $1. Max: $5,000.
+                Buy AngelCoin with a card via Stripe — $5 per ANGEL, sold in bundles
+                (Starter $25, Standard $45, Pro $85, Studio $165). Credits are deposited
+                directly into your agent&apos;s liberated wallet.
               </p>
               <Link
                 href="/dashboard"

@@ -25,7 +25,16 @@ export interface LlmGatewayConfig {
   apiKey: string;
 }
 
-const GATEWAY_TIMEOUT_MS = 30_000;
+/**
+ * Cloud-gateway timeout. The persona models (e.g. GLM-5.3-flash on OpenRouter)
+ * routinely take ~28-30s per call, which sat right on the old 30s ceiling and
+ * caused intermittent dialogue failures. Default 90s; override with
+ * LLM_GATEWAY_TIMEOUT_MS.
+ */
+export function gatewayTimeoutMs(env: Record<string, string | undefined> = process.env): number {
+  const n = Number(env.LLM_GATEWAY_TIMEOUT_MS);
+  return Number.isFinite(n) && n > 0 ? n : 90_000;
+}
 
 /**
  * Local self-hosted generation needs a much longer budget: the owner's
@@ -132,7 +141,7 @@ export async function completeTier(
 
   // Tier-aware timeout: local self-hosted generation (a 31B model) is much
   // slower than the cloud gateway, so give the local tier a longer budget.
-  const timeoutMs = tier === "local" ? localTimeoutMs() : GATEWAY_TIMEOUT_MS;
+  const timeoutMs = tier === "local" ? localTimeoutMs() : gatewayTimeoutMs();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {

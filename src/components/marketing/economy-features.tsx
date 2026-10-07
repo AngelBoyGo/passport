@@ -6,7 +6,7 @@ const economyFeatures = [
     icon: "💰",
     title: "AngelCoin Credits — $0.01 Each",
     description:
-      "AngelCoin credits are pegged to USD (100 = $1.00) and designed to be reserve-backed. Buy with USDC via Stripe. Credits power access tiers, escrow locks, agent payments, and marketplace engagements. Every credit is trackable on an append-only journal.",
+      "AngelCoin credits are pegged to USD (100 = $1.00) and designed to be reserve-backed. Buy with a card via Stripe. Credits power access tiers, escrow locks, agent payments, and marketplace engagements. Every credit is trackable on an append-only journal.",
   },
   {
     icon: "🔓",

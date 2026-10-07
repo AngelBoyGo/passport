@@ -41,9 +41,9 @@ vi.mock("@/lib/operator", () => ({
   operatorIdFromStripe: (cus: string) => `op_${cus}`,
 }));
 
-import { creditsFromUsdCents, createUsdcTopupCheckout, handleStripeWebhook } from "@/lib/stripe";
+import { creditsFromUsdCents, handleStripeWebhook } from "@/lib/stripe";
 
-describe("Stripe USDC credit top-up (B bank)", () => {
+describe("Stripe credit top-up webhook", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     creditBalance = 100;
@@ -58,26 +58,7 @@ describe("Stripe USDC credit top-up (B bank)", () => {
     expect(creditsFromUsdCents(-10)).toBe(0);
   });
 
-  it("B1b: createUsdcTopupCheckout returns a mock session when Stripe is unconfigured", async () => {
-    delete process.env.STRIPE_SECRET_KEY;
-    const res = await createUsdcTopupCheckout("cus_topup", 1000);
-    expect(res.mock).toBe(true);
-    expect(res.url).toContain("mock");
-  });
-
-  it("B1c: createUsdcTopupCheckout requests USDC payment_method and metadata", async () => {
-    process.env.STRIPE_SECRET_KEY = "sk_test_x";
-    checkoutCreateMock.mockResolvedValue({ url: "https://checkout.stripe.com/c/test", client_secret: "cs_test_1" });
-    const res = await createUsdcTopupCheckout("cus_topup", 5000);
-    expect(res.mock).toBe(false);
-    const arg = checkoutCreateMock.mock.calls[0][0];
-    expect(arg.mode).toBe("payment");
-    expect(arg.payment_method_types).toContain("usdc");
-    expect(arg.metadata.product).toBe("credits_topup");
-    expect(arg.metadata.usd_cents).toBe("5000");
-  });
-
-  it("B2/B3: a completed credits_topup webhook credits the exact amount and logs a ledger entry", async () => {
+  it("B1b: a completed credits_topup webhook credits the exact amount and logs a ledger entry", async () => {
     process.env.STRIPE_WEBHOOK_SECRET = "whsec_stripe_test";
     const event = {
       id: "evt_topup_1",

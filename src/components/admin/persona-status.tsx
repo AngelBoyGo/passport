@@ -168,8 +168,8 @@ export function useElapsedMs(
 
 function TerminalIcon({ state }: { state: PersonaRunState }) {
   const common = {
-    width: 18,
-    height: 18,
+    width: 22,
+    height: 22,
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
@@ -203,18 +203,13 @@ function TerminalIcon({ state }: { state: PersonaRunState }) {
 /** Decorative: the adjacent, visible status word carries the meaning for AT. */
 function Indicator({ state, paused }: { state: PersonaRunState; paused: boolean }) {
   const tone = STATUS_TONE[state];
+  // Bigger + denser dots so each orb reads clearly at a glance.
+  const orbProps = { size: 26, density: 1.4, dotSize: 1.35, className: `shrink-0 ${tone}` };
   if (ACTIVE_STATES.includes(state)) {
-    return (
-      <Orb
-        state={ORB_STATE[state]}
-        size={20}
-        paused={paused}
-        className={`shrink-0 ${tone}`}
-      />
-    );
+    return <Orb state={ORB_STATE[state]} paused={paused} {...orbProps} />;
   }
   if (state === "idle") {
-    return <Orb state="base" size={20} paused className={`shrink-0 ${tone}`} />;
+    return <Orb state="base" paused {...orbProps} />;
   }
   return (
     <span className={tone}>

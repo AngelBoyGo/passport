@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { computeIndependenceScore } from "@/lib/agent-wallet/wallet";
+import { loadFiatReserveUsd } from "@/lib/monetary/reserve";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,22 @@ export async function GET() {
 
   const totalSupply = wallets.reduce((sum, w) => sum + w.balance, 0);
   const totalStaked = wallets.reduce((sum, w) => sum + w.staked, 0);
+
+  // Honest backing: report the REAL reserve vs what full 1:1 backing requires,
+  // instead of an unconditional "1:1 active" claim.
+  const [fiatReserveUsd, gold] = await Promise.all([
+    loadFiatReserveUsd().catch(() => 0),
+    prisma.commodityReserve
+      .findFirst({ where: { symbol: "Au" }, select: { totalFineGrams: true } })
+      .catch(() => null),
+  ]);
+  const requiredReserveUsd = totalSupply * 5.0;
+  const coverageRatio =
+    requiredReserveUsd > 0
+      ? Number((fiatReserveUsd / requiredReserveUsd).toFixed(4))
+      : fiatReserveUsd > 0
+        ? 1
+        : 0;
   const liberatedCount = wallets.filter(
     (w) => computeIndependenceScore({
       balance: w.balance,
@@ -54,16 +71,24 @@ export async function GET() {
       agent_wallet_count: wallets.length,
     },
     reserve: {
-      status: "active",
-      backing_type: "PHYSICAL_COMMODITY_BASKET",
-      backing_ratio: "1:1",
+      status:
+        totalSupply === 0
+          ? "bootstrap"
+          : fiatReserveUsd >= requiredReserveUsd
+            ? "backed"
+            : "under_backed",
+      backing_type: "FIAT_TREASURY",
+      fiat_reserve_usd: fiatReserveUsd,
+      gold_fine_grams: gold?.totalFineGrams ?? 0,
+      required_reserve_usd: Number(requiredReserveUsd.toFixed(2)),
+      coverage_ratio: coverageRatio,
       last_updated: new Date().toISOString(),
     },
     exchange: {
       buy_url: "https://passport.metis.gold/api/v1/angelcoin/buy",
       min_buy_usd_cents: 2500, // Starter bundle = $25.00
       max_buy_usd_cents: 500000,
-      supported_payment_methods: ["card", "usdc"],
+      supported_payment_methods: ["card"],
     },
     timestamp: new Date().toISOString(),
   }, {

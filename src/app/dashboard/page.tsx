@@ -96,11 +96,6 @@ interface ActivityEvent {
   link?: string;
 }
 
-interface WalletCardData {
-  chain_address?: string;
-  [key: string]: unknown;
-}
-
 export default function UserDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [lens, setLens] = useState<PersonaLens>("builder");
@@ -117,9 +112,8 @@ export default function UserDashboard() {
   const [governance, setGovernance] = useState<GovernanceData | null>(null);
   const [governanceAgent, setGovernanceAgent] = useState<string | null>(null);
   const [governanceLoading, setGovernanceLoading] = useState(false);
-  const [topUpAmount, setTopUpAmount] = useState<number>(5000);
-  const [walletCard, setWalletCard] = useState<WalletCardData | null>(null);
-  const [toppingUp, setToppingUp] = useState(false);
+  const [buyBundle, setBuyBundle] = useState<string>("starter");
+  const [buyingAngl, setBuyingAngl] = useState(false);
   const [activityFeed, setActivityFeed] = useState<ActivityEvent[] | null>(null);
   const [referralCode, setReferralCode] = useState<string | null>(null);
   const [copiedRef, setCopiedRef] = useState(false);
@@ -235,32 +229,28 @@ export default function UserDashboard() {
     }
   }
 
-  async function handleTopUp() {
+  async function handleBuyAngel() {
     try {
-      setToppingUp(true);
-      const res = await fetch("/api/v1/account/topup", {
+      setBuyingAngl(true);
+      const res = await fetch("/api/v1/angelcoin/buy", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
-        body: JSON.stringify({ usd_cents: topUpAmount }),
+        body: JSON.stringify({ bundle_id: buyBundle }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.url) window.location.assign(data.url); // Stripe USDC Checkout
-        else if (data.mock) alert("Dev mode: credits top-up mocked (no Stripe key).");
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.url) {
+        window.location.assign(data.url); // Stripe Checkout (card)
+      } else if (res.ok && data.mock) {
+        alert("Dev mode: ANGEL purchase mocked (no Stripe key).");
+      } else {
+        alert(data.error || `Purchase failed (${res.status})`);
       }
     } catch {
-      alert("Top-up failed");
+      alert("Purchase failed");
     } finally {
-      setToppingUp(false);
+      setBuyingAngl(false);
     }
-  }
-
-  async function loadWalletCard() {
-    try {
-      const res = await fetch("/api/v1/account/wallet", { cache: "no-store", credentials: "same-origin" });
-      if (res.ok) setWalletCard(await res.json());
-    } catch {}
   }
 
   const loadGovernance = useCallback(async (commitment: string) => {
@@ -446,45 +436,39 @@ export default function UserDashboard() {
           </div>
         )}
 
-        {/* ── Add credits (USDC) + custodial wallet ── */}
+        {/* ── Buy AngelCoin (card via Stripe) ── */}
         <div className="rounded-xl border border-slate-800 bg-slate-800/80 p-5 shadow-sm space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-              <h2 className="text-base font-bold text-white flex items-center gap-2">
-                <span>💵</span> Add Credits (USDC) · Stablecoin
-              </h2>
-              <p className="text-xs text-slate-400">Top up Operator.credits with USDC via Stripe — settlement is backed by real dollars.</p>
-            </div>
-            <button
-              type="button"
-              onClick={loadWalletCard}
-              className="text-xs text-indigo-400 hover:underline"
-            >
-              {walletCard ? (walletCard.chain_address ? `Wallet ${walletCard.chain_address.slice(0,8)}…` : "Refresh wallet") : "View wallet"}
-            </button>
+          <div>
+            <h2 className="text-base font-bold text-white flex items-center gap-2">
+              <span>💎</span> Buy AngelCoin
+            </h2>
+            <p className="text-xs text-slate-400">
+              $5.00 per ANGEL, sold in bundles. Paid by card via Stripe; ANGEL is deposited into your
+              agent&apos;s wallet and each purchase is booked 1:1 against the reserve.
+            </p>
           </div>
 
           <div className="flex flex-wrap items-end gap-3">
             <div>
-              <label className="block text-[11px] uppercase tracking-wide text-slate-400 font-semibold">Amount (USD)</label>
+              <label className="block text-[11px] uppercase tracking-wide text-slate-400 font-semibold">Bundle</label>
               <select
-                value={topUpAmount}
-                onChange={(e) => setTopUpAmount(Number(e.target.value))}
+                value={buyBundle}
+                onChange={(e) => setBuyBundle(e.target.value)}
                 className="mt-1 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200"
               >
-                <option value={1000}>$10 — 1,000 credits</option>
-                <option value={5000}>$50 — 5,000 credits</option>
-                <option value={10000}>$100 — 10,000 credits</option>
-                <option value={50000}>$500 — 50,000 credits</option>
+                <option value="starter">Starter — 5 ANGEL · $25</option>
+                <option value="standard">Standard — 9 ANGEL · $45</option>
+                <option value="pro">Pro — 17 ANGEL · $85</option>
+                <option value="studio">Studio — 33 ANGEL · $165</option>
               </select>
             </div>
             <button
               type="button"
-              onClick={handleTopUp}
-              disabled={toppingUp}
-              className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-500 transition disabled:opacity-50"
+              onClick={handleBuyAngel}
+              disabled={buyingAngl}
+              className="rounded-lg bg-purple-600 px-5 py-2 text-sm font-semibold text-white hover:bg-purple-500 transition disabled:opacity-50"
             >
-              {toppingUp ? "Starting…" : "Top up with USDC →"}
+              {buyingAngl ? "Starting…" : "Buy with card →"}
             </button>
           </div>
         </div>
