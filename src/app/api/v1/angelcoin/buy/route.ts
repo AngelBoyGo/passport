@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { sessionFromRequest } from "@/lib/auth/cookies";
-import { getStripe } from "@/lib/stripe";
+import { getStripe, resolveStripeCustomerId } from "@/lib/stripe";
 import { ensureOperator } from "@/lib/operator";
 import { checkInMemoryRateLimit, clientIpFromRequest } from "@/lib/rateLimit";
 import { ANGEL_BUNDLES, MONETARY_PARAMS } from "@/lib/angelcoin/monetary";
@@ -102,8 +102,18 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  // Repair a stale/fake Stripe customer id (e.g. the `cus_<hash>` minted at
+  // signup) before checkout, so live Stripe does not reject it as resource_missing.
+  const customerId = await resolveStripeCustomerId(operator.stripeCustomerId, operator.email);
+  if (customerId !== operator.stripeCustomerId) {
+    await prisma.operator.update({
+      where: { id: operator.id },
+      data: { stripeCustomerId: customerId },
+    });
+  }
+
   const checkout = await stripe.checkout.sessions.create({
-    customer: operator.stripeCustomerId,
+    customer: customerId,
     mode: "payment",
     line_items: [
       {

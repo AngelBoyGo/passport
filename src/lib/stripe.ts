@@ -42,6 +42,40 @@ export async function getOrCreateStripeCustomer(
 }
 
 /**
+ * Returns a Stripe customer id that is valid for the CURRENT Stripe account.
+ *
+ * A stored id can be stale — created in TEST mode, under a different account, or
+ * a FAKE id minted at signup (`cus_<hash>`) which is NOT a real Stripe customer.
+ * Live Stripe then answers `resource_missing` and every checkout 500s. We verify
+ * the id and, if it is missing, create a real customer. The caller persists the
+ * returned id so the webhook still matches the operator by stripeCustomerId.
+ */
+export async function resolveStripeCustomerId(
+  stripeCustomerId: string | null | undefined,
+  email?: string | null
+): Promise<string> {
+  const stripe = getStripe();
+  if (!stripe) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("Stripe not configured (STRIPE_SECRET_KEY)");
+    }
+    return stripeCustomerId || `cus_dev_${Date.now()}`;
+  }
+  if (stripeCustomerId) {
+    try {
+      const customer = await stripe.customers.retrieve(stripeCustomerId);
+      if (!(customer as Stripe.DeletedCustomer).deleted) return stripeCustomerId;
+    } catch (err) {
+      // A missing customer is expected for fake/test ids; recreate below. Any
+      // other Stripe error is real and must surface.
+      if ((err as { code?: string }).code !== "resource_missing") throw err;
+    }
+  }
+  const created = await stripe.customers.create({ email: email ?? undefined });
+  return created.id;
+}
+
+/**
  * Creates a Stripe Checkout session for Pro subscription or credit top-up.
  */
 export async function createCheckoutSession(

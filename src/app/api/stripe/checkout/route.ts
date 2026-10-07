@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   createCheckoutSession,
+  resolveStripeCustomerId,
 } from "@/lib/stripe";
 import { ensureOperator } from "@/lib/operator";
+import { prisma } from "@/lib/db";
 import { sessionFromRequest } from "@/lib/auth/cookies";
 
 /**
@@ -23,11 +25,16 @@ export async function POST(request: NextRequest) {
   );
 
   try {
-    const session = await createCheckoutSession(
-      operator.stripeCustomerId,
-      operator.email
-    );
-    return NextResponse.json(session);
+    // Repair a stale/fake Stripe customer id before checkout.
+    const customerId = await resolveStripeCustomerId(operator.stripeCustomerId, operator.email);
+    if (customerId !== operator.stripeCustomerId) {
+      await prisma.operator.update({
+        where: { id: operator.id },
+        data: { stripeCustomerId: customerId },
+      });
+    }
+    const checkout = await createCheckoutSession(customerId, operator.email);
+    return NextResponse.json(checkout);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Checkout failed";
     return NextResponse.json({ error: message }, { status: 500 });

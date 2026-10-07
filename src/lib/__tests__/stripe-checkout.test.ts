@@ -2,11 +2,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
 const customersCreateMock = vi.fn();
+const customersRetrieveMock = vi.fn();
 const sessionsCreateMock = vi.fn();
 
 vi.mock("stripe", () => ({
   default: class MockStripe {
-    customers = { create: customersCreateMock };
+    customers = { create: customersCreateMock, retrieve: customersRetrieveMock };
     checkout = { sessions: { create: sessionsCreateMock } };
   },
 }));
@@ -28,9 +29,13 @@ vi.mock("@/lib/auth/auth-service", () => ({
 beforeEach(async () => {
   vi.resetModules();
   customersCreateMock.mockReset();
+  customersRetrieveMock.mockReset();
   sessionsCreateMock.mockReset();
   ensureOperatorMock.mockReset();
   getSessionFromTokenMock.mockReset();
+  // The route verifies the stored customer exists before checkout; default to a
+  // valid (non-deleted) customer so the id is reused unchanged.
+  customersRetrieveMock.mockResolvedValue({ id: "cus_valid", deleted: false });
   process.env.STRIPE_SECRET_KEY = "sk_test_mock";
   process.env.STRIPE_PRICE_PRO = "price_test_pro";
   process.env.NEXT_PUBLIC_APP_URL = "https://passport.metis.gold";
