@@ -33,6 +33,10 @@ const { entries, tx, makeAccount } = vi.hoisted(() => {
       ),
     },
     $queryRaw: vi.fn().mockResolvedValue([{ id: "acct_1", subjectCommitment: "h" }]),
+    agentWallet: {
+      upsert: vi.fn(async () => ({})),
+      updateMany: vi.fn(async () => ({ count: 1 })),
+    },
   };
   return { entries, tx, makeAccount };
 });

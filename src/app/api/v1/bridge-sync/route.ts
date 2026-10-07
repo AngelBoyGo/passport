@@ -214,6 +214,31 @@ async function syncLedgerToWallet(commitment: string) {
   const target = Math.max(0, ledgerBalance);
   const delta = target - (existing?.balance ?? 0);
 
+  if (delta === 0) {
+    return {
+      subject_commitment: commitment,
+      synced: true,
+      reason: "Already in sync",
+      ledger_balance: ledgerBalance,
+      wallet_balance: target,
+    };
+  }
+
+  // AUDIT FIX: a POSITIVE delta would MINT ANGEL to force the wallet up to a
+  // journal balance that may have no reserve backing (journal-only legacy
+  // grants). Refuse it — only a NEGATIVE delta (wallet ahead of the ledger) may
+  // be reconciled down, which burns surplus and never mints.
+  if (delta > 0) {
+    return {
+      subject_commitment: commitment,
+      synced: false,
+      reason: "Refused: ledger exceeds wallet (would mint unbacked ANGEL). Reconcile via a reserve-backed issuance, not a wallet top-up.",
+      ledger_balance: ledgerBalance,
+      wallet_balance: existing?.balance ?? 0,
+      delta,
+    };
+  }
+
   const wallet = await prisma.agentWallet.upsert({
     where: { subjectCommitment: commitment },
     create: {

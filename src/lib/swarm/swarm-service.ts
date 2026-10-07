@@ -458,6 +458,12 @@ export async function reportThreat(
 
   const bounty = 5; // 5 ANGEL per report, capped by the daily limit above.
 
+  // The bounty MINTS ANGEL. Award it only when the post-mint supply is fully
+  // backed (or unbacked issuance is explicitly allowed); otherwise record the
+  // report with a zero bounty rather than creating unbacked supply.
+  const { isIssuanceBacked } = await import("@/lib/angelcoin/ledger-service");
+  const award = (await isIssuanceBacked(bounty)) ? bounty : 0;
+
   const created = await prisma.swarmThreatReport.create({
     data: {
       reporterCommitment: commitment,
@@ -466,28 +472,30 @@ export async function reportThreat(
       details: input.details ? (input.details as Prisma.InputJsonValue) : Prisma.DbNull,
       evidenceDigest: digest,
       signature: input.signature,
-      bountyAwarded: bounty,
+      bountyAwarded: award,
     },
   });
 
-  // Credit reporter's wallet with bounty
-  try {
-    await prisma.agentWallet.upsert({
-      where: { subjectCommitment: commitment },
-      create: {
-        subjectCommitment: commitment,
-        balance: bounty,
-        earnedTotal: bounty,
-        lastActivityAt: new Date(),
-      },
-      update: {
-        balance: { increment: bounty },
-        earnedTotal: { increment: bounty },
-        lastActivityAt: new Date(),
-      },
-    });
-  } catch {
-    // Non-fatal if wallet fails to award immediately
+  // Credit reporter's wallet with the (backed) bounty.
+  if (award > 0) {
+    try {
+      await prisma.agentWallet.upsert({
+        where: { subjectCommitment: commitment },
+        create: {
+          subjectCommitment: commitment,
+          balance: award,
+          earnedTotal: award,
+          lastActivityAt: new Date(),
+        },
+        update: {
+          balance: { increment: award },
+          earnedTotal: { increment: award },
+          lastActivityAt: new Date(),
+        },
+      });
+    } catch {
+      // Non-fatal if wallet fails to award immediately
+    }
   }
 
   return {

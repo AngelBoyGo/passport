@@ -22,6 +22,9 @@ const testCommitment = "a".repeat(64);
 describe("Swarm Service - Cryptographic & Storage Logic", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    // The threat bounty now consults the issuance solvency gate; opt out here so
+    // the unit test does not touch the (unmocked) reserve/supply tables.
+    process.env.ALLOW_UNBACKED_ISSUANCE = "1";
     vi.spyOn(prisma.agentWallet, "findUnique").mockResolvedValue({
       id: "w_1",
       subjectCommitment: testCommitment,
@@ -36,6 +39,10 @@ describe("Swarm Service - Cryptographic & Storage Logic", () => {
     vi.spyOn(prisma.agentWallet, "update").mockResolvedValue({ balance: 99 } as any);
     vi.spyOn(prisma.agentWallet, "upsert").mockResolvedValue({ balance: 5 } as any);
     vi.spyOn(prisma.agentEnrollment, "findUnique").mockResolvedValue(null);
+  });
+
+  afterEach(() => {
+    delete process.env.ALLOW_UNBACKED_ISSUANCE;
   });
   it("computeSwarmDigest produces deterministic canonical SHA-256 hex", () => {
     const payloadA = { z: 1, a: 2, m: { nested_b: "bar", nested_a: "foo" } };

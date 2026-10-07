@@ -145,7 +145,10 @@ beforeEach(() => {
     const tx = {
       $queryRaw: queryRawMock,
       angelCoinJournalEntry: { create: createEntryMock, findMany: findManyMock },
-      agentWallet: { upsert: vi.fn(async () => ({})) },
+      agentWallet: {
+        upsert: vi.fn(async () => ({})),
+        updateMany: vi.fn(async () => ({ count: 1 })),
+      },
       angelCoinAccount: {
         findUnique: vi.fn(async (args: { where: { subjectCommitment: string } }) => {
           for (const acct of accounts.values()) {
@@ -254,6 +257,10 @@ describe("transferCredits", () => {
               .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
           ),
         },
+        agentWallet: {
+          upsert: vi.fn(async () => ({})),
+          updateMany: vi.fn(async () => ({ count: 1 })),
+        },
       };
       return fn(tx);
     });
@@ -325,6 +332,10 @@ describe("transferCredits", () => {
           findMany: vi.fn(async (args: { where: { accountId: string } }) =>
             txJournal.filter((e) => e.accountId === args.where.accountId)
           ),
+        },
+        agentWallet: {
+          upsert: vi.fn(async () => ({})),
+          updateMany: vi.fn(async () => ({ count: 1 })),
         },
       };
       return fn(tx);

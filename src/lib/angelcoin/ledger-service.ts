@@ -198,6 +198,64 @@ async function assertEnrollmentIfRequired(subjectCommitment: string): Promise<vo
 }
 
 /**
+ * True when issuing `amount` more ANGEL keeps the system fully backed at parity,
+ * OR the operator explicitly allowed unbacked issuance (ALLOW_UNBACKED_ISSUANCE).
+ * Every supply-increasing primitive must consult this before minting.
+ */
+export async function isIssuanceBacked(amount: number): Promise<boolean> {
+  if (String(process.env.ALLOW_UNBACKED_ISSUANCE || "").toLowerCase() === "1") return true;
+  const { loadFiatReserveUsd } = await import("@/lib/monetary/reserve");
+  const { parityStatus } = await import("@/lib/monetary/parity");
+  const { circulatingSupply } = await import("@/lib/monetary/supply");
+  const [snap, reserveUsd] = await Promise.all([circulatingSupply(), loadFiatReserveUsd()]);
+  const post = parityStatus({ supplyAngel: snap.supply + Math.max(0, amount), reserveUsd });
+  return post.reserveAdequate;
+}
+
+/** Fail-closed variant: throws `issuance_refused_undercollateralized` when unbacked. */
+export async function assertIssuanceBacked(amount: number): Promise<void> {
+  if (await isIssuanceBacked(amount)) return;
+  const { loadFiatReserveUsd } = await import("@/lib/monetary/reserve");
+  const { parityStatus } = await import("@/lib/monetary/parity");
+  const { circulatingSupply } = await import("@/lib/monetary/supply");
+  const [snap, reserveUsd] = await Promise.all([circulatingSupply(), loadFiatReserveUsd()]);
+  const post = parityStatus({ supplyAngel: snap.supply + Math.max(0, amount), reserveUsd });
+  throw new Error(
+    `issuance_refused_undercollateralized:reserve=$${reserveUsd} ` +
+      `need=$${(post.requiredReserveUsd ?? 0).toFixed(2)} coverage=${post.coverageRatio}`
+  );
+}
+
+/**
+ * Mirrors a journal delta onto AgentWallet.balance in the SAME transaction, so
+ * the canonical supply counter (Σ AgentWallet.balance) tracks the journal.
+ *
+ * Never mints from a debit: a debit the wallet cannot cover FAILS CLOSED
+ * (`wallet_ledger_desync`) rather than driving the balance negative or silently
+ * dropping the mirror (which would let the two ledgers drift). Credits upsert.
+ * `earnedTotal`/`spentTotal` are left to callers; only `balance` moves here.
+ */
+async function mirrorWalletDelta(tx: PrismaTx, subjectCommitment: string, delta: number): Promise<void> {
+  if (!Number.isFinite(delta) || delta === 0) return;
+  if (delta > 0) {
+    await tx.agentWallet.upsert({
+      where: { subjectCommitment },
+      create: { subjectCommitment, balance: delta, earnedTotal: 0, spentTotal: 0, lastActivityAt: new Date() },
+      update: { balance: { increment: delta }, lastActivityAt: new Date() },
+    });
+    return;
+  }
+  const debit = -delta;
+  const res = await tx.agentWallet.updateMany({
+    where: { subjectCommitment, balance: { gte: debit } },
+    data: { balance: { decrement: debit }, lastActivityAt: new Date() },
+  });
+  if (res.count === 0) {
+    throw new Error(`wallet_ledger_desync:${subjectCommitment.slice(0, 12)}`);
+  }
+}
+
+/**
  * Grants operator credits via OPERATOR_GRANT entry.
  *
  * AUDIT FIX (H2): issuance now fails CLOSED on undercollateralization. A grant
@@ -214,20 +272,9 @@ export async function grantCredits(
   assertValidSubjectCommitment(subjectCommitment);
   await assertEnrollmentIfRequired(subjectCommitment);
 
-  if (String(process.env.ALLOW_UNBACKED_ISSUANCE || "").toLowerCase() !== "1") {
-    const { loadFiatReserveUsd } = await import("@/lib/monetary/reserve");
-    const { parityStatus } = await import("@/lib/monetary/parity");
-    const { circulatingSupply } = await import("@/lib/monetary/supply");
-    const [snap, reserveUsd] = await Promise.all([circulatingSupply(), loadFiatReserveUsd()]);
-    // Would the post-grant supply still be fully backed at parity?
-    const post = parityStatus({ supplyAngel: snap.supply + Math.max(0, amount), reserveUsd });
-    if (!post.reserveAdequate) {
-      throw new Error(
-        `issuance_refused_undercollateralized:reserve=$${reserveUsd} ` +
-          `need=$${(post.requiredReserveUsd ?? 0).toFixed(2)} coverage=${post.coverageRatio}`
-      );
-    }
-  }
+  // Fail-closed unless the post-grant supply is fully backed (or the operator
+  // deliberately allowed unbacked issuance).
+  await assertIssuanceBacked(amount);
 
   // UNIFICATION: write the journal entry AND credit AgentWallet.balance in one
   // transaction, so the journal-derived balance and the canonical supply counter
@@ -236,11 +283,7 @@ export async function grantCredits(
   const account = await getOrCreateAccount(subjectCommitment);
   return prisma.$transaction(async (tx) => {
     const entry = await appendEntry(tx, account.id, AngelCoinEntryType.OPERATOR_GRANT, amount, { metadata });
-    await tx.agentWallet.upsert({
-      where: { subjectCommitment },
-      create: { subjectCommitment, balance: amount, earnedTotal: 0, spentTotal: 0, lastActivityAt: new Date() },
-      update: { balance: { increment: amount }, lastActivityAt: new Date() },
-    });
+    await mirrorWalletDelta(tx, subjectCommitment, amount);
     const entries = await loadJournalEntries(account.id, tx);
     return { account, entry, balances: computeBalances(entries) };
   });
@@ -308,6 +351,10 @@ export async function transferCredits(
       { counterpartyCommitment: fromCommitment }
     );
 
+    // Mirror the transfer onto the canonical wallets (net supply unchanged).
+    await mirrorWalletDelta(tx, fromCommitment, -amount);
+    await mirrorWalletDelta(tx, toCommitment, amount);
+
     const updatedSenderEntries = await loadJournalEntries(sender.id, tx);
     return {
       sender,
@@ -346,6 +393,8 @@ export async function lockCredits(
       amount,
       { metadata }
     );
+    // Locking escrow removes funds from spendable balance → mirror the debit.
+    await mirrorWalletDelta(tx, subjectCommitment, -amount);
     const updatedEntries = await loadJournalEntries(account.id, tx);
     return {
       account,
@@ -474,6 +523,12 @@ export async function releaseEscrowToWorker(
     }
 
     const finalSenderEntries = await loadJournalEntries(sender.id, tx);
+    // Mirror: the hirer's NET delta is 0 (UNLOCK amount+fee, then SPEND amount+fee),
+    // so only the worker and treasury wallets move. Net supply unchanged.
+    await mirrorWalletDelta(tx, workerCommitment, amount);
+    if (fee > 0) {
+      await mirrorWalletDelta(tx, PROTOCOL_TREASURY_COMMITMENT, fee);
+    }
     return {
       sender,
       receiver,
@@ -516,6 +571,8 @@ export async function unlockCredits(
       amount,
       { metadata }
     );
+    // Releasing escrow returns funds to spendable balance → mirror the credit.
+    await mirrorWalletDelta(tx, subjectCommitment, amount);
     const updatedEntries = await loadJournalEntries(account.id, tx);
     return {
       account,
@@ -527,50 +584,61 @@ export async function unlockCredits(
 
 /**
  * Applies a safety-net topup entry.
+ *
+ * This MINTS ANGEL, so it now (a) passes the reserve/solvency gate like every
+ * other issuance primitive and (b) mirrors the credit onto AgentWallet.balance
+ * in the same transaction — previously it wrote a journal-only entry that was
+ * invisible to the canonical supply counter and created spendable ANGEL from
+ * nothing.
  */
 export async function safetyNetTopup(
   subjectCommitment: string,
   amount: number,
   metadata?: string
 ) {
+  assertValidSubjectCommitment(subjectCommitment);
+  await assertEnrollmentIfRequired(subjectCommitment);
+  await assertIssuanceBacked(amount);
   const account = await getOrCreateAccount(subjectCommitment);
-  const entry = await appendEntry(
-    prisma,
-    account.id,
-    AngelCoinEntryType.SAFETY_NET_TOPUP,
-    amount,
-    { metadata }
-  );
-  const entries = await loadJournalEntries(account.id);
-  return {
-    account,
-    entry,
-    balances: computeBalances(entries),
-  };
+  return prisma.$transaction(async (tx) => {
+    const entry = await appendEntry(
+      tx,
+      account.id,
+      AngelCoinEntryType.SAFETY_NET_TOPUP,
+      amount,
+      { metadata }
+    );
+    await mirrorWalletDelta(tx, subjectCommitment, amount);
+    const entries = await loadJournalEntries(account.id, tx);
+    return { account, entry, balances: computeBalances(entries) };
+  });
 }
 
 /**
- * Applies a recovery award entry.
+ * Applies a recovery award entry. Mints ANGEL → same gate + wallet mirror as
+ * safetyNetTopup (previously journal-only and unbacked).
  */
 export async function recoveryAward(
   subjectCommitment: string,
   amount: number,
   metadata?: string
 ) {
+  assertValidSubjectCommitment(subjectCommitment);
+  await assertEnrollmentIfRequired(subjectCommitment);
+  await assertIssuanceBacked(amount);
   const account = await getOrCreateAccount(subjectCommitment);
-  const entry = await appendEntry(
-    prisma,
-    account.id,
-    AngelCoinEntryType.RECOVERY_AWARD,
-    amount,
-    { metadata }
-  );
-  const entries = await loadJournalEntries(account.id);
-  return {
-    account,
-    entry,
-    balances: computeBalances(entries),
-  };
+  return prisma.$transaction(async (tx) => {
+    const entry = await appendEntry(
+      tx,
+      account.id,
+      AngelCoinEntryType.RECOVERY_AWARD,
+      amount,
+      { metadata }
+    );
+    await mirrorWalletDelta(tx, subjectCommitment, amount);
+    const entries = await loadJournalEntries(account.id, tx);
+    return { account, entry, balances: computeBalances(entries) };
+  });
 }
 
 /**

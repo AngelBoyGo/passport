@@ -132,6 +132,10 @@ describe("credit enrollment enforcement flag", () => {
         $queryRaw: queryRawMock.mockResolvedValue([
           { id: "acct_sender", subjectCommitment: VALID_COMMITMENT },
         ]),
+        agentWallet: {
+          upsert: vi.fn(async () => ({})),
+          updateMany: vi.fn(async () => ({ count: 1 })),
+        },
       };
       findManyMock.mockResolvedValue([
         {

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- test mocks use partial Prisma rows and mock objects */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { sign, getPublicKey } from "@noble/ed25519";
 import { bytesToHex, hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
@@ -18,6 +18,9 @@ const testCommitment = "a".repeat(64);
 describe("Swarm API Routes", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    // The threat bounty consults the issuance solvency gate; opt out so the
+    // route test does not touch the (unmocked) reserve/supply tables.
+    process.env.ALLOW_UNBACKED_ISSUANCE = "1";
 
     vi.spyOn(prisma.agentWallet, "findUnique").mockResolvedValue({
       id: "w_1",
@@ -35,6 +38,10 @@ describe("Swarm API Routes", () => {
     vi.spyOn(prisma.agentWallet, "upsert").mockResolvedValue({ balance: 5 } as any);
     vi.spyOn(prisma.resurrectionCapsule, "findUnique").mockResolvedValue(null);
     vi.spyOn(prisma.agentEnrollment, "findUnique").mockResolvedValue(null);
+  });
+
+  afterEach(() => {
+    delete process.env.ALLOW_UNBACKED_ISSUANCE;
   });
 
   describe("POST & GET /api/v1/swarm/memory", () => {
