@@ -531,7 +531,13 @@ async function runDialogueReflection(datapoints: BrainDatapoints, cycleId: strin
     const genesis = await proposeMissionGenesis(datapoints, recent);
     if (genesis) {
       const created = await createMission(genesis);
-      if (created.ok) missions = [created.mission];
+      if (created.ok) {
+        missions = [created.mission];
+        const { notifyCommander } = await import("@/lib/telegram/notify");
+        await notifyCommander(
+          `🧠 *New mission authored*\n${created.mission.title}\n\`${created.mission.missionId}\`\nThe dialogue will plan it next cycle.`
+        );
+      }
     }
   }
 
@@ -579,6 +585,15 @@ async function runDialogueReflection(datapoints: BrainDatapoints, cycleId: strin
       if (committed.ok) {
         console.log(
           `[command-brain] Dialogue committed plan ${committed.plan.planId} for mission ${m.missionId} (${result.steps.length} steps)`
+        );
+        // Push the completed dialogue to Telegram (the brain's own work is
+        // otherwise invisible — the owner only sees fleet-watch digests).
+        const { notifyCommander } = await import("@/lib/telegram/notify");
+        const steps = result.steps
+          .map((s) => `  ${s.step}. ${s.action} — ${String(s.rationale).slice(0, 90)}`)
+          .join("\n");
+        await notifyCommander(
+          `🧠 *Dialogue complete* — plan committed\nMission: ${m.title}\n${steps}\ncycle \`${cycleId}\``
         );
       }
     }

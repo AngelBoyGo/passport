@@ -319,13 +319,9 @@ async function handleCommand(command: string, args: string[], from: string): Pro
       const { assignTask } = await import("@/lib/brain/ask");
       const r = await assignTask(instruction);
       if (!r.ok) return `⚠️ Could not create task: ${r.reason}`;
-      return [
-        "*Task assigned* ✅",
-        `Mission: \`${r.missionId}\``,
-        `Title: ${r.title}`,
-        "",
-        "The two-persona dialogue will plan it on the next cycle; use `/plan` to force planning now, `/missions` to track.",
-      ].join("\n");
+      // The detailed "Task assigned" push is sent by assignTask via
+      // notifyCommander; keep this reply short so we don't double-post.
+      return `✅ Task received: *${r.title}*\nThe dialogue will plan it next cycle (or \`/plan\` to force it now).`;
     }
 
     case "mars":

@@ -132,6 +132,12 @@ export async function assignTask(
   });
   if (!created.ok) return { ok: false, reason: created.reason };
   await audit("brain_task_assigned", title, text.slice(0, 400));
+  // Push the assignment to Telegram (covers tasks assigned outside the /task
+  // command path too, e.g. the API/console).
+  const { notifyCommander } = await import("@/lib/telegram/notify");
+  await notifyCommander(
+    `📋 *Task assigned*\n${created.mission.title}\n\`${created.mission.missionId}\`\nThe dialogue will plan it next cycle.`
+  );
   return { ok: true, missionId: created.mission.missionId, title: created.mission.title };
 }
 
