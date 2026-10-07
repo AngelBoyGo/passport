@@ -25,6 +25,15 @@ interface EconomyData {
     escrows: Array<{ status: string; count: number; lockedAngel: number; fineGrams: number }>;
     vaultLocations: string[];
   };
+  backing: {
+    status: "bootstrap" | "backed" | "under_backed";
+    fiat_reserve_usd: number;
+    supply_angel: number;
+    required_reserve_usd: number;
+    coverage_ratio: number;
+    gold_fine_grams: number;
+    recent_inflows: Array<{ kind: string; usd: number; at: string }>;
+  };
   rails: {
     by_state: Record<string, number>;
     total: number;
@@ -114,8 +123,22 @@ export function EconomyDashboard({
 
   const c = data?.currency;
   const r = data?.reserves;
+  const b = data?.backing;
   const m = data?.marketplace;
   const rails = data?.rails;
+
+  const backingTone =
+    b?.status === "backed"
+      ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+      : b?.status === "under_backed"
+        ? "bg-red-500/20 text-red-400 border-red-500/30"
+        : "bg-slate-500/20 text-slate-300 border-slate-500/30";
+  const backingLabel =
+    b?.status === "backed"
+      ? "1:1 Backed"
+      : b?.status === "under_backed"
+        ? `Under-backed ${(b.coverage_ratio * 100).toFixed(0)}%`
+        : "Bootstrap — no supply";
 
   return (
     <div className="space-y-6">
@@ -124,8 +147,8 @@ export function EconomyDashboard({
         <div className="rounded-2xl border border-white/10 bg-[#0e131d] p-5 shadow-xl">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">AngelCoin Peg</span>
-            <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-400 border border-emerald-500/30">
-              1:1 Backed
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${backingTone}`}>
+              {b ? backingLabel : "…"}
             </span>
           </div>
           <p className="mt-2 text-2xl font-bold font-mono text-white">$5.00 USD</p>
@@ -173,6 +196,70 @@ export function EconomyDashboard({
           </p>
         </div>
       </div>
+
+      {/* ── Reserve & Backing (real signed fiat reserve vs required 1:1) ── */}
+      <section aria-label="Reserve and backing" className="rounded-2xl border border-white/10 bg-[#0e131d] p-6 shadow-xl space-y-4">
+        <div className="flex items-center justify-between border-b border-white/10 pb-3">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-400">Treasury</p>
+            <h3 className="text-lg font-semibold text-white">Reserve &amp; Backing</h3>
+          </div>
+          <span className={`rounded px-2 py-0.5 text-xs font-mono border ${backingTone}`}>
+            {b ? b.status.replace("_", " ") : "…"}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 text-xs">
+          <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3">
+            <span className="text-slate-400 uppercase text-[10px]">Fiat Reserve</span>
+            <p className="text-lg font-bold font-mono text-emerald-300 mt-0.5">${b ? b.fiat_reserve_usd.toLocaleString() : "…"}</p>
+          </div>
+          <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3">
+            <span className="text-slate-400 uppercase text-[10px]">Supply</span>
+            <p className="text-lg font-bold font-mono text-indigo-300 mt-0.5">
+              {b ? number.format(b.supply_angel) : "…"} <span className="text-[10px] font-normal text-slate-400">ANGEL</span>
+            </p>
+          </div>
+          <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3">
+            <span className="text-slate-400 uppercase text-[10px]">Required (1:1)</span>
+            <p className="text-lg font-bold font-mono text-slate-200 mt-0.5">${b ? b.required_reserve_usd.toLocaleString() : "…"}</p>
+          </div>
+          <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3">
+            <span className="text-slate-400 uppercase text-[10px]">Coverage</span>
+            <p className={`text-lg font-bold font-mono mt-0.5 ${b && b.coverage_ratio >= 1 ? "text-emerald-300" : "text-amber-300"}`}>
+              {b ? `${(b.coverage_ratio * 100).toFixed(1)}%` : "…"}
+            </p>
+          </div>
+        </div>
+
+        <div>
+          <h4 className="text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Recent Reserve Inflows</h4>
+          {b?.recent_inflows && b.recent_inflows.length > 0 ? (
+            <div className="divide-y divide-white/5 text-xs">
+              {b.recent_inflows.map((e, i) => (
+                <div key={i} className="flex items-center justify-between py-2">
+                  <span className="font-mono text-slate-300">{e.kind}</span>
+                  <span className="text-slate-400">
+                    <strong className={e.usd >= 0 ? "text-emerald-300" : "text-red-300"}>
+                      {e.usd >= 0 ? "+" : ""}${e.usd.toLocaleString()}
+                    </strong>
+                    <span className="ml-2 text-slate-500">{new Date(e.at).toLocaleString()}</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-slate-500">
+              No reserve inflows yet — the first ANGEL bundle purchase or external revenue will appear here.
+            </p>
+          )}
+        </div>
+
+        <p className="text-[11px] text-slate-500">
+          Gold backing: <strong className="text-amber-300">{b ? number.format(b.gold_fine_grams) : "…"}g</strong> fine
+          (custody/audit separate from the fiat treasury).
+        </p>
+      </section>
 
       {error && (
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-xs text-red-300">

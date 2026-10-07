@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sessionFromRequest } from "@/lib/auth/cookies";
 import { prisma } from "@/lib/db";
 import { computeIndependenceScore } from "@/lib/agent-wallet/wallet";
+import { loadFiatReserveUsd, RESERVE_KINDS } from "@/lib/monetary/reserve";
 
 export const dynamic = "force-dynamic";
 const NO_STORE = { "Cache-Control": "no-store, max-age=0" };
@@ -140,6 +141,32 @@ export async function GET(request: NextRequest) {
     const totalFineGrams = reserves.reduce((sum, r) => sum + r.totalFineGrams, 0);
     const totalLots = reserves.reduce((sum, r) => sum + r.activeLotsCount, 0);
 
+    // ── Reserve & backing: the REAL signed fiat reserve vs what full 1:1
+    // backing of the current supply requires. This is the honest coverage view
+    // (previously the console showed an unconditional "1:1 Backed").
+    const [fiatReserveUsd, recentInflows] = await Promise.all([
+      loadFiatReserveUsd().catch(() => 0),
+      prisma.operatorLedgerEntry.findMany({
+        where: { kind: { in: [...RESERVE_KINDS] } },
+        orderBy: { createdAt: "desc" },
+        take: 8,
+        select: { kind: true, deltaMicros: true, metadata: true, createdAt: true },
+      }),
+    ]);
+    const requiredReserveUsd = totalSupply * 5.0;
+    const coverageRatio =
+      requiredReserveUsd > 0
+        ? Number((fiatReserveUsd / requiredReserveUsd).toFixed(4))
+        : fiatReserveUsd > 0
+          ? 1
+          : 0;
+    const backingStatus =
+      totalSupply === 0
+        ? "bootstrap"
+        : fiatReserveUsd >= requiredReserveUsd
+          ? "backed"
+          : "under_backed";
+
     // Map rail status
     const railsByState: Record<string, number> = {};
     for (const r of rails) railsByState[r.state] = r._count._all;
@@ -200,6 +227,19 @@ export async function GET(request: NextRequest) {
             fineGrams: e._sum.fineGrams ?? 0,
           })),
           vaultLocations: ["VAULT-BKO-01 (Mali)", "VAULT-OUA-01 (Burkina Faso)", "VAULT-NIM-01 (Niger)"],
+        },
+        backing: {
+          status: backingStatus,
+          fiat_reserve_usd: fiatReserveUsd,
+          supply_angel: totalSupply,
+          required_reserve_usd: Number(requiredReserveUsd.toFixed(2)),
+          coverage_ratio: coverageRatio,
+          gold_fine_grams: totalFineGrams,
+          recent_inflows: recentInflows.map((e) => ({
+            kind: e.kind,
+            usd: Number((e.deltaMicros / 1_000_000).toFixed(2)),
+            at: e.createdAt.toISOString(),
+          })),
         },
         rails: {
           by_state: railsByState,
