@@ -10,7 +10,7 @@ import { completeTier, getGatewayConfig } from "../gateway-client";
 
 describe("tiers — table + resolution", () => {
   it("pins the OpenRouter model ids", () => {
-    expect(DEFAULT_TIER_MODEL.neuron).toBe("deepseek/deepseek-chat-v3.1");
+    expect(DEFAULT_TIER_MODEL.neuron).toBe("deepseek/deepseek-v4.1-flash");
     expect(DEFAULT_TIER_MODEL.money).toBe("deepseek/deepseek-r1");
     expect(TIER_MODEL_ALLOWLIST.money).toEqual(["deepseek/deepseek-r1"]);
   });
@@ -98,7 +98,7 @@ describe("gateway-client — authorization before transport", () => {
     try {
       await completeTier("neuron", { system: "s", user: "u" }, cfg);
       const body = JSON.parse(String(calls[0].init.body));
-      expect(body.model).toBe("deepseek/deepseek-chat-v3.1");
+      expect(body.model).toBe("deepseek/deepseek-v4.1-flash");
       expect(calls[0].init.headers).toMatchObject({ Authorization: "Bearer vk_test" });
     } finally {
       globalThis.fetch = origFetch;

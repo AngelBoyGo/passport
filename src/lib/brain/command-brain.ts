@@ -551,6 +551,7 @@ async function runDialogueReflection(datapoints: BrainDatapoints, cycleId: strin
       datapoints: datapoints as unknown as Record<string, unknown>,
       recentMemory: recent,
       openSteps,
+      runId: cycleId,
     });
 
     await prisma.brainMemory
@@ -917,6 +918,25 @@ export async function runBrainCycle(now: Date = new Date(), deps: BrainDeps = {}
       } catch (err) {
         console.warn(
           "[command-brain] Dialogue reflection failed (best-effort):",
+          err instanceof Error ? err.message : String(err)
+        );
+      }
+    }
+
+    // Bounded retention (1-in-10 cycles ≈ hourly): BrainMemory/MissionPlan grow
+    // forever otherwise. Best-effort — a prune failure never affects the cycle.
+    if (Math.random() < 0.1) {
+      try {
+        const { pruneBrainHistory } = await import("@/lib/brain/retention");
+        const pruned = await pruneBrainHistory();
+        if (pruned.brainMemory || pruned.missionPlans) {
+          console.log(
+            `[command-brain] retention pruned brainMemory=${pruned.brainMemory} missionPlans=${pruned.missionPlans}`
+          );
+        }
+      } catch (err) {
+        console.warn(
+          "[command-brain] retention prune failed (best-effort):",
           err instanceof Error ? err.message : String(err)
         );
       }

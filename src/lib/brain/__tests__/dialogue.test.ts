@@ -104,7 +104,31 @@ describe("dialogue — Plan → Critique → Revise → Commit", () => {
     await runMissionDialogue(CTX);
     const models = completeMock.mock.calls.map((c) => c[0].model);
     expect(models[0]).toBe("z-ai/glm-5.3-flash"); // MUSE default
-    expect(models[1]).toBe("deepseek/deepseek-chat-v3.1"); // MARS default
+    expect(models[1]).toBe("deepseek/deepseek-v4.1-flash"); // MARS default
+  });
+
+  it("records per-turn ms and emits real lifecycle events when a runId is set", async () => {
+    const { subscribePersonaPhases, __resetPersonaBus, recentPersonaPhases } = await import(
+      "@/lib/brain/persona-events"
+    );
+    __resetPersonaBus();
+    const seen: string[] = [];
+    const unsub = subscribePersonaPhases((e) => seen.push(`${e.persona}:${e.phase}`));
+
+    completeMock
+      .mockResolvedValueOnce(draftJson(80))
+      .mockResolvedValueOnce(critiqueProse(75))
+      .mockResolvedValueOnce(draftJson(85));
+    const r = await runMissionDialogue({ ...CTX, runId: "cyc_test" });
+    unsub();
+
+    expect(r.ok).toBe(true);
+    expect(r.turns.every((t) => typeof t.ms === "number")).toBe(true);
+    expect(seen).toContain("muse:queued");
+    expect(seen).toContain("mars:queued");
+    expect(seen).toContain("muse:working");
+    expect(seen).toContain("mars:working");
+    expect(recentPersonaPhases().every((e) => e.runId === "cyc_test")).toBe(true);
   });
 
   it("MORE does NOT join when LOCAL_LLM_BASE_URL is unset (dialogue still completes)", async () => {

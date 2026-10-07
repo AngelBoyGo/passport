@@ -107,6 +107,11 @@ export async function mintFleetAgent(input: MintInstanceInput): Promise<MintedIn
     throw new Error(`invalid_instance_spec:${specOk.reason}`);
   }
 
+  // Resolve the model BEFORE any identity rows are written. resolveTierModel
+  // throws on a disallowed LLM_MODEL_<TIER> override; doing it here (not in the
+  // return object) prevents an orphaned ACTIVE identity when the env is bad.
+  const resolvedModel = resolveTierModel(input.llmTier);
+
   const cap = maxFleetAgents();
 
   // 1. Keypair — the private key is handed to the runtime layer exactly once.
@@ -204,7 +209,7 @@ export async function mintFleetAgent(input: MintInstanceInput): Promise<MintedIn
     enrollment: { privateKeyHex, publicKeyHex },
     rawApiKey: instance.rawApiKey,
     tier: input.llmTier,
-    resolvedModel: resolveTierModel(input.llmTier),
+    resolvedModel,
   };
 }
 
@@ -306,6 +311,10 @@ export async function rehydrateFleetAgent(
 
   const capsule = await getResurrectionCapsule(commitment);
 
+  // Resolve the model BEFORE the transaction mutates the instance, so a bad
+  // env override cannot leave a rehydrated instance with no resolvable model.
+  const resolvedModel = resolveTierModel(finalTier);
+
   // AUDIT FIX (M1): rehydrate must respect the global fleet cap. Mint only
   // counts live instances, so stop-all → mint-to-cap → rehydrate-all previously
   // doubled the fleet. Enforce the cap here in a serializable transaction.
@@ -336,7 +345,7 @@ export async function rehydrateFleetAgent(
   return {
     capsule,
     tier: finalTier,
-    resolvedModel: resolveTierModel(finalTier),
+    resolvedModel,
     upgraded: finalTier !== currentTier,
   };
 }

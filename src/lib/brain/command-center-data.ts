@@ -10,6 +10,29 @@
 
 import { prisma } from "@/lib/db";
 import { BRAIN_ACTIONS } from "@/lib/brain/command-brain";
+import { PERSONAS, personaModel } from "@/lib/brain/personas";
+import { resolveTierModel, DEFAULT_TIER_MODEL } from "@/lib/llm/tiers";
+
+/** Static descriptor for one persona, so the UI can show its exact model. */
+export interface PersonaDescriptor {
+  id: string;
+  name: string;
+  tier: string;
+  /** Resolved model id (env override honoured) — the exact id sent to the gateway. */
+  model: string;
+  /** True for the self-hosted tier (MORE). */
+  local: boolean;
+}
+
+/** One persisted turn of the most recent Plan → Critique → Revise → Commit dialogue. */
+export interface DialogueTurnView {
+  persona: string;
+  role: string;
+  content: string;
+  confidence: number | null;
+  /** Per-turn model-call duration in ms (null when not recorded). */
+  ms: number | null;
+}
 
 export interface CommandCenterData {
   current_run: {
@@ -39,13 +62,58 @@ export interface CommandCenterData {
     outcomes_24h_by_class: Record<string, number>;
     memory_rows_by_kind: Record<string, number>;
   };
+  /** The four brains the UI renders (MARS/MUSE/MORE) with their resolved models. */
+  personas: PersonaDescriptor[];
+  /** The latest committed dialogue run, if any (drives per-persona status). */
+  last_dialogue: {
+    cycle_id: string | null;
+    mission_id: string;
+    at: string;
+    turns: DialogueTurnView[];
+  } | null;
   timestamp: string;
 }
 
-export async function buildCommandCenterData(): Promise<CommandCenterData> {
-  const since24h = new Date(Date.now() - 24 * 3_600_000);
+function mapDialogueTurns(dialogue: unknown): DialogueTurnView[] {
+  if (!Array.isArray(dialogue)) return [];
+  return dialogue
+    .filter((t): t is Record<string, unknown> => Boolean(t) && typeof t === "object")
+    .map((t) => ({
+      persona: String(t.persona ?? "unknown"),
+      role: String(t.role ?? "turn"),
+      content: typeof t.content === "string" ? t.content : JSON.stringify(t.content ?? ""),
+      confidence:
+        typeof t.confidence === "number" && Number.isFinite(t.confidence) ? t.confidence : null,
+      ms: typeof t.ms === "number" && Number.isFinite(t.ms) ? t.ms : null,
+    }));
+}
 
-  const [recentRows, evaluations, proposalCounts, canary, outcomeCounts, memoryCounts] = await Promise.all([
+/** The orchestrator row (neuron tier). Never throws on a bad env override. */
+function resolveNeuronModel(): string {
+  try {
+    return resolveTierModel("neuron");
+  } catch {
+    return DEFAULT_TIER_MODEL.neuron;
+  }
+}
+
+/** MARS, MUSE, MORE (from config) + the neuron-tier Brain, with resolved models. */
+function describePersonas(): PersonaDescriptor[] {
+  return [
+    ...Object.values(PERSONAS).map((p) => ({
+      id: p.id,
+      name: p.name,
+      tier: p.tier,
+      model: personaModel(p),
+      local: p.tier === "local",
+    })),
+    { id: "brain", name: "Brain", tier: "neuron", model: resolveNeuronModel(), local: false },
+  ];
+}
+
+export async function buildCommandCenterData(): Promise<CommandCenterData> {  const since24h = new Date(Date.now() - 24 * 3_600_000);
+
+  const [recentRows, evaluations, proposalCounts, canary, outcomeCounts, memoryCounts, recentPlans] = await Promise.all([
     prisma.brainMemory.findMany({ orderBy: { createdAt: "desc" }, take: 12 }),
     prisma.brainMemory.findMany({
       where: { kind: "EVALUATION" },
@@ -60,6 +128,14 @@ export async function buildCommandCenterData(): Promise<CommandCenterData> {
       _count: { _all: true },
     }),
     prisma.brainMemory.groupBy({ by: ["kind"], _count: { _all: true } }),
+    // Latest dialogue transcripts (MissionPlan.dialogue). Bounded take; the most
+    // recent plan carrying turns is the run the UI shows. Reading existing rows
+    // only — no orchestration change.
+    prisma.missionPlan.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 5,
+      select: { cycleId: true, missionId: true, dialogue: true, createdAt: true },
+    }),
   ]);
 
   const lastObservation = recentRows.find((r) => r.kind === "OBSERVATION");
@@ -127,6 +203,17 @@ export async function buildCommandCenterData(): Promise<CommandCenterData> {
         return acc;
       }, {}),
     },
+    personas: describePersonas(),
+    last_dialogue: (() => {
+      const plan = recentPlans.find((p) => Array.isArray(p.dialogue) && (p.dialogue as unknown[]).length > 0);
+      if (!plan) return null;
+      return {
+        cycle_id: plan.cycleId,
+        mission_id: plan.missionId,
+        at: plan.createdAt.toISOString(),
+        turns: mapDialogueTurns(plan.dialogue),
+      };
+    })(),
     timestamp: new Date().toISOString(),
   };
 }

@@ -93,7 +93,7 @@ export const MARS: Persona = {
   id: "mars",
   name: "MARS",
   tier: "cortex",
-  defaultModel: "deepseek/deepseek-chat-v3.1",
+  defaultModel: "deepseek/deepseek-v4.1-flash",
   modelEnv: "LLM_MODEL_MARS",
   temperature: 0.1,
   systemPrompt:

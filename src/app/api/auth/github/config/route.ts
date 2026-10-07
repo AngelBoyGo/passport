@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
  * response so the client can append it to the authorize URL).
  */
 export async function GET() {
-  const clientId = process.env.GITHUB_CLIENT_ID ?? "";
+  const clientId = (process.env.GITHUB_CLIENT_ID ?? process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID ?? "").trim();
   const state = bytesToHex(crypto.getRandomValues(new Uint8Array(24)));
 
   const response = NextResponse.json({ clientId, state });

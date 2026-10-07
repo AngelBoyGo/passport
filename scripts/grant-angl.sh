@@ -1,6 +1,18 @@
 #!/bin/bash
 set -euo pipefail
 
+# SAFETY: this script mints journal-only ANGEL (OPERATOR_GRANT with NO reserve
+# and NO AgentWallet credit). It is a DEV fixture only. It refuses production
+# and requires an explicit opt-in so it can never contaminate a real economy.
+if [ "${NODE_ENV:-}" = "production" ]; then
+  echo "Refusing: NODE_ENV=production (dev fixture)." >&2
+  exit 1
+fi
+if [ "${ALLOW_DEV_GRANT:-}" != "1" ]; then
+  echo "Refusing: this mints unbacked ANGEL. Set ALLOW_DEV_GRANT=1 to proceed." >&2
+  exit 1
+fi
+
 DB=$(docker ps --format "{{.Names}}" | grep "postgres" | head -1)
 
 # Get first 2 agent commitments (hirer and worker)

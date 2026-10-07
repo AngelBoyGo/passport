@@ -26,7 +26,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL(stateCheck.redirectTo, baseUrl));
   }
 
-  const clientId = process.env.GITHUB_CLIENT_ID;
+  // Accept the server-side name (preferred) or the NEXT_PUBLIC_* name used by
+  // the env template, so following the template does not silently break login.
+  const clientId = process.env.GITHUB_CLIENT_ID ?? process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
   const clientSecret = process.env.GITHUB_CLIENT_SECRET;
 
   if (!clientId || !clientSecret) {

@@ -2,11 +2,17 @@
  * Fleet control plane integration tests — REAL dev Postgres (127.0.0.1:5433).
  * Each mint creates a true Passport (enrollment ISSUED); cleanup removes only
  * the rows these tests created (capability-prefixed).
+ *
+ * SAFETY: these tests DELETE rows. They must NOT run by default — an ambient
+ * DATABASE_URL in a developer/CI shell could point at a shared/prod DB. They are
+ * opt-in: run with RUN_DB_TESTS=1 and a dedicated database.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-// Env BEFORE dynamic imports. DATABASE_URL is only filled when unset (another
-// suite may have already pinned its own target — never stomp a sibling pool).
+const RUN_DB_TESTS = process.env.RUN_DB_TESTS === "1";
+
+// Env BEFORE dynamic imports. DATABASE_URL is only filled when unset so the
+// Prisma client can be constructed (no connection is made unless the suite runs).
 process.env.DATABASE_URL ??= "postgresql://passport:passport@127.0.0.1:5433/passport?schema=public";
 delete process.env.FLEET_MINT_MONEY_ENABLED;
 
@@ -37,23 +43,28 @@ async function cleanup() {
     await prisma.agentInstance.deleteMany({ where: { commitment: r.commitment } });
     await prisma.resurrectionCapsule.deleteMany({ where: { agentCommitment: r.commitment } });
     await prisma.agent.deleteMany({ where: { agentId: r.commitment } });
-    await prisma.agentEnrollment.deleteMany({ where: { context: "FLEET_AGENT", subjectCommitment: r.commitment, publicKey: { not: undefined } } });
+    await prisma.agentEnrollment.deleteMany({ where: { context: "FLEET_AGENT", subjectCommitment: r.commitment } });
     if (r.operatorId) {
       await prisma.apiKey.deleteMany({ where: { operatorId: r.operatorId } });
       await prisma.operator.deleteMany({ where: { id: r.operatorId } });
     }
   }
-  // sweeping fallback for anything this suite may have leaked
-  await prisma.agentEnrollment.deleteMany({ where: { context: "FLEET_AGENT", publicKey: { in: [] } } });
+  // Sweep enrollments this suite minted (covers any row not matched by the CAP
+  // scan above). NOTE: the previous `publicKey: { in: [] }` matched ZERO rows.
+  if (commitments.length > 0) {
+    await prisma.agentEnrollment.deleteMany({
+      where: { context: "FLEET_AGENT", subjectCommitment: { in: commitments } },
+    });
+  }
 }
 
-describe("fleet-service — mint / stop / rehydrate against a real Passport", () => {
+describe.skipIf(!RUN_DB_TESTS)("fleet-service — mint / stop / rehydrate against a real Passport", () => {
   it("mints a fleet agent with an ISSUED passport + active instance", async () => {
     const minted = await fleet.mintFleetAgent({ capability: CAP, llmTier: "neuron", displayName: "test-neuron" });
     commitments.push(minted.commitment);
 
     expect(minted.tier).toBe("neuron");
-    expect(minted.resolvedModel).toBe("deepseek/deepseek-chat-v3.1");
+    expect(minted.resolvedModel).toBe("deepseek/deepseek-v4.1-flash");
     expect(minted.rawApiKey).toMatch(/^pp_flt_/);
 
     const enrollment = await prisma.agentEnrollment.findUnique({

@@ -1,6 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState, useRef } from "react";
+import {
+  PersonaStatusPanel,
+  acceptRun,
+  type RunScope,
+  type PersonaRunState,
+} from "@/components/admin/persona-status";
+import type { PersonaDescriptor, DialogueTurnView } from "@/lib/brain/command-center-data";
 
 interface BrainData {
   current_run: {
@@ -30,6 +37,8 @@ interface BrainData {
     outcomes_24h_by_class: Record<string, number>;
     memory_rows_by_kind: Record<string, number>;
   };
+  personas?: PersonaDescriptor[];
+  last_dialogue?: { cycle_id: string | null; mission_id: string; at: string; turns: DialogueTurnView[] } | null;
   timestamp: string;
 }
 
@@ -125,7 +134,31 @@ export default function AdminBrainPage() {
   const [isLiveStream, setIsLiveStream] = useState<boolean>(false);
   const [countdownSeconds, setCountdownSeconds] = useState<number | null>(null);
 
+  // ── Persona status: run-scoped so a late event from an older run cannot
+  // overwrite the newer one. `triggeringAction` is the real in-flight signal.
+  const [scopedRun, setScopedRun] = useState<RunScope>({ runId: null, at: null, turns: [] });
+  const [runStartedAt, setRunStartedAt] = useState<number | null>(null);
+  const [runEndedAt, setRunEndedAt] = useState<number | null>(null);
+  // Live per-persona phases streamed from the dialogue (queued/working/...).
+  const [live, setLive] = useState<{ runId: string | null; phases: Record<string, PersonaRunState> }>({
+    runId: null,
+    phases: {},
+  });
+
   const eventSourceRef = useRef<EventSource | null>(null);
+
+  // Single writer for brain snapshots: adopts the latest dialogue run through
+  // the monotonic guard. Called from event handlers / async fetches, never
+  // synchronously inside an effect.
+  const applyData = useCallback((json: BrainData) => {
+    setData(json);
+    const d = json.last_dialogue;
+    if (d) {
+      setScopedRun((prev) =>
+        acceptRun(prev, { runId: d.cycle_id ?? d.at, at: d.at, turns: d.turns })
+      );
+    }
+  }, []);
 
   const loadData = useCallback(async () => {
     try {
@@ -133,11 +166,11 @@ export default function AdminBrainPage() {
       if (res.status === 403) throw new Error("Executive admin access required (ADMIN_OPERATOR_EMAILS).");
       if (!res.ok) throw new Error(`Unable to load brain state (${res.status})`);
       const json = await res.json();
-      setData(json);
+      applyData(json);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, []);
+  }, [applyData]);
 
   const loadHistory = useCallback(async () => {
     try {
@@ -166,7 +199,7 @@ export default function AdminBrainPage() {
         es.addEventListener("snapshot", (e) => {
           try {
             const parsed = JSON.parse(e.data);
-            setData(parsed);
+            applyData(parsed);
             setIsLiveStream(true);
             setError("");
           } catch {}
@@ -175,7 +208,7 @@ export default function AdminBrainPage() {
         es.addEventListener("update", (e) => {
           try {
             const parsed = JSON.parse(e.data);
-            setData(parsed);
+            applyData(parsed);
             loadHistory();
             setIsLiveStream(true);
           } catch {}
@@ -188,6 +221,28 @@ export default function AdminBrainPage() {
               setCountdownSeconds(parsed.secondsUntilNext);
             }
             setIsLiveStream(true);
+          } catch {}
+        });
+
+        // REAL per-persona lifecycle events from the dialogue process.
+        es.addEventListener("persona", (e) => {
+          try {
+            const ev = JSON.parse(e.data) as {
+              runId?: string;
+              persona?: string;
+              phase?: PersonaRunState;
+            };
+            if (!ev.runId || !ev.persona || !ev.phase) return;
+            const { runId: rid, persona, phase } = ev as {
+              runId: string;
+              persona: string;
+              phase: PersonaRunState;
+            };
+            setLive((prev) =>
+              prev.runId === rid
+                ? { runId: prev.runId, phases: { ...prev.phases, [persona]: phase } }
+                : { runId: rid, phases: { [persona]: phase } }
+            );
           } catch {}
         });
 
@@ -213,7 +268,7 @@ export default function AdminBrainPage() {
         eventSourceRef.current.close();
       }
     };
-  }, [loadData, loadHistory, isLiveStream]);
+  }, [loadData, loadHistory, isLiveStream, applyData]);
 
   // Client countdown interval
   useEffect(() => {
@@ -257,6 +312,9 @@ export default function AdminBrainPage() {
     setTriggeringAction(actionLabel);
     setActionSuccessMsg(null);
     setError("");
+    setRunStartedAt(Date.now());
+    setRunEndedAt(null);
+    setLive({ runId: null, phases: {} });
 
     try {
       const res = await fetch("/api/admin/brain/cycle", {
@@ -283,6 +341,7 @@ export default function AdminBrainPage() {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setTriggeringAction(null);
+      setRunEndedAt(Date.now());
     }
   }
 
@@ -421,6 +480,20 @@ export default function AdminBrainPage() {
           <p className="text-[11px] text-slate-500">Hard constraint preserved</p>
         </div>
       </div>
+
+      {/* ── Persona / Model / Status ── */}
+      {data.personas && data.personas.length > 0 && (
+        <PersonaStatusPanel
+          personas={data.personas}
+          turns={scopedRun.turns}
+          runId={scopedRun.runId}
+          active={triggeringAction !== null}
+          error={error || null}
+          startedAt={runStartedAt}
+          endedAt={runEndedAt}
+          states={live.runId ? live.phases : undefined}
+        />
+      )}
 
       {/* ── Executive On-Demand Diagnostic Action Strip ── */}
       <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 flex flex-wrap items-center justify-between gap-3">

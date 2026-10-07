@@ -12,8 +12,7 @@
  * journal, e.g. legacy grants; reported separately as "wallet-only").
  *
  * Usage:
- *   node scripts/reconcile-supply.cjs            # full report
- *   RECONCILE_LIMIT=200 node scripts/reconcile-supply.cjs
+ *   node scripts/reconcile-supply.cjs            # full report (scans ALL wallets)
  * Exit codes: 0 = no drift, 1 = drift found, 2 = hard error.
  * NOTE: always read-only. It never writes.
  */
@@ -22,12 +21,13 @@ const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
 async function main() {
-  const limit = Number(process.env.RECONCILE_LIMIT) || 500;
-
+  // NOTE: scan ALL wallets. The previous `take: limit` (default 500) truncated
+  // the wallet set, so any account beyond the cap was mis-reported as
+  // "journal-only (no wallet)" — a fabricated drift count on large DBs.
   const wallets = await prisma.agentWallet.findMany({
     select: { subjectCommitment: true, balance: true, staked: true, earnedTotal: true, spentTotal: true },
-    take: limit,
   });
+  const walletCommits = new Set(wallets.map((w) => w.subjectCommitment));
 
   const accounts = await prisma.angelCoinAccount.findMany({
     select: { subjectCommitment: true, journal: { select: { entryType: true, amount: true } } },
@@ -75,7 +75,7 @@ async function main() {
   }
 
   for (const a of accounts) {
-    if (!wallets.some((w) => w.subjectCommitment === a.subjectCommitment)) {
+    if (!walletCommits.has(a.subjectCommitment)) {
       const avail = computeBalances(a.journal).availableBalance;
       if (avail !== 0) { journalOnlyCount++; rows.push({ commit: a.subjectCommitment.slice(0, 16) + "…", wallet: "(no wallet)", journal: avail, drift: "journal-only" }); }
     }

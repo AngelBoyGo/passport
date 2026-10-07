@@ -17,6 +17,11 @@ const databaseUrl =
   process.env.DATABASE_URL ??
   "postgresql://passport:passport@localhost:5433/passport?schema=public";
 
+// SAFETY: this deletes + seeds real receipts. Refuse production unless opted in.
+if (process.env.ALLOW_SEED !== "1" && (process.env.NODE_ENV === "production" || /(167\.99\.|137\.184\.|134\.209\.|metis\.gold)/i.test(databaseUrl))) {
+  throw new Error("Refusing to seed a production database. Set ALLOW_SEED=1 to override.");
+}
+
 function receiptBase(
   operatorId: string,
   agentRecordId: string,

@@ -7,9 +7,10 @@ import {
   parseCommand,
   isCommanderChat,
   sendTelegramMessage,
-  commanderChatIds,
   telegramConfigured,
   verifyTelegramSecret,
+  claimTelegramUpdate,
+  allowTelegramCommand,
   COMMANDER_HELP,
 } from "@/lib/telegram/commander";
 
@@ -29,7 +30,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "telegram_not_configured" }, { status: 503, headers: NO_STORE });
   }
   const secret = request.headers.get("x-telegram-bot-api-secret-token");
-  if (!verifyTelegramSecret(secret, process.env.TELEGRAM_WEBHOOK_SECRET)) {
+  let secretOk = false;
+  try {
+    secretOk = verifyTelegramSecret(secret, process.env.TELEGRAM_WEBHOOK_SECRET);
+  } catch {
+    secretOk = false; // fail closed → 401, never a 500 from a bad header
+  }
+  if (!secretOk) {
     return NextResponse.json({ ok: false, error: "bad_secret" }, { status: 401, headers: NO_STORE });
   }
 
@@ -38,6 +45,12 @@ export async function POST(request: NextRequest) {
     update = (await request.json()) as TelegramUpdate;
   } catch {
     return NextResponse.json({ ok: true }, { headers: NO_STORE });
+  }
+
+  // Idempotency: Telegram redelivers an update if it does not get a timely 2xx.
+  // Drop the replay so /brain, /plan, /task, /watch cannot double-execute.
+  if (!claimTelegramUpdate(update.update_id)) {
+    return NextResponse.json({ ok: true, deduped: true }, { headers: NO_STORE });
   }
 
   const chatId = update.message?.chat?.id;
@@ -57,6 +70,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true }, { headers: NO_STORE });
   }
 
+  // Per-chat throttle: expensive commands run cycles / spend LLM budget.
+  if (!allowTelegramCommand(chatId)) {
+    await sendTelegramMessage(chatId, "⏳ Too many commands — wait a minute and try again.");
+    return NextResponse.json({ ok: true }, { headers: NO_STORE });
+  }
+
   const parsed = parseCommand(text);
   if (!parsed) {
     await sendTelegramMessage(chatId, "Send a command, e.g. `/status` or `/brain`. /help for the list.");
@@ -67,8 +86,10 @@ export async function POST(request: NextRequest) {
     const reply = await handleCommand(parsed.command, parsed.args, from);
     await sendTelegramMessage(chatId, reply);
   } catch (err) {
+    // Log the detail server-side; never leak internals (Prisma/LLM/DB) to chat.
     const message = err instanceof Error ? err.message : String(err);
-    await sendTelegramMessage(chatId, `⚠️ Command failed: ${message.slice(0, 300)}`);
+    console.error(`[telegram] command /${parsed.command} failed: ${message}`);
+    await sendTelegramMessage(chatId, "⚠️ Command failed. See server logs for details.");
   }
 
   return NextResponse.json({ ok: true }, { headers: NO_STORE });
@@ -206,7 +227,9 @@ async function handleCommand(command: string, args: string[], from: string): Pro
 
     case "mission": {
       const id = String(args[0] ?? "").trim();
-      if (!id) return "Usage: `/mission <mission_id>`";
+      // Ids are generated as lowercase alphanumerics/underscores; reject anything
+      // else (format + length) so a crafted id can't enumerate/hammer the DB.
+      if (!id || id.length > 64 || !/^[a-z0-9_]+$/i.test(id)) return "Usage: `/mission <mission_id>`";
       const { getMission, getCurrentPlan } = await import("@/lib/brain/mission-service");
       const m = await getMission(id);
       if (!m) return `Mission \`${id}\` not found.`;
@@ -251,6 +274,7 @@ async function handleCommand(command: string, args: string[], from: string): Pro
         thesis: m.thesis,
         datapoints: dps as unknown as Record<string, unknown>,
         openSteps: plan ? plan.steps.filter((s) => !s.done) : [],
+        runId: `tgplan_${Date.now()}`,
       });
       if (!result.ok) return `Dialogue did not commit a plan: ${result.reason}`;
       await commitPlan({
@@ -332,7 +356,9 @@ async function handleCommand(command: string, args: string[], from: string): Pro
       const { recentOperatorDirectives } = await import("@/lib/brain/ask");
       const rows = await recentOperatorDirectives(8);
       if (rows.length === 0) return "*Operator directives:* none yet. Use `/ask` or `/task`.";
-      const lines = rows.map((r) => `• [${r.action}] ${String(r.details ?? r.targetId ?? "").slice(0, 90)}`);
+      // targetId holds the operator's question/instruction; details holds the
+      // brain's answer. Show the DIRECTIVE (targetId), not the reply.
+      const lines = rows.map((r) => `• [${r.action}] ${String(r.targetId ?? r.details ?? "").slice(0, 90)}`);
       return ["*Recent operator directives*", ...lines].join("\n");
     }
 
@@ -348,7 +374,6 @@ export async function GET() {
       ok: true,
       service: "passport-telegram-commander",
       configured: telegramConfigured(),
-      allowlistedChats: commanderChatIds().length,
     },
     { headers: NO_STORE }
   );

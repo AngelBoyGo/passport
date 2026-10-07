@@ -3,6 +3,7 @@ import { sessionFromRequest } from "@/lib/auth/cookies";
 import { isExecutiveAdmin } from "@/lib/admin/admin-auth";
 import { prisma } from "@/lib/db";
 import { buildCommandCenterData } from "@/lib/brain/command-center-data";
+import { subscribePersonaPhases } from "@/lib/brain/persona-events";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +52,13 @@ export async function GET(request: NextRequest) {
     }
   })();
 
+  // Forward REAL per-persona lifecycle events (queued/working/completed/failed)
+  // as the dialogue runs. Emitted from the scheduler/dialogue process into the
+  // shared globalThis bus; this stream relays them to the browser immediately.
+  const unsubscribePersona = subscribePersonaPhases((event) => {
+    void sendEvent("persona", event);
+  });
+
   const intervalId = setInterval(async () => {
     if (isClosed) {
       clearInterval(intervalId);
@@ -89,6 +97,7 @@ export async function GET(request: NextRequest) {
   request.signal.addEventListener("abort", () => {
     isClosed = true;
     clearInterval(intervalId);
+    unsubscribePersona();
     writer.close().catch(() => {});
   });
 

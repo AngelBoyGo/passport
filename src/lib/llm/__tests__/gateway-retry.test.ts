@@ -89,12 +89,13 @@ describe("completeTierResilient — retry + same-tier fallback", () => {
   });
 
   it("throws (fail-closed) when every model and attempt fails", async () => {
-    const { fn, calls } = fakeFetch([http500(), http500(), http500(), http500()]);
+    const maxCalls = TIER_MODEL_ALLOWLIST.neuron.length * 2;
+    const { fn, calls } = fakeFetch(Array.from({ length: maxCalls + 2 }, () => http500()));
     await expect(
       completeTierResilient("neuron", opts, { config: CFG, fetchImpl: fn, attemptsPerModel: 2, retryDelayMs: 0 })
     ).rejects.toThrow(/LLM gateway/i);
-    // bounded: 2 models × 2 attempts = 4 calls max
-    expect(calls.length).toBeLessThanOrEqual(4);
+    // bounded: every model on the tier × attempts, and never more
+    expect(calls.length).toBeLessThanOrEqual(maxCalls);
   });
 
   it("does NOT fall back across tiers (never uses the money model)", async () => {

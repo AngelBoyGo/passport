@@ -33,6 +33,7 @@ import {
   type PersonaId,
 } from "@/lib/brain/personas";
 import type { MissionStep } from "@/lib/brain/mission-service";
+import { emitPersonaPhase } from "@/lib/brain/persona-events";
 
 export interface DialogueTurn {
   persona: PersonaId;
@@ -40,6 +41,8 @@ export interface DialogueTurn {
   content: string;
   /** Self-rated confidence 0-100 (null = the mind did not provide one). */
   confidence: number | null;
+  /** Wall-clock duration of this turn's model call, in ms (per-persona timing). */
+  ms?: number;
 }
 
 /** MORE (local gemma-4) only joins when its endpoint is configured. */
@@ -56,6 +59,8 @@ export interface MissionContext {
   recentMemory?: Array<{ kind: string; summary: string }>;
   /** Existing committed steps not yet done — revise around them. */
   openSteps?: MissionStep[];
+  /** Cycle/run id; when set, real per-persona lifecycle events are emitted. */
+  runId?: string;
 }
 
 export interface DialogueResult {
@@ -81,22 +86,46 @@ const llmDeps = {
 /** Calls one persona on its own model + tier. Fail-closed: any throw ends the dialogue. */
 async function askPersona(
   personaId: PersonaId,
-  opts: { user: string; json?: boolean }
-): Promise<string> {
+  opts: { user: string; json?: boolean },
+  runId?: string
+): Promise<{ text: string; ms: number }> {
   const persona = PERSONAS[personaId];
   const model = resolveAllowlistedModel(persona.tier, personaModel(persona));
-  return llmDeps.complete({
-    system: persona.systemPrompt,
-    user: opts.user,
-    tier: persona.tier,
-    model,
-    temperature: persona.temperature,
-    // Gemma 4 heretic emits a long private reasoning trace before `content`.
-    // Ollama's OpenAI-compatible endpoint honors reasoning_effort=none; without
-    // it, MORE spends minutes reasoning and can hit the completion timeout.
-    ...(persona.tier === "local" ? { reasoningEffort: "none" as const, maxTokens: 256 } : {}),
-    json: opts.json ?? true,
-  });
+  const startedAt = Date.now();
+  if (runId) {
+    emitPersonaPhase({ runId, persona: personaId, phase: "working", at: new Date().toISOString() });
+  }
+  try {
+    const text = await llmDeps.complete({
+      system: persona.systemPrompt,
+      user: opts.user,
+      tier: persona.tier,
+      model,
+      temperature: persona.temperature,
+      // Gemma 4 heretic emits a long private reasoning trace before `content`.
+      // Ollama's OpenAI-compatible endpoint honors reasoning_effort=none; without
+      // it, MORE spends minutes reasoning and can hit the completion timeout.
+      ...(persona.tier === "local" ? { reasoningEffort: "none" as const, maxTokens: 256 } : {}),
+      json: opts.json ?? true,
+    });
+    const ms = Date.now() - startedAt;
+    if (runId) {
+      emitPersonaPhase({ runId, persona: personaId, phase: "completed", at: new Date().toISOString(), ms });
+    }
+    return { text, ms };
+  } catch (err) {
+    if (runId) {
+      emitPersonaPhase({
+        runId,
+        persona: personaId,
+        phase: "failed",
+        at: new Date().toISOString(),
+        ms: Date.now() - startedAt,
+        detail: String(err instanceof Error ? err.message : err).slice(0, 160),
+      });
+    }
+    throw err;
+  }
 }
 
 /** Parses a persona's JSON into candidate steps, dropping anything malformed. */
@@ -241,6 +270,16 @@ export async function runMissionDialogue(ctx: MissionContext): Promise<DialogueR
   const turns: DialogueTurn[] = [];
   const datapoints = ctx.datapoints ?? {};
   const memory = ctx.recentMemory ?? [];
+  const runId = ctx.runId;
+
+  // Announce the participants as Queued before the first call — a REAL signal
+  // (the dialogue has begun), not a fabricated phase.
+  if (runId) {
+    const participants: PersonaId[] = ["muse", "mars"];
+    if (isMoreEnabled()) participants.push("more");
+    const at = new Date().toISOString();
+    for (const p of participants) emitPersonaPhase({ runId, persona: p, phase: "queued", at });
+  }
 
   const sharedContext = JSON.stringify({
     mission: { id: ctx.missionId ?? null, title: ctx.title, objective: ctx.objective, thesis: ctx.thesis ?? null },
@@ -253,7 +292,7 @@ export async function runMissionDialogue(ctx: MissionContext): Promise<DialogueR
   let draft: MissionStep[];
   let draftConfidence = 0;
   try {
-    const draftRaw = await askPersona(DRAFTER, {
+    const { text: draftRaw, ms: draftMs } = await askPersona(DRAFTER, {
       user:
         "Draft up to 2 candidate NEXT STEPS to advance this mission. Each step must name one " +
         "allowlisted action and its params. Be concrete and novel.\n" +
@@ -261,11 +300,11 @@ export async function runMissionDialogue(ctx: MissionContext): Promise<DialogueR
         "\n" +
         `Return STRICT JSON: {"steps":[{"action":"<ALLOWLIST>","params":{},"rationale":"..."}],"confidence":<0-100>}.\n\n` +
         sharedContext,
-    });
+    }, runId);
     const parsedRaw = parseJsonObject(draftRaw);
     draftConfidence = extractConfidence(parsedRaw);
     draft = parseCandidateSteps(parsedRaw, draftConfidence);
-    turns.push({ persona: DRAFTER, role: "draft", content: JSON.stringify(draft), confidence: draftConfidence });
+    turns.push({ persona: DRAFTER, role: "draft", content: JSON.stringify(draft), confidence: draftConfidence, ms: draftMs });
   } catch (err) {
     return { ok: false, reason: `draft_failed:${msg(err)}`, steps: [], committedStep: null, turns, summary: "draft failed", draftedBy: DRAFTER };
   }
@@ -287,11 +326,12 @@ export async function runMissionDialogue(ctx: MissionContext): Promise<DialogueR
   // ── 2. CRITIQUE (MARS) — sees MUSE's confidence ────────────────────────────
   let critiqueText = "";
   let critiqueConfidence: number | null = null;
+  let critiqueMs: number | undefined;
   try {
     // Free-form critique (no JSON mode): ranking is prose, and some providers
     // return empty completions under strict JSON mode at high temperature. MARS
     // appends a CONFIDENCE: NN marker, which we parse out for cross-visibility.
-    critiqueText = await askPersona(CRITIC, {
+    const critiqueCall = await askPersona(CRITIC, {
       json: false,
       user:
         "Adversarially critique these candidate steps for this mission. Attack cost, risk, " +
@@ -300,24 +340,25 @@ export async function runMissionDialogue(ctx: MissionContext): Promise<DialogueR
         `mission=${JSON.stringify({ title: ctx.title, objective: ctx.objective })}\n` +
         `muse_confidence=${draftConfidence}\n` +
         `candidates=${JSON.stringify(draft)}`,
-    });
+    }, runId);
+    critiqueMs = critiqueCall.ms;
     // Accept either a trailing marker OR a JSON body (MARS's system prompt
     // demands strict JSON), so its confidence is visible to the other minds.
-    const { text, confidence } = parseCritique(critiqueText);
+    const { text, confidence } = parseCritique(critiqueCall.text);
     critiqueText = text;
     critiqueConfidence = confidence;
-    turns.push({ persona: CRITIC, role: "critique", content: critiqueText, confidence: critiqueConfidence });
+    turns.push({ persona: CRITIC, role: "critique", content: critiqueText, confidence: critiqueConfidence, ms: critiqueMs });
   } catch (err) {
     // A failed critique does not abort the dialogue — the arbiter still vets the
     // draft. Record the failure so it is visible.
     critiqueText = `critique_unavailable:${msg(err)}`;
-    turns.push({ persona: CRITIC, role: "critique", content: critiqueText, confidence: null });
+    turns.push({ persona: CRITIC, role: "critique", content: critiqueText, confidence: null, ms: critiqueMs });
   }
 
   // ── 3. REVISE (MUSE) — sees its own draft confidence + MARS's ──────────────
   let revised = draft;
   try {
-    const reviseRaw = await askPersona(DRAFTER, {
+    const { text: reviseRaw, ms: reviseMs } = await askPersona(DRAFTER, {
       user:
         "Revise your candidate steps in light of the critique. Drop weak steps, keep the " +
         "strongest, and return the FINAL ordered plan. Use ONLY the exact params allowed:\n" +
@@ -327,7 +368,7 @@ export async function runMissionDialogue(ctx: MissionContext): Promise<DialogueR
         `mission=${JSON.stringify({ title: ctx.title, objective: ctx.objective })}\n` +
         `your_draft_confidence=${draftConfidence}\nmars_confidence=${critiqueConfidence ?? "unrated"}\n` +
         `draft=${JSON.stringify(draft)}\ncritique=${critiqueText}`,
-    });
+    }, runId);
     const parsedRaw = parseJsonObject(reviseRaw);
     const reviseConfidence = extractConfidence(parsedRaw);
     const parsed = parseCandidateSteps(parsedRaw, reviseConfidence);
@@ -339,6 +380,7 @@ export async function runMissionDialogue(ctx: MissionContext): Promise<DialogueR
       role: "revise",
       content: revised === parsed ? JSON.stringify(revised) : `kept_draft_confidence_${reviseConfidence}`,
       confidence: reviseConfidence,
+      ms: reviseMs,
     });
   } catch (err) {
     turns.push({ persona: DRAFTER, role: "revise", content: `revise_unavailable:${msg(err)}`, confidence: null });
@@ -351,7 +393,7 @@ export async function runMissionDialogue(ctx: MissionContext): Promise<DialogueR
   // with the revised plan.
   if (isMoreEnabled()) {
     try {
-      const synthRaw = await askPersona("more", {
+      const { text: synthRaw, ms: synthMs } = await askPersona("more", {
         user:
           "MARS critiqued and MUSE revised. As the synthesizer, either keep the revised plan, " +
           "replace it with a stronger COMBINED plan, or expose a blind spot. Use ONLY the exact " +
@@ -363,19 +405,20 @@ export async function runMissionDialogue(ctx: MissionContext): Promise<DialogueR
           `mission=${JSON.stringify({ title: ctx.title, objective: ctx.objective })}\n` +
           `muse_confidence=${draftConfidence}\nmars_confidence=${critiqueConfidence ?? "unrated"}\n` +
           `revised_plan=${JSON.stringify(revised)}\nmars_critique=${critiqueText}`,
-      });
+      }, runId);
       const parsedRaw = parseJsonObject(synthRaw);
       const synthConfidence = extractConfidence(parsedRaw);
       const synthSteps = parseCandidateSteps(parsedRaw, synthConfidence);
       if (synthSteps.length > 0 && synthConfidence >= CONFIDENCE_FLOOR) {
         revised = synthSteps;
-        turns.push({ persona: "more", role: "synthesize", content: JSON.stringify(synthSteps), confidence: synthConfidence });
+        turns.push({ persona: "more", role: "synthesize", content: JSON.stringify(synthSteps), confidence: synthConfidence, ms: synthMs });
       } else {
         turns.push({
           persona: "more",
           role: "synthesize",
           content: `kept_revised_plan (confidence ${synthConfidence}):${String(parsedRaw.synthesis ?? "").slice(0, 200)}`,
           confidence: synthConfidence,
+          ms: synthMs,
         });
       }
     } catch (err) {

@@ -12,7 +12,12 @@
  */
 
 import { prisma } from "@/lib/db";
-import { completeTierResilient, completeTierResilientParsed, type ChatMessage } from "@/lib/llm/gateway-client";
+import {
+  completeTierResilient,
+  completeTierResilientParsed,
+  type ChatMessage,
+  type ReasoningEffort,
+} from "@/lib/llm/gateway-client";
 import { resolveAllowlistedModel } from "@/lib/llm/tiers";
 import type { LlmTier } from "@/lib/llm/tiers";
 
@@ -53,6 +58,8 @@ export async function brainComplete(opts: {
   model?: string;
   /** Multi-turn conversation; replaces [system,user] when present. */
   messages?: ChatMessage[];
+  reasoningEffort?: ReasoningEffort;
+  maxTokens?: number;
 }): Promise<string> {
   const tier = opts.tier ?? "neuron";
   if (tier === "money") {
@@ -90,6 +97,8 @@ export async function brainCompleteJson<T>(
     tier?: LlmTier;
     model?: string;
     messages?: ChatMessage[];
+    reasoningEffort?: ReasoningEffort;
+    maxTokens?: number;
   },
   parse: (raw: string) => T
 ): Promise<T> {

@@ -4,6 +4,9 @@ import {
   isCommanderChat,
   commanderChatIds,
   telegramConfigured,
+  verifyTelegramSecret,
+  claimTelegramUpdate,
+  allowTelegramCommand,
 } from "../commander";
 
 const ENV = { ...process.env };
@@ -70,5 +73,42 @@ describe("telegramConfigured", () => {
     expect(telegramConfigured()).toBe(false);
     process.env.TELEGRAM_WEBHOOK_SECRET = "sec";
     expect(telegramConfigured()).toBe(true);
+  });
+});
+
+describe("verifyTelegramSecret", () => {
+  it("accepts the exact secret and fails closed on mismatch/empty", () => {
+    expect(verifyTelegramSecret("abc", "abc")).toBe(true);
+    expect(verifyTelegramSecret("abc", "abd")).toBe(false);
+    expect(verifyTelegramSecret("", "abc")).toBe(false);
+    expect(verifyTelegramSecret("abc", undefined)).toBe(false);
+    expect(verifyTelegramSecret(null, "abc")).toBe(false);
+  });
+
+  it("does NOT throw on a multibyte input of equal code-unit length", () => {
+    // "é" has .length 1 but 2 UTF-8 bytes; the old code threw RangeError here.
+    expect(() => verifyTelegramSecret("é", "a")).not.toThrow();
+    expect(verifyTelegramSecret("é", "a")).toBe(false);
+  });
+});
+
+describe("claimTelegramUpdate (webhook idempotency)", () => {
+  it("accepts the first sighting and rejects a replay", () => {
+    expect(claimTelegramUpdate(9001)).toBe(true);
+    expect(claimTelegramUpdate(9001)).toBe(false);
+  });
+
+  it("accepts distinct ids and treats a missing id as processable", () => {
+    expect(claimTelegramUpdate(9002)).toBe(true);
+    expect(claimTelegramUpdate(9003)).toBe(true);
+    expect(claimTelegramUpdate(undefined)).toBe(true);
+  });
+});
+
+describe("allowTelegramCommand (per-chat throttle)", () => {
+  it("allows up to the limit then throttles, independently per chat", () => {
+    for (let i = 0; i < 20; i++) expect(allowTelegramCommand(770)).toBe(true);
+    expect(allowTelegramCommand(770)).toBe(false);
+    expect(allowTelegramCommand(771)).toBe(true);
   });
 });

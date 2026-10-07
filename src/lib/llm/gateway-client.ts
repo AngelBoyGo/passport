@@ -115,12 +115,19 @@ export async function completeTier(
   requireLlmTier(tier);
   const cfg = config ?? getTierGatewayConfig(tier);
 
-  let model = resolveTierModel(tier);
+  // Resolve the model WITHOUT throwing on a bad tier-env override when the
+  // caller supplied an explicit allowlisted model. Previously resolveTierModel
+  // ran unconditionally, so a stale LLM_MODEL_<TIER> (e.g. a legacy id from the
+  // env template) threw before the valid explicit model was applied — killing
+  // every persona call. Now the env default is only consulted when needed.
+  let model: string;
   if (opts.model) {
     if (!tierAllowlist(tier).includes(opts.model)) {
       throw new Error(`tier_model_not_allowed:${tier}:${opts.model}`);
     }
     model = opts.model;
+  } else {
+    model = resolveTierModel(tier);
   }
 
   // Tier-aware timeout: local self-hosted generation (a 31B model) is much
@@ -205,8 +212,9 @@ export async function completeTierResilient(
   const retryDelayMs = Math.max(0, resilient.retryDelayMs ?? 250);
 
   const allowed = tierAllowlist(tier);
-  // Primary = caller's explicit allowlisted model, else the tier default.
-  const primary = opts.model ?? DEFAULT_TIER_MODEL[tier];
+  // Primary = caller's explicit allowlisted model, else the env-resolved tier
+  // model (honouring LLM_MODEL_<TIER>; fail-closed on a disallowed override).
+  const primary = opts.model ?? resolveTierModel(tier);
   if (!allowed.includes(primary)) {
     throw new Error(`tier_model_not_allowed:${tier}:${primary}`);
   }
@@ -283,7 +291,7 @@ export async function completeTierResilientParsed<T>(
   const retryDelayMs = Math.max(0, resilient.retryDelayMs ?? 250);
 
   const allowed = tierAllowlist(tier);
-  const primary = opts.model ?? DEFAULT_TIER_MODEL[tier];
+  const primary = opts.model ?? resolveTierModel(tier);
   if (!allowed.includes(primary)) {
     throw new Error(`tier_model_not_allowed:${tier}:${primary}`);
   }

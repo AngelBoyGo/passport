@@ -30,6 +30,12 @@ mcp/node_modules/@passport/sdk
 .DS_Store
 *.pem
 
+# local database artifacts (never commit; Postgres is the source of truth)
+prisma/*.db
+prisma/*.db-journal
+*.sqlite
+*.sqlite3
+
 # debug
 npm-debug.log*
 yarn-debug.log*
