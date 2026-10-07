@@ -23,9 +23,18 @@
 let warnedMissingRole = false;
 
 export function schedulersAllowed(): { allowed: boolean; reason?: string } {
+  // Environment identity is AUTHORITATIVE and checked first: a deployment whose
+  // role is not "primary" must never schedule — even if it copied
+  // SCHEDULERS_ENABLED=true from the primary env (the exact staging-clone
+  // scenario that produces duplicate cycles and Telegram digests).
+  const role = String(process.env.SCHEDULER_ROLE || "").trim().toLowerCase();
+  if (role && role !== "primary") {
+    return { allowed: false, reason: `SCHEDULER_ROLE=${role} (only "primary" runs schedulers)` };
+  }
+
   const explicit = String(process.env.SCHEDULERS_ENABLED || "").toLowerCase();
-  // An explicit opt-in always wins (lets a test exercise the scheduling logic
-  // without actually running jobs — the jobs are mocked at their boundaries).
+  // An explicit opt-in lets a test exercise the scheduling logic without actually
+  // running jobs (the jobs are mocked at their boundaries).
   if (explicit === "true") {
     return { allowed: true };
   }
@@ -34,13 +43,6 @@ export function schedulersAllowed(): { allowed: boolean; reason?: string } {
   }
   if (explicit === "false") {
     return { allowed: false, reason: "SCHEDULERS_ENABLED=false" };
-  }
-  // Environment identity: a secondary/staging deployment must never run the
-  // schedulers, even in NODE_ENV=production (it may share the Telegram bot or
-  // the database). Only `SCHEDULER_ROLE=primary` may run them.
-  const role = String(process.env.SCHEDULER_ROLE || "").trim().toLowerCase();
-  if (role && role !== "primary") {
-    return { allowed: false, reason: `SCHEDULER_ROLE=${role} (only "primary" runs schedulers)` };
   }
   if (process.env.NODE_ENV === "development") {
     return { allowed: false, reason: "development (set SCHEDULERS_ENABLED=true to opt in)" };

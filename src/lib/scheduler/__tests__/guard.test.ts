@@ -55,10 +55,10 @@ describe("scheduler guard", () => {
     expect(schedulersAllowed().allowed).toBe(true);
   });
 
-  it("explicit SCHEDULERS_ENABLED=true overrides a non-primary role", () => {
+  it("a non-primary role is authoritative — even SCHEDULERS_ENABLED=true cannot override it", () => {
     vi.stubEnv("VITEST", "true");
     vi.stubEnv("SCHEDULER_ROLE", "secondary");
     vi.stubEnv("SCHEDULERS_ENABLED", "true");
-    expect(schedulersAllowed().allowed).toBe(true);
+    expect(schedulersAllowed().allowed).toBe(false);
   });
 });
