@@ -533,7 +533,7 @@ async function runDialogueReflection(datapoints: BrainDatapoints, cycleId: strin
   // flywheel" missions/day), producing churn instead of progress.
   if (missions.length === 0) {
     const cooldownMin = Number(process.env.BRAIN_MISSION_GENESIS_COOLDOWN_MINUTES);
-    const cooldownMs = (Number.isFinite(cooldownMin) && cooldownMin >= 0 ? cooldownMin : 720) * 60_000;
+    const cooldownMs = (Number.isFinite(cooldownMin) && cooldownMin >= 0 ? cooldownMin : 60) * 60_000;
     const lastMission = await prisma.mission
       .findFirst({ orderBy: { createdAt: "desc" }, select: { createdAt: true } })
       .catch(() => null);
