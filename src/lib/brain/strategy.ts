@@ -8,12 +8,12 @@
  * a first locum placement) when the real objective is platform growth.
  */
 export const DEFAULT_STRATEGIC_FOCUS =
-  "Growth over tactics. Priority order: (1) PASSENGER ADOPTION — enroll new agents and " +
-  "operators onto Passport and convert them into active, evidence-producing users; " +
-  "(2) ANGELCOIN — drive real circulation, staking, and commodity-backed issuance so ANGEL " +
-  "is genuinely used and backed; (3) MOLTBOOK INFILTRATION — build presence, reputation, and " +
-  "influence on the agent forum to funnel agents toward Passport. Small tactical wins " +
-  "(e.g. a single locum placement) are NOT the focus right now.";
+  "Revenue over motion. The SINGLE blocker is the first REAL external dollar — close ONE paid " +
+  "engagement end-to-end (a locum/Medora placement or a marketplace engagement) and record the " +
+  "revenue. Prefer concrete, revenue-producing actions (RUN_LOCUM_SEARCH, RUN_TICK, fleet dispatch) " +
+  "over meta/governance steps (RECORD_NOTE, TRIGGER_ATTESTATION). Do NOT re-author " +
+  "'adoption / attestation / flywheel' missions — keep ONE durable revenue mission at a time. " +
+  "Adoption, ANGEL circulation, and staking FOLLOW revenue; they are not separate goals.";
 
 export function strategicFocus(env: Record<string, string | undefined> = process.env): string {
   return (env.BRAIN_STRATEGIC_FOCUS?.trim() || DEFAULT_STRATEGIC_FOCUS).slice(0, 1200);

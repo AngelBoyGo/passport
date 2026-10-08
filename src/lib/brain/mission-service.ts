@@ -55,6 +55,31 @@ function newId(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+const TITLE_STOPWORDS = new Set([
+  "the", "and", "for", "with", "from", "into", "onto", "that", "this", "its",
+  "our", "your", "one", "new", "via", "over", "per", "are", "not",
+]);
+
+function titleTokens(title: string): Set<string> {
+  return new Set(
+    title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 2 && !TITLE_STOPWORDS.has(w))
+  );
+}
+
+/** Jaccard similarity of two mission titles (0..1). Exported for tests. */
+export function titleSimilarity(a: string, b: string): number {
+  const A = titleTokens(a);
+  const B = titleTokens(b);
+  if (A.size === 0 || B.size === 0) return 0;
+  let inter = 0;
+  for (const w of A) if (B.has(w)) inter++;
+  return inter / (A.size + B.size - inter);
+}
+
 /** Active missions, highest priority first. */
 export async function listActiveMissions(limit = 20): Promise<MissionRecord[]> {
   const rows = await prisma.mission.findMany({
@@ -121,6 +146,24 @@ export async function createMission(input: {
     select: { missionId: true },
   });
   if (dupe) return { ok: false, reason: `duplicate_mission:${dupe.missionId}` };
+
+  // Similarity dedupe (brain-authored only): reject a NEAR-duplicate of any
+  // mission authored in the last 14 days, not just an ACTIVE exact-title match.
+  // Exact-match alone let near-identical "adoption flywheel" missions through
+  // several times a day, each auto-completing in minutes — pure churn.
+  if (input.createdBy !== "operator") {
+    const recent = await prisma.mission.findMany({
+      where: { createdAt: { gte: new Date(Date.now() - 14 * 86_400_000) } },
+      select: { missionId: true, title: true },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
+    for (const m of recent) {
+      if (titleSimilarity(title, m.title) >= 0.5) {
+        return { ok: false, reason: `similar_mission_exists:${m.missionId}` };
+      }
+    }
+  }
 
   const row = await prisma.mission.create({
     data: {
