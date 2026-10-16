@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Forbidden: executive admin required" }, { status: 403, headers: NO_STORE });
   }
 
-  let body: { forceAction?: string } = {};
+  let body: { forceAction?: string; forceParams?: Record<string, unknown> } = {};
   try {
     body = await request.json();
   } catch {
@@ -32,12 +32,14 @@ export async function POST(request: NextRequest) {
     let report;
     if (body.forceAction && BRAIN_ACTIONS.includes(body.forceAction as BrainAction)) {
       const action = body.forceAction as BrainAction;
+      const forcedParams =
+        body.forceParams && typeof body.forceParams === "object" ? body.forceParams : {};
       // Run cycle with model instruction targeted to the forced action
       report = await runBrainCycle(new Date(), {
         complete: async () =>
           JSON.stringify({
             action,
-            params: {},
+            params: forcedParams,
             rationale: `Executive manual trigger: ${action} initiated by operator ${session.operator.email ?? session.operator.id}`,
             confidence: 1.0,
           }),

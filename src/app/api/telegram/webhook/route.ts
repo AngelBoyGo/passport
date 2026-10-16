@@ -78,7 +78,20 @@ export async function POST(request: NextRequest) {
 
   const parsed = parseCommand(text);
   if (!parsed) {
-    await sendTelegramMessage(chatId, "Send a command, e.g. `/status` or `/brain`. /help for the list.");
+    // Plain text (no leading command) → talk to the brain directly.
+    const question = String(text ?? "").trim();
+    if (!question) {
+      await sendTelegramMessage(chatId, "Send a message to talk to the brain, or /help for commands.");
+      return NextResponse.json({ ok: true }, { headers: NO_STORE });
+    }
+    try {
+      const { askBrain } = await import("@/lib/brain/ask");
+      const r = await askBrain(question);
+      await sendTelegramMessage(chatId, r.ok ? `🧠 ${r.answer}` : `⚠️ Brain could not answer: ${r.reason}`);
+    } catch (err) {
+      console.error(`[telegram] chat failed: ${err instanceof Error ? err.message : String(err)}`);
+      await sendTelegramMessage(chatId, "⚠️ The brain could not answer right now — try again shortly.");
+    }
     return NextResponse.json({ ok: true }, { headers: NO_STORE });
   }
 

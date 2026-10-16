@@ -55,9 +55,82 @@ export function computeReceiptsMerkleRoot(hashes: string[]): string {
   return current[0];
 }
 
+interface AnchorRow {
+  checkpoint_id: string;
+  timestamp: Date | string;
+  receipt_count: number;
+  merkle_root: string;
+  previous_checkpoint_hash: string | null;
+  content_hash: string;
+  signature: string;
+  public_key: string;
+  algorithm: "ed25519";
+}
+
+/**
+ * The persisted append-only checkpoint chain head, or null when none exists
+ * (table missing / no anchors yet). Persistence is best-effort: the signed root
+ * is still returned if the store is unavailable.
+ */
+export async function getLatestPersistedCheckpoint(): Promise<SignedCheckpoint | null> {
+  try {
+    const rows = await prisma.$queryRaw<AnchorRow[]>`
+      SELECT "checkpointId" AS checkpoint_id,
+             "timestamp" AS timestamp,
+             "receiptCount" AS receipt_count,
+             "merkleRoot" AS merkle_root,
+             "previousCheckpointHash" AS previous_checkpoint_hash,
+             "contentHash" AS content_hash,
+             "signature" AS signature,
+             "publicKey" AS public_key,
+             "algorithm" AS algorithm
+      FROM "CheckpointAnchor"
+      ORDER BY "createdAt" DESC
+      LIMIT 1
+    `;
+    const r = rows[0];
+    if (!r) return null;
+    return {
+      checkpoint_id: r.checkpoint_id,
+      timestamp: r.timestamp instanceof Date ? r.timestamp.toISOString() : String(r.timestamp),
+      receipt_count: Number(r.receipt_count),
+      merkle_root: r.merkle_root,
+      previous_checkpoint_hash: r.previous_checkpoint_hash,
+      content_hash: r.content_hash,
+      signature: r.signature,
+      algorithm: r.algorithm,
+      public_key: r.public_key,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Persists a signed checkpoint to the append-only chain. Best-effort. */
+async function persistCheckpoint(cp: SignedCheckpoint): Promise<void> {
+  try {
+    await prisma.$executeRaw`
+      INSERT INTO "CheckpointAnchor"
+        ("id","checkpointId","timestamp","receiptCount","merkleRoot","previousCheckpointHash","contentHash","signature","publicKey","algorithm","createdAt")
+      VALUES
+        (${"ca_" + crypto.randomUUID().replace(/-/g, "")}, ${cp.checkpoint_id}, ${new Date(cp.timestamp)},
+         ${cp.receipt_count}, ${cp.merkle_root}, ${cp.previous_checkpoint_hash}, ${cp.content_hash},
+         ${cp.signature}, ${cp.public_key}, ${cp.algorithm}, now())
+    `;
+  } catch (err) {
+    console.warn("[checkpoint] persist failed (non-fatal):", err instanceof Error ? err.message : String(err));
+  }
+}
+
 /**
  * Creates an Ed25519-signed Merkle checkpoint over finalized receipts.
  * External anchor point for air-gapped / sovereign compliance verification.
+ *
+ * Persisted + chained: the checkpoint is written to the append-only
+ * `CheckpointAnchor` store and linked to the prior head via
+ * `previous_checkpoint_hash`. If the receipt set is UNCHANGED since the last
+ * anchor (same count + merkle root), the existing head is returned instead of
+ * creating a duplicate row — so the chain only grows when history grows.
  */
 export async function createReceiptCheckpoint(options?: {
   since?: Date;
@@ -77,16 +150,24 @@ export async function createReceiptCheckpoint(options?: {
 
   const receiptHashes = receipts.map((r) => r.contentHash);
   const merkleRoot = computeReceiptsMerkleRoot(receiptHashes);
+
+  // Idempotent per receipt-set: return the persisted head if nothing changed.
+  const latest = await getLatestPersistedCheckpoint();
+  if (
+    latest &&
+    latest.merkle_root === merkleRoot &&
+    latest.receipt_count === receipts.length
+  ) {
+    return latest;
+  }
+
   const checkpointId = `ckpt_${crypto.randomUUID().replace(/-/g, "")}`;
   const timestamp = new Date().toISOString();
   const publicKey = getPublicKeyHex();
 
-  // H3: chain on EXPLICITLY supplied previous checkpoint hash only. We do NOT
-  // auto-chain from in-process memory: a module-level cache would fabricate
-  // unrelated links across endpoints/instances and break the reproducibility
-  // an auditor relies on. Callers that want a real append-only chain must pass
-  // the previous checkpoint hash (e.g. from a persisted checkpoint store).
-  const previousHash = options?.previousCheckpointHash ?? null;
+  // Chain on the persisted previous head (or an explicit override). Never
+  // fabricate a link from in-process memory.
+  const previousHash = options?.previousCheckpointHash ?? latest?.content_hash ?? null;
 
   const unsigned = {
     checkpoint_id: checkpointId,
@@ -107,6 +188,8 @@ export async function createReceiptCheckpoint(options?: {
     algorithm: "ed25519",
     public_key: publicKey,
   };
+
+  await persistCheckpoint(checkpoint);
   return checkpoint;
 }
 

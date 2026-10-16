@@ -1846,3 +1846,21 @@ model ProvisioningThrottle {
 }
 
 
+
+/// CheckpointAnchor — append-only chain of signed Merkle checkpoints over finalized receipts.
+model CheckpointAnchor {
+  id                     String   @id
+  checkpointId           String   @unique
+  timestamp              DateTime
+  receiptCount           Int
+  merkleRoot             String
+  previousCheckpointHash String?
+  contentHash            String
+  signature              String
+  publicKey              String
+  algorithm              String   @default("ed25519")
+  createdAt              DateTime @default(now())
+
+  @@index([createdAt])
+}
+
